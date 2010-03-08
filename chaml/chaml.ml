@@ -21,75 +21,89 @@ open Arg
 open Misc
 open Format
 open Location
+open Config
 
-(* Compile a .ml file *)
+exception Error
 
-let print_if ppf flag printer arg =
-  if !flag then fprintf ppf "%a@." printer arg;
-  arg
+(* Optionally preprocess a source file *)
 
-let (++) x f = f x
+let preprocess sourcefile =
+  match !Clflags.preprocessor with
+    None -> sourcefile
+  | Some pp ->
+      let tmpfile = Filename.temp_file "camlpp" "" in
+      let comm = Printf.sprintf "%s %s > %s"
+                                pp (Filename.quote sourcefile) tmpfile
+      in
+      if Ccomp.command comm <> 0 then begin
+        Misc.remove_file tmpfile;
+        raise Error;
+      end;
+      tmpfile
 
-let implementation ppf sourcefile outputprefix =
-  Location.input_name := sourcefile;
-  init_path ();
-  let modulename =
-    String.capitalize(Filename.basename(chop_extension_if_any sourcefile)) in
-  check_unit_name ppf sourcefile modulename;
-  Env.set_unit_name modulename;
-  let inputfile = Pparse.preprocess sourcefile in
-  let env = initial_env() in
-  if !Clflags.print_types then begin
-    try ignore(
-      Pparse.file ppf inputfile Parse.implementation ast_impl_magic_number
-      ++ print_if ppf Clflags.dump_parsetree Printast.implementation
-      ++ Typemod.type_implementation sourcefile outputprefix modulename env)
-    with x ->
-      Pparse.remove_preprocessed_if_ast inputfile;
-      raise x
-  end else begin
-    let objfile = outputprefix ^ ".cmo" in
-    let oc = open_out_bin objfile in
+let remove_preprocessed inputfile =
+  match !Clflags.preprocessor with
+    None -> ()
+  | Some _ -> Misc.remove_file inputfile
+
+let remove_preprocessed_if_ast inputfile =
+  match !Clflags.preprocessor with
+    None -> ()
+  | Some _ ->
+      if inputfile <> !Location.input_name then Misc.remove_file inputfile
+
+(* Parse a file or get a dumped syntax tree in it *)
+
+exception Outdated_version
+
+let file ppf inputfile parse_fun ast_magic =
+  let ic = open_in_bin inputfile in
+  let is_ast_file =
     try
-      Pparse.file ppf inputfile Parse.implementation ast_impl_magic_number
-      ++ print_if ppf Clflags.dump_parsetree Printast.implementation
-      ++ Unused_var.warn ppf
-      ++ Typemod.type_implementation sourcefile outputprefix modulename env
-      ++ Translmod.transl_implementation modulename
-      ++ print_if ppf Clflags.dump_rawlambda Printlambda.lambda
-      ++ Simplif.simplify_lambda
-      ++ print_if ppf Clflags.dump_lambda Printlambda.lambda
-      ++ Bytegen.compile_implementation modulename
-      ++ print_if ppf Clflags.dump_instr Printinstr.instrlist
-      ++ Emitcode.to_file oc modulename;
-      Warnings.check_fatal ();
-      close_out oc;
-      Pparse.remove_preprocessed inputfile;
-      Stypes.dump (outputprefix ^ ".annot");
-    with x ->
-      close_out oc;
-      remove_file objfile;
-      Pparse.remove_preprocessed_if_ast inputfile;
-      Stypes.dump (outputprefix ^ ".annot");
-      raise x
-  end
-
-let c_file name =
-  Location.input_name := name;
-  if Ccomp.compile_file name <> 0 then exit 2
-
-let process_implementation_file ppf name =
-  let opref = Misc.chop_extension_if_any name in
-  Compile.implementation ppf name opref
-
-let impl = process_implementation_file Format.err_formatter
+      let buffer = String.create (String.length ast_magic) in
+      really_input ic buffer 0 (String.length ast_magic);
+      if buffer = ast_magic then true
+      else if String.sub buffer 0 9 = String.sub ast_magic 0 9 then
+        raise Outdated_version
+      else false
+    with
+      Outdated_version ->
+        Misc.fatal_error "Ocaml and preprocessor have incompatible versions"
+    | _ -> false
+  in
+  let ast =
+    try
+      if is_ast_file then begin
+        if !Clflags.fast then
+          fprintf ppf "@[Warning: %s@]@."
+            "option -unsafe used with a preprocessor returning a syntax tree";
+        Location.input_name := input_value ic;
+        input_value ic
+      end else begin
+        seek_in ic 0;
+        Location.input_name := inputfile;
+        let lexbuf = Lexing.from_channel ic in
+        Location.init lexbuf inputfile;
+        parse_fun lexbuf
+      end
+    with x -> close_in ic; raise x
+  in
+  close_in ic;
+  ast
 
 let _ =
   let filename = ref "" in
+  let usage = String.concat ""
+                ["ChaML: a type-checker for OCaml programs.\n";
+                 "Usage: "; Sys.argv.(0); " [OPTIONS] FILE\n"] in
   Arg.parse
     []
     (fun f -> if !filename = "" then filename := f else failwith "Only one file must be specified")
-    "ChaML: a type-checker for OCaml programs."
-    ();
+    usage;
+  if !filename = "" then
+    print_string usage
+  else
+    let ast = file Format.err_formatter !filename Parse.implementation ast_impl_magic_number in
+    print_endline "*** Parsing done"
 
 
