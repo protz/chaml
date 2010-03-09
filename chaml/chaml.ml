@@ -17,17 +17,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Arg
-open Misc
-open Format
-open Location
-open Config
-
 exception Error
 
 (* Optionally preprocess a source file *)
 
-let preprocess sourcefile =
+(*let preprocess sourcefile =
   match !Clflags.preprocessor with
     None -> sourcefile
   | Some pp ->
@@ -50,12 +44,14 @@ let remove_preprocessed_if_ast inputfile =
   match !Clflags.preprocessor with
     None -> ()
   | Some _ ->
-      if inputfile <> !Location.input_name then Misc.remove_file inputfile
+      if inputfile <> !Location.input_name then Misc.remove_file inputfile*)
 
 (* Parse a file or get a dumped syntax tree in it *)
 
 exception Outdated_version
 
+(* Stolen from driver/pparse.ml *)
+(* val file : formatter -> string -> (Lexing.lexbuf -> 'a) -> string -> 'a *)
 let file ppf inputfile parse_fun ast_magic =
   let ic = open_in_bin inputfile in
   let is_ast_file =
@@ -75,7 +71,7 @@ let file ppf inputfile parse_fun ast_magic =
     try
       if is_ast_file then begin
         if !Clflags.fast then
-          fprintf ppf "@[Warning: %s@]@."
+          Format.fprintf ppf "@[Warning: %s@]@."
             "option -unsafe used with a preprocessor returning a syntax tree";
         Location.input_name := input_value ic;
         input_value ic
@@ -92,18 +88,26 @@ let file ppf inputfile parse_fun ast_magic =
   ast
 
 let _ =
-  let filename = ref "" in
+  let arg_filename = ref "" in
+  let arg_print_ast = ref false in
+  let arg_print_constraints = ref false in
   let usage = String.concat ""
                 ["ChaML: a type-checker for OCaml programs.\n";
                  "Usage: "; Sys.argv.(0); " [OPTIONS] FILE\n"] in
   Arg.parse
-    []
-    (fun f -> if !filename = "" then filename := f else failwith "Only one file must be specified")
+    [
+      "--print-ast", Arg.Set arg_print_ast, "print the AST as parsed by the OCaml frontend";
+      "--print-constraints", Arg.Set arg_print_constraints, "print the constraints in a format mini can parse";
+    ]
+    (fun f -> if !arg_filename = "" then arg_filename := f else print_endline "*** More than one file given, keeping the first one.")
     usage;
-  if !filename = "" then
+  if !arg_filename = "" then begin
     print_string usage
-  else
-    let ast = file Format.err_formatter !filename Parse.implementation ast_impl_magic_number in
-    print_endline "*** Parsing done"
-
-
+  end else begin
+    let ast = file Format.err_formatter !arg_filename Parse.implementation Config.ast_impl_magic_number in
+    if !arg_print_ast then
+      Format.fprintf Format.std_formatter "%a@." Printast.implementation ast;
+    let konstraint = Constraint.generate_constraint ast in
+    if !arg_print_constraints then
+      print_string (Constraint.string_of_constraint konstraint)
+  end
