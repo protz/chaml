@@ -1,0 +1,4 @@
+- At least do the application
+- See _constraint for the right way to dump constraints
+- Write a constraint dumper
+- Confirm that the given constraints are correct by feeding mini with them

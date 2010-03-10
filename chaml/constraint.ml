@@ -90,7 +90,7 @@ and type_constraint = [
     `True
   | `Conj of type_constraint * type_constraint
   | `Exists of type_var list * type_constraint
-  | `Equals of type_var * type_term
+  | `Equals of type_term * type_term
   | `Instance of ident * type_term
   | `Let of type_scheme list
 ]
@@ -105,16 +105,24 @@ let type_term_product x y: type_term =
   let type_product = { cons_name = "*"; cons_arity = 2 } in
   `Cons (type_product, [x; y])
 
-(* Parsetree.pattern *)
-let rec generate_constraint_pattern: (type_var * type_constraint * type_var IdentMap.t) -> pattern -> (type_var list * type_constraint * type_var IdentMap.t) =
-  fun (x, c, var_map) { ppat_desc; ppat_loc } ->
+let tv_tt x = (x: type_var :> type_term)
+
+(* Parsetree.pattern 
+ *
+ * We are given a type var that's supposed to match the given pattern. What we
+ * return is a type constraint and a map from identifiers to corresponding type
+ * variables. For instance, generate_constraint_pattern X (a*b) returns
+ * \exists Y Z. [ X = Y * Z and a < X and b < Y ] and { a => Y; b => Z }
+ *
+ * *)
+let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * type_var IdentMap.t) =
+  fun x { ppat_desc; ppat_loc } ->
     match ppat_desc with
       | Ppat_var v ->
           let var = ident v in
-          let c' = `Instance (var, (x: type_var :> type_term)) in (* WTF??? *)
-          let c'' = `Conj (c, c') in
-          let var_map' = IdentMap.add var x var_map in
-          [x], c'', var_map'
+          let c = `Instance (var, (x: type_var :> type_term)) in
+          let var_map = IdentMap.add var x IdentMap.empty in
+          c, var_map
       (* | Ppat_tuple patterns -> *)
       | _ -> failwith "This pattern is not implemented\n"
 
@@ -122,46 +130,29 @@ let rec generate_constraint_pattern: (type_var * type_constraint * type_var Iden
  * 
  * - TODO figure out what label and the expression option are for in
  * Pexp_function then do things accordingly.
+ *
  * *)
 and generate_constraint_expression: type_var -> expression -> type_constraint =
-  fun x { pexp_desc; pexp_loc } ->
+  fun t { pexp_desc; pexp_loc } ->
     match pexp_desc with
       | Pexp_function (_, _, pat_expr_list) ->
-          let generate_branch pat_expr =
-            let t = fresh_type_var ~letter:'t' () in
-            let s = generate_scheme t pat_expr in
-            let vars, _, _, _ = s in
-            t, vars, `Let [s]
+          let generate_branch (pat, expr) =
+            (* as in the definition *)
+            let x1 = fresh_type_var ~letter:'x' () in
+            let x2 = fresh_type_var ~letter:'x' () in
+            let c1, var_map = generate_constraint_pattern x1 pat in
+            let c2 = generate_constraint_expression x2 expr in
+            let arrow_constr: type_constraint = `Equals (type_cons_arrow (tv_tt x1) (tv_tt x2), (tv_tt t)) in
+            let c = `Conj (arrow_constr, c2) in
+            let let_constr: type_constraint = `Let [[x1], c1, var_map, c] in
+            `Exists ([x1; x2], let_constr)
           in
-          (* for each branch, we get its type variable xi and an associated
-          * constraint (it's a `Let [the_type_scheme]) *)
-          let type_vars, bound_vars, type_constrs = Jlist.split3 (List.map generate_branch pat_expr_list) in
-          let bound_vars = List.flatten bound_vars in
-          (* generates x = t1; x = t2; x = ... *)
-          let equalities: type_constraint list = List.map (fun t -> `Equals (x, (t: type_var :> type_term))) type_vars in
-          (* do a big `Conj of a list *)
-          let conj = List.fold_left (fun c1 c2 -> `Conj (c1, c2)) `True in
-          (* generates c1 \wedge c2 \wedge ... \wedge cn *)
-          let constraints1 = conj type_constrs in
-          let constraints2 = conj equalities in
-          `Exists (bound_vars , `Conj (constraints1, constraints2))
-      | Pexp_ident i ->
-          `Instance (`Var i, (x: type_var :> type_term)) (* WTF??? *)
+          let constraints = List.map generate_branch pat_expr_list in
+          List.fold_left (fun c1 c2 -> `Conj (c1, c2)) `True constraints
+      | Pexp_ident x ->
+          `Instance (`Var x, tv_tt t) (* WTF??? *)
       | _ ->
           failwith "This expression is not supported\n"
-
-(* Parsetree.pattern = Parsetree.expression --> generate scheme
- *
- * Maybe as an optimization we would like to keep the IdentMap all along the
- * way, pass it from function to function, and then be able to lookup in it
- * anywhere. Plus it's functional so its matches the recursive calls...
- *
- * *)
-and generate_scheme: type_var -> (pattern * expression) -> type_scheme = fun t (pat, expr) ->
-  let x = fresh_type_var ~letter:'x' () in
-  let type_vars, c1, var_map = generate_constraint_pattern (x, `True, IdentMap.empty) pat in
-  let c2 = generate_constraint_expression t expr in
-  x::type_vars, c1, var_map, c2
 
 (* Parsetree.structure_item
  * 
@@ -180,11 +171,14 @@ and generate_constraint_structure_item: type_var -> structure_item -> type_const
     match pstr_desc with
       | Pstr_value (rec_flag, pat_expr_list) ->
           if rec_flag = Asttypes.Nonrecursive then
-            let generate_fresh pat_expr =
+            let generate_value (pat, expr) =
               let t = fresh_type_var ~letter:'t' () in
-              generate_scheme t pat_expr
+              let x = fresh_type_var ~letter:'x' () in
+              let c1, var_map = generate_constraint_pattern x pat in
+              let c2 = generate_constraint_expression t expr in
+              `Let [[x], c1, var_map, c2]
             in
-            `Let (List.map generate_fresh pat_expr_list)
+            List.fold_left (fun c1 c2 -> `Conj (c1, c2)) `True (List.map generate_value pat_expr_list)
           else
             failwith "rec flag not implemented\n"
       | _ -> failwith "structure_item not implemented\n"
