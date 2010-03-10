@@ -1,6 +1,6 @@
 (* NB: let f x = x gives a different AST.
 *      let _  also gives a different AST *)
-let f = fun x -> x
+let f x = x
 (*
 [
   structure_item (test.ml[1,0+0]..test.ml[1,0+18])
@@ -22,7 +22,7 @@ let f = fun x -> x
     ]
 *)
 
-let g = f f
+(* let g = f f *)
 (*
   structure_item (test.ml[4,105+0]..test.ml[4,105+11])
     Pstr_value Nonrec
