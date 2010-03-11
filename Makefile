@@ -5,6 +5,6 @@ all:
 
 test:
 	mini --do print-constraint test.ml
-	./chaml.native --print-constraints test.ml > _constraints
+	./chaml.native --print-constraint test.ml > _constraints
 	@cat _constraints
 	mini --start parse-constraint _constraints

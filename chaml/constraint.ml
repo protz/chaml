@@ -36,6 +36,8 @@ let fresh_var =
 type type_var = [
   `Var of string
 ]
+let string_of_type_var = function
+  | `Var s -> s
 
 (* small wrapper *)
 let fresh_type_var ?letter (): type_var =
@@ -48,6 +50,9 @@ type ident = [
 
 (* quick wrapper *)
 let ident x = `Var (Longident.Lident x)
+let string_of_ident = function
+  | `Var (Longident.Lident x) -> x
+  | _ -> failwith "This kind of ident is not supported\n"
 
 (* Instead of writing
  *   let z: \forall \vec{X}.[C].X in [C']
@@ -93,6 +98,7 @@ and type_constraint = [
   | `Equals of type_term * type_term
   | `Instance of ident * type_term
   | `Let of type_scheme list * type_constraint
+  | `Dump
 ]
 
 (* Wrapper to build T = X -> Y *)
@@ -140,11 +146,14 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
             (* as in the definition *)
             let x1 = fresh_type_var ~letter:'x' () in
             let x2 = fresh_type_var ~letter:'x' () in
+            (* ~ [[ pat: X1 ]] *)
             let c1, var_map = generate_constraint_pattern x1 pat in
+            (* [[ t: X2 ]] *)
             let c2 = generate_constraint_expression x2 expr in
+            (* X1 -> X2 = T *)
             let arrow_constr: type_constraint = `Equals (type_cons_arrow (tv_tt x1) (tv_tt x2), (tv_tt t)) in
             let c2' = `Conj (arrow_constr, c2) in
-            let let_constr: type_constraint = `Let [[x1], c1, var_map, c2'] in
+            let let_constr: type_constraint = `Let ([[x1], c1, var_map], c2') in
             `Exists ([x1; x2], let_constr)
           in
           let constraints = List.map generate_branch pat_expr_list in
@@ -168,34 +177,101 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
  * The fact that pat_expr_list is there is for let ... and ... that are defined
  * simultaneously. We allow that through the type_scheme list in `Let type.
  *
- * XXX structure is wrong, we can have multiple binding in the same scope. the
- * 'list is not a the right place.
+ * For top-level definitions, the variables end up free in the environment.
  *
  * *)
-and generate_constraint_structure_item: type_var -> structure_item -> type_constraint =
-  fun t { pstr_desc; pstr_loc } ->
-    match pstr_desc with
-      | Pstr_value (rec_flag, pat_expr_list) ->
-          if rec_flag = Asttypes.Nonrecursive then
-            let generate_value (pat, expr) =
-              let t = fresh_type_var ~letter:'t' () in
-              let x = fresh_type_var ~letter:'x' () in
-              let c1, var_map = generate_constraint_pattern x pat in
-              let c2 = generate_constraint_expression t expr in
-              [x], c1, var_map, c2
-            in
-            `Let (List.map generate_value pat_expr_list)
-          else
-            failwith "rec flag not implemented\n"
-      | _ -> failwith "structure_item not implemented\n"
-
-(* Generate a constraint for a given program *)
-let generate_constraint: structure -> type_constraint list =
+and generate_constraint: structure -> type_constraint =
   fun structure ->
-    let f structure_item = generate_constraint_structure_item (fresh_type_var ~letter:'t' ()) structure_item in
-    (* Wrong. Do a let in with a fold_left... *)
-    List.map f structure
+    let generate_constraint_structure_item = fun { pstr_desc; pstr_loc } c2 ->
+      match pstr_desc with
+        | Pstr_value (rec_flag, pat_expr_list) ->
+            if rec_flag = Asttypes.Nonrecursive then
+              let generate_value (pat, expr) =
+                let x = fresh_type_var ~letter:'x' () in
+                let c1, var_map = generate_constraint_pattern x pat in
+                let c1' = generate_constraint_expression x expr in
+                [x], `Conj (c1, c1'), var_map
+              in
+              `Let (List.map generate_value pat_expr_list, c2)
+            else
+              failwith "rec flag not implemented\n"
+        | _ -> failwith "structure_item not implemented\n"
+    in
+    List.fold_right generate_constraint_structure_item structure `Dump
 
 (* Print the constraints in a format readable by mini *)
-let string_of_constraint konstraint: string =
-  assert false
+let string_of_constraint: type_constraint -> string = fun konstraint ->
+  let inc i = " " ^ i in
+  let space_before_type_var = fun x -> " " ^ (string_of_type_var x) in
+  let rec string_of_constraint = fun i -> function
+    | `True ->
+        "true"
+    | `Conj (`True, c)
+    | `Conj (c, `True) ->
+        string_of_constraint i c
+    | `Conj (c1, c2) ->
+        let c1 = string_of_constraint i c1 in
+        let c2 = string_of_constraint i c2 in
+        String.concat "" ["("; c1; ") and ("; c2; ")"]
+    | `Exists (xs, c) ->
+        let xs = String.concat "" (List.map space_before_type_var xs) in
+        let i' = inc i in
+        let c = string_of_constraint i' c in
+        String.concat "" ["exists"; xs; ".\n"; i'; c]
+    | `Equals (t1, t2) ->
+        let t1 = string_of_type t1 in
+        let t2 = string_of_type t2 in
+        String.concat "" [t1; " = "; t2]
+    | `Instance (x, t) ->
+        let x = string_of_ident x in
+        let t = string_of_type t in
+        String.concat "" [x; " < "; t]
+    | `Let (schemes, c) ->
+        let i' = inc i in
+        let sep = ";\n" ^ i' in
+        let schemes = String.concat sep (List.map (string_of_type_scheme i') schemes) in
+        let c = string_of_constraint i c in
+        String.concat "" ("let\n" :: i' :: schemes :: ["\n"; i; "in\n"; i; c])
+    | `Dump ->
+        "dump\n"
+  and string_of_type_scheme i s =
+    let open Jstring in
+    let xs, c, var_map = s in
+    let buf = Buf.create () in
+    if List.length xs > 0 then begin
+      let xs = List.map space_before_type_var xs in
+      Buf.add buf "forall";
+      Buf.add_list buf xs;
+      Buf.add buf " ";
+    end;
+    let i' = inc i in
+    if c <> `True then begin
+      let c = string_of_constraint i' c in
+      Buf.add_list buf ["[\n"; i'; c; "\n"; i; "]\n"; i];
+    end;
+    if var_map <> IdentMap.empty then begin
+      Buf.add_list buf ["("];
+      let l = ref [] in
+      IdentMap.iter
+        (fun i v ->
+          l := (String.concat " : " [string_of_ident i; string_of_type_var v]) :: !l)
+        var_map;
+      Buf.add buf (String.concat "; " !l);
+      Buf.add buf ")";
+    end;
+    Buf.flush buf
+  and string_of_type = function
+    | `Var _ as v -> string_of_type_var v
+    | `Cons ({ cons_name; cons_arity }, types) ->
+       match cons_name with
+       | "->" | "*" as op ->
+           let t1 = string_of_type (List.nth types 0) in
+           let t2 = string_of_type (List.nth types 1) in
+           String.concat " " [t1; op; t2]
+       | _ as op ->
+           let types = List.map string_of_type types in
+           let types = String.concat ", " types in
+           String.concat "" [op; "("; types; ")"]
+  in
+  string_of_constraint "" konstraint
+

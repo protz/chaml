@@ -90,14 +90,14 @@ let file ppf inputfile parse_fun ast_magic =
 let _ =
   let arg_filename = ref "" in
   let arg_print_ast = ref false in
-  let arg_print_constraints = ref false in
+  let arg_print_constraint = ref false in
   let usage = String.concat ""
                 ["ChaML: a type-checker for OCaml programs.\n";
                  "Usage: "; Sys.argv.(0); " [OPTIONS] FILE\n"] in
   Arg.parse
     [
       "--print-ast", Arg.Set arg_print_ast, "print the AST as parsed by the OCaml frontend";
-      "--print-constraints", Arg.Set arg_print_constraints, "print the constraints in a format mini can parse";
+      "--print-constraint", Arg.Set arg_print_constraint, "print the constraint in a format mini can parse";
     ]
     (fun f -> if !arg_filename = "" then arg_filename := f else print_endline "*** More than one file given, keeping the first one.")
     usage;
@@ -108,6 +108,6 @@ let _ =
     if !arg_print_ast then
       Format.fprintf Format.std_formatter "%a@." Printast.implementation ast;
     let konstraint = Constraint.generate_constraint ast in
-    if !arg_print_constraints then
+    if !arg_print_constraint then
       print_string (Constraint.string_of_constraint konstraint)
   end
