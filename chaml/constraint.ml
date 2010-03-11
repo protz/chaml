@@ -101,15 +101,31 @@ and type_constraint = [
   | `Dump
 ]
 
-(* Wrapper to build T = X -> Y *)
-let type_cons_arrow x y: type_term =
-  let type_arrow = { cons_name = "->"; cons_arity = 2 } in
-  `Cons (type_arrow, [x; y])
-
-(* Wrapper to build T = X * Y *)
-let type_term_product x y: type_term =
-  let type_product = { cons_name = "*"; cons_arity = 2 } in
-  `Cons (type_product, [x; y])
+(* Get a pre-existing type constructor. Create the tuples as needed. *)
+let type_cons: string -> type_term list -> type_term =
+  let tbl = Hashtbl.create 8 in
+  (* Add this one. It's pre-defined. *)
+  Hashtbl.add tbl "->" { cons_name = "->"; cons_arity = 2 };
+  (* The function *)
+  fun cons_name args ->
+    begin match Jhashtbl.find_opt tbl cons_name with
+    | Some cons ->
+        assert ((List.length args) = cons.cons_arity);
+        `Cons (cons, args)
+    | None ->
+        if cons_name = "*" then
+          let cons_arity = List.length args in
+          let cons_key = "*" ^ (string_of_int cons_arity) in
+          match Jhashtbl.find_opt tbl cons_key with
+          | None ->
+              let cons = { cons_name; cons_arity } in
+              Hashtbl.add tbl cons_key cons;
+              `Cons (cons, args)
+          | Some cons ->
+              `Cons (cons, args)
+        else
+          failwith (Printf.sprintf "Unbound type constructor %s\n" cons_name)
+    end
 
 let tv_tt x = (x: type_var :> type_term)
 
@@ -126,11 +142,29 @@ let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * t
     match ppat_desc with
       | Ppat_var v ->
           let var = ident v in
-          (* let c = `Instance (var, (x: type_var :> type_term)) in *)
           let var_map = IdentMap.add var x IdentMap.empty in
-          (* c, var_map *)
           `True, var_map
-      (* | Ppat_tuple patterns -> *)
+      | Ppat_tuple patterns ->
+        (* as in "JIdentMap" *)
+        let module JIM = Jmap.Make(IdentMap) in
+        let rec combine known_vars known_map current_constraint = function
+          | new_pattern :: remaining_patterns ->
+              let xi = fresh_type_var () in
+              let sub_constraint, sub_map = generate_constraint_pattern xi new_pattern in
+              if not (IdentMap.is_empty (JIM.inter known_map sub_map)) then
+                failwith "Variable is bound several times in the matching";
+              let new_map = JIM.union known_map sub_map in
+              let new_constraint = `Conj (sub_constraint, current_constraint) in
+              let new_vars = xi :: known_vars in
+              combine new_vars new_map new_constraint remaining_patterns
+          | [] -> 
+              known_vars, known_map, current_constraint
+        in
+        let sub_vars, sub_map, sub_constraint = combine [] IdentMap.empty `True patterns in
+        let sub_vars = (sub_vars: type_var list :> type_term list) in
+        let konstraint = `Equals (tv_tt x, type_cons "*" sub_vars) in
+        let konstraint = `Conj (konstraint, sub_constraint) in
+        konstraint, sub_map
       | _ -> failwith "This pattern is not implemented\n"
 
 (* Parsetree.expression
@@ -152,7 +186,9 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
             (* [[ t: X2 ]] *)
             let c2 = generate_constraint_expression x2 expr in
             (* X1 -> X2 = T *)
-            let arrow_constr: type_constraint = `Equals (type_cons_arrow (tv_tt x1) (tv_tt x2), (tv_tt t)) in
+            let arrow_constr: type_constraint =
+              `Equals (type_cons "->" [tv_tt x1; tv_tt x2], (tv_tt t))
+            in
             let c2' = `Conj (arrow_constr, c2) in
             let let_constr: type_constraint = `Let ([[], c1, var_map], c2') in
             `Exists ([x1; x2], let_constr)
@@ -249,16 +285,10 @@ let string_of_constraint: type_constraint -> string = fun konstraint ->
     if c <> `True then begin
       let c = string_of_constraint i' c in
       Buf.add_list buf ["[\n"; i'];
-      (*if var_map <> IdentMap.empty then begin
-        Buf.add buf "let ";
-        Buf.add buf (string_of_var_map var_map);
-        Buf.add buf " in\n";
-        Buf.add buf i';
-      end;*)
       Buf.add buf c;
       Buf.add_list buf ["\n"; i; "]\n"; i];
     end;
-    if var_map <> IdentMap.empty then
+    if not (IdentMap.is_empty var_map) then
       Buf.add buf (string_of_var_map var_map);
     Buf.flush buf
   and string_of_var_map var_map =
@@ -277,10 +307,13 @@ let string_of_constraint: type_constraint -> string = fun konstraint ->
     | `Var _ as v -> string_of_type_var v
     | `Cons ({ cons_name; cons_arity }, types) ->
        match cons_name with
-       | "->" | "*" as op ->
+       | "->" as op ->
            let t1 = string_of_type (List.nth types 0) in
            let t2 = string_of_type (List.nth types 1) in
            String.concat " " [t1; op; t2]
+       | "*" ->
+           let sub_types = List.map string_of_type types in
+           String.concat " * " sub_types
        | _ as op ->
            let types = List.map string_of_type types in
            let types = String.concat ", " types in
