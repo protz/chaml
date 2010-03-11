@@ -137,35 +137,34 @@ let tv_tt x = (x: type_var :> type_term)
  * \exists Y Z. [ X = Y * Z and a < X and b < Y ] and { a => Y; b => Z }
  *
  * *)
-let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * type_var IdentMap.t) =
+let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * type_var IdentMap.t * type_var list) =
   fun x { ppat_desc; ppat_loc } ->
     match ppat_desc with
       | Ppat_var v ->
           let var = ident v in
           let var_map = IdentMap.add var x IdentMap.empty in
-          `True, var_map
+          `True, var_map, []
       | Ppat_tuple patterns ->
         (* as in "JIdentMap" *)
         let module JIM = Jmap.Make(IdentMap) in
         let rec combine known_vars known_map current_constraint = function
           | new_pattern :: remaining_patterns ->
               let xi = fresh_type_var () in
-              let sub_constraint, sub_map = generate_constraint_pattern xi new_pattern in
+              let sub_constraint, sub_map, sub_vars = generate_constraint_pattern xi new_pattern in
               if not (IdentMap.is_empty (JIM.inter known_map sub_map)) then
                 failwith "Variable is bound several times in the matching";
               let new_map = JIM.union known_map sub_map in
               let new_constraint = `Conj (sub_constraint, current_constraint) in
-              let new_vars = xi :: known_vars in
+              let new_vars = xi :: sub_vars @ known_vars in
               combine new_vars new_map new_constraint remaining_patterns
           | [] -> 
-              known_vars, known_map, current_constraint
+              List.rev known_vars, known_map, current_constraint
         in
         let sub_vars, sub_map, sub_constraint = combine [] IdentMap.empty `True patterns in
         let sub_terms = (sub_vars: type_var list :> type_term list) in
         let konstraint = `Equals (tv_tt x, type_cons "*" sub_terms) in
         let konstraint = `Conj (konstraint, sub_constraint) in
-        let konstraint = `Exists (sub_vars, konstraint) in
-        konstraint, sub_map
+        konstraint, sub_map, sub_vars
       | _ -> failwith "This pattern is not implemented\n"
 
 (* Parsetree.expression
@@ -183,7 +182,7 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
             let x1 = fresh_type_var ~letter:'x' () in
             let x2 = fresh_type_var ~letter:'x' () in
             (* ~ [[ pat: X1 ]] *)
-            let c1, var_map = generate_constraint_pattern x1 pat in
+            let c1, var_map, generated_vars = generate_constraint_pattern x1 pat in
             (* [[ t: X2 ]] *)
             let c2 = generate_constraint_expression x2 expr in
             (* X1 -> X2 = T *)
@@ -192,7 +191,7 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
             in
             let c2' = `Conj (arrow_constr, c2) in
             let let_constr: type_constraint = `Let ([[], c1, var_map], c2') in
-            `Exists ([x1; x2], let_constr)
+            `Exists ([x1; x2] @ generated_vars, let_constr)
           in
           let constraints = List.map generate_branch pat_expr_list in
           List.fold_left (fun c1 c2 -> `Conj (c1, c2)) `True constraints
@@ -226,9 +225,10 @@ and generate_constraint: structure -> type_constraint =
             if rec_flag = Asttypes.Nonrecursive then
               let generate_value (pat, expr) =
                 let x = fresh_type_var ~letter:'x' () in
-                let c1, var_map = generate_constraint_pattern x pat in
+                let c1, var_map, generated_vars = generate_constraint_pattern x pat in
                 let c1' = generate_constraint_expression x expr in
-                [x], `Conj (c1, c1'), var_map
+                let konstraint = `Exists (generated_vars, `Conj (c1, c1')) in
+                [x], konstraint, var_map
               in
               `Let (List.map generate_value pat_expr_list, c2)
             else
@@ -252,10 +252,13 @@ let string_of_constraint: type_constraint -> string = fun konstraint ->
         let c2 = string_of_constraint i c2 in
         String.concat "" ["("; c1; ") and ("; c2; ")"]
     | `Exists (xs, c) ->
-        let xs = String.concat "" (List.map space_before_type_var xs) in
         let i' = inc i in
         let c = string_of_constraint i' c in
-        String.concat "" ["exists"; xs; ".\n"; i'; c]
+        if List.length xs > 0 then 
+          let xs = String.concat "" (List.map space_before_type_var xs) in
+          String.concat "" ["exists"; xs; ".\n"; i'; c]
+        else
+          c
     | `Equals (t1, t2) ->
         let t1 = string_of_type t1 in
         let t2 = string_of_type t2 in
