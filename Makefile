@@ -8,3 +8,6 @@ test:
 	./chaml.native --print-constraint test.ml > _constraints
 	@cat _constraints
 	mini --start parse-constraint _constraints
+
+unit_test:
+	cd stdlib && ocamlbuild jmap_test.native && ./jmap_test.native

@@ -161,9 +161,10 @@ let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * t
               known_vars, known_map, current_constraint
         in
         let sub_vars, sub_map, sub_constraint = combine [] IdentMap.empty `True patterns in
-        let sub_vars = (sub_vars: type_var list :> type_term list) in
-        let konstraint = `Equals (tv_tt x, type_cons "*" sub_vars) in
+        let sub_terms = (sub_vars: type_var list :> type_term list) in
+        let konstraint = `Equals (tv_tt x, type_cons "*" sub_terms) in
         let konstraint = `Conj (konstraint, sub_constraint) in
+        let konstraint = `Exists (sub_vars, konstraint) in
         konstraint, sub_map
       | _ -> failwith "This pattern is not implemented\n"
 

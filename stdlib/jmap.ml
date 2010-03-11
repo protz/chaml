@@ -32,6 +32,6 @@ end = functor (M: Map.S) -> struct
     M.fold (fun k v m -> M.add k v m) m1 m2
 
   let inter m1 m2 =
-    M.fold (fun k v m1 -> if M.mem k m1 then m1 else M.remove k m1) m1 m2
+    M.fold (fun k v m1 -> if M.mem k m2 then m1 else M.remove k m1) m1 m1
 
 end
