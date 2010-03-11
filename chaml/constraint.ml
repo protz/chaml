@@ -126,9 +126,10 @@ let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * t
     match ppat_desc with
       | Ppat_var v ->
           let var = ident v in
-          let c = `Instance (var, (x: type_var :> type_term)) in
+          (* let c = `Instance (var, (x: type_var :> type_term)) in *)
           let var_map = IdentMap.add var x IdentMap.empty in
-          c, var_map
+          (* c, var_map *)
+          `True, var_map
       (* | Ppat_tuple patterns -> *)
       | _ -> failwith "This pattern is not implemented\n"
 
@@ -153,7 +154,7 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
             (* X1 -> X2 = T *)
             let arrow_constr: type_constraint = `Equals (type_cons_arrow (tv_tt x1) (tv_tt x2), (tv_tt t)) in
             let c2' = `Conj (arrow_constr, c2) in
-            let let_constr: type_constraint = `Let ([[x1], c1, var_map], c2') in
+            let let_constr: type_constraint = `Let ([[], c1, var_map], c2') in
             `Exists ([x1; x2], let_constr)
           in
           let constraints = List.map generate_branch pat_expr_list in
@@ -247,18 +248,30 @@ let string_of_constraint: type_constraint -> string = fun konstraint ->
     let i' = inc i in
     if c <> `True then begin
       let c = string_of_constraint i' c in
-      Buf.add_list buf ["[\n"; i'; c; "\n"; i; "]\n"; i];
+      Buf.add_list buf ["[\n"; i'];
+      (*if var_map <> IdentMap.empty then begin
+        Buf.add buf "let ";
+        Buf.add buf (string_of_var_map var_map);
+        Buf.add buf " in\n";
+        Buf.add buf i';
+      end;*)
+      Buf.add buf c;
+      Buf.add_list buf ["\n"; i; "]\n"; i];
     end;
-    if var_map <> IdentMap.empty then begin
-      Buf.add_list buf ["("];
-      let l = ref [] in
-      IdentMap.iter
-        (fun i v ->
-          l := (String.concat " : " [string_of_ident i; string_of_type_var v]) :: !l)
-        var_map;
-      Buf.add buf (String.concat "; " !l);
-      Buf.add buf ")";
-    end;
+    if var_map <> IdentMap.empty then
+      Buf.add buf (string_of_var_map var_map);
+    Buf.flush buf
+  and string_of_var_map var_map =
+    let open Jstring in
+    let buf = Buf.create () in
+    Buf.add_list buf ["("];
+    let l = ref [] in
+    IdentMap.iter
+      (fun i v ->
+        l := (String.concat " : " [string_of_ident i; string_of_type_var v]) :: !l)
+      var_map;
+    Buf.add buf (String.concat "; " !l);
+    Buf.add buf ")";
     Buf.flush buf
   and string_of_type = function
     | `Var _ as v -> string_of_type_var v
