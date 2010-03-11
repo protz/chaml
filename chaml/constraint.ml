@@ -75,7 +75,7 @@ and type_cons = {
   cons_arity: int;
 }
 
-type type_scheme = type_var list * type_constraint * type_var IdentMap.t * type_constraint
+type type_scheme = type_var list * type_constraint * type_var IdentMap.t
 
 (* C, D see p. 407.
  *
@@ -92,7 +92,7 @@ and type_constraint = [
   | `Exists of type_var list * type_constraint
   | `Equals of type_term * type_term
   | `Instance of ident * type_term
-  | `Let of type_scheme list
+  | `Let of type_scheme list * type_constraint
 ]
 
 (* Wrapper to build T = X -> Y *)
@@ -143,14 +143,14 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
             let c1, var_map = generate_constraint_pattern x1 pat in
             let c2 = generate_constraint_expression x2 expr in
             let arrow_constr: type_constraint = `Equals (type_cons_arrow (tv_tt x1) (tv_tt x2), (tv_tt t)) in
-            let c = `Conj (arrow_constr, c2) in
-            let let_constr: type_constraint = `Let [[x1], c1, var_map, c] in
+            let c2' = `Conj (arrow_constr, c2) in
+            let let_constr: type_constraint = `Let [[x1], c1, var_map, c2'] in
             `Exists ([x1; x2], let_constr)
           in
           let constraints = List.map generate_branch pat_expr_list in
           List.fold_left (fun c1 c2 -> `Conj (c1, c2)) `True constraints
       | Pexp_ident x ->
-          `Instance (`Var x, tv_tt t) (* WTF??? *)
+          `Instance (`Var x, tv_tt t)
       | _ ->
           failwith "This expression is not supported\n"
 
@@ -165,6 +165,12 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
  * were looking for. It's quite unclear for the moment how we'll do that but
  * let's leave it like that.
  *
+ * The fact that pat_expr_list is there is for let ... and ... that are defined
+ * simultaneously. We allow that through the type_scheme list in `Let type.
+ *
+ * XXX structure is wrong, we can have multiple binding in the same scope. the
+ * 'list is not a the right place.
+ *
  * *)
 and generate_constraint_structure_item: type_var -> structure_item -> type_constraint =
   fun t { pstr_desc; pstr_loc } ->
@@ -176,9 +182,9 @@ and generate_constraint_structure_item: type_var -> structure_item -> type_const
               let x = fresh_type_var ~letter:'x' () in
               let c1, var_map = generate_constraint_pattern x pat in
               let c2 = generate_constraint_expression t expr in
-              `Let [[x], c1, var_map, c2]
+              [x], c1, var_map, c2
             in
-            List.fold_left (fun c1 c2 -> `Conj (c1, c2)) `True (List.map generate_value pat_expr_list)
+            `Let (List.map generate_value pat_expr_list)
           else
             failwith "rec flag not implemented\n"
       | _ -> failwith "structure_item not implemented\n"
@@ -187,6 +193,7 @@ and generate_constraint_structure_item: type_var -> structure_item -> type_const
 let generate_constraint: structure -> type_constraint list =
   fun structure ->
     let f structure_item = generate_constraint_structure_item (fresh_type_var ~letter:'t' ()) structure_item in
+    (* Wrong. Do a let in with a fold_left... *)
     List.map f structure
 
 (* Print the constraints in a format readable by mini *)

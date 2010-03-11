@@ -1,6 +1,7 @@
 (* NB: let f x = x gives a different AST.
 *      let _  also gives a different AST *)
 let f x = x
+let g x = x
 (*
 [
   structure_item (test.ml[1,0+0]..test.ml[1,0+18])
