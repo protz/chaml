@@ -237,6 +237,8 @@ let tv_tt x = (x: type_var :> type_term)
 let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * type_var IdentMap.t * type_var list) =
   fun x { ppat_desc; ppat_loc } ->
     match ppat_desc with
+      | Ppat_any ->
+          `True, IdentMap.empty, []
       | Ppat_var v ->
           let var = ident v in
           let var_map = IdentMap.add var x IdentMap.empty in
@@ -323,7 +325,17 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
           in
           `Exists (x1 :: xis, big_constr)
       | Pexp_let (rec_flag, pat_expr_list, e2) ->
-          failwith "Inner let is coming"
+          if rec_flag <> Asttypes.Nonrecursive then
+            failwith "Rec flag not supported";
+          let generate_value (pat, expr) =
+            let x = fresh_type_var ~letter:'x' () in
+            let c1, var_map, generated_vars = generate_constraint_pattern x pat in
+            let c1' = generate_constraint_expression x expr in
+            let konstraint = `Exists (generated_vars, `Conj (c1, c1')) in
+            [x], konstraint, var_map
+          in
+          let c2 = generate_constraint_expression t e2 in
+          `Let (List.map generate_value pat_expr_list, c2)
       | _ ->
           failwith "This expression is not supported\n"
 
@@ -363,4 +375,3 @@ and generate_constraint: structure -> type_constraint =
         | _ -> failwith "structure_item not implemented\n"
     in
     List.fold_right generate_constraint_structure_item structure `Dump
-
