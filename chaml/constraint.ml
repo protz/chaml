@@ -322,6 +322,8 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
             List.fold_left (fun c1 c2 -> `Conj (c1, c2)) constr sub_constraints
           in
           `Exists (x1 :: xis, big_constr)
+      | Pexp_let (rec_flag, pat_expr_list, e2) ->
+          failwith "Inner let is coming"
       | _ ->
           failwith "This expression is not supported\n"
 

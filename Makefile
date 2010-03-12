@@ -11,3 +11,11 @@ test:
 
 unit_test:
 	cd stdlib && ocamlbuild jmap_test.native && ./jmap_test.native
+
+bug_mini1:
+	mini --end print-constraint bug_mini1.ml > _constraint_mini
+	mini --start parse-constraint _constraint_mini
+
+bug_mini2:
+	mini --end print-constraint bug_mini2.ml > _constraint_mini
+	mini --start parse-constraint _constraint_mini
