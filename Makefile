@@ -9,6 +9,14 @@ test:
 	@cat _constraints
 	mini --start parse-constraint _constraints
 
+test_compare:
+	@printf '\x1b[38;5;204mMini output\x1b[38;5;15m\n'
+	@mini test.ml
+	@printf '\x1b[38;5;204mChaML output\x1b[38;5;15m\n'
+	@./chaml.native --print-constraint test.ml > _constraints
+	@mini --start parse-constraint _constraints
+
+
 unit_test:
 	cd stdlib && ocamlbuild jmap_test.native && ./jmap_test.native
 
