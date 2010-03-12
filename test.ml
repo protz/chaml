@@ -22,7 +22,7 @@ let apply f g x = f g x
     ]
 *)
 
-(* let g = f f *)
+let g = f f
 (*
   structure_item (test.ml[4,105+0]..test.ml[4,105+11])
     Pstr_value Nonrec
