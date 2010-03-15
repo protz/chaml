@@ -13,6 +13,11 @@ test_chaml:
 	./chaml.native --print-constraint test.ml > _constraints
 	mini --start parse-constraint _constraints
 
+test_chaml2:
+	./chaml.native --print-constraint --pretty-printing test2.ml
+	./chaml.native --print-constraint test2.ml > _constraints
+	mini --start parse-constraint _constraints
+
 test_compare:
 	@printf '\x1b[38;5;204mMini output\x1b[38;5;15m\n'
 	@mini test.ml
