@@ -145,13 +145,13 @@ let string_of_constraint, string_of_type =
     | `Conj (c1, c2) ->
         let c1 = string_of_constraint i c1 in
         let c2 = string_of_constraint i c2 in
-        String.concat "" ["("; c1; ") and ("; c2; ")"]
+        String.concat "" ["("; c1; ") \xE2\x88\xA7 ("; c2; ")"]
     | `Exists (xs, c) ->
         let i' = inc i in
         let c = string_of_constraint i' c in
         if List.length xs > 0 then 
           let xs = String.concat "" (List.map space_before_type_var xs) in
-          String.concat "" ["exists"; xs; ".\n"; i'; c]
+          String.concat "" ["\xE2\x88\x83"; xs; ".\n"; i'; c]
         else
           c
     | `Equals (t1, t2) ->
@@ -176,7 +176,7 @@ let string_of_constraint, string_of_type =
     let buf = Buf.create () in
     if List.length xs > 0 then begin
       let xs = List.map space_before_type_var xs in
-      Buf.add buf "forall";
+      Buf.add buf "\xE2\x88\x80";
       Buf.add_list buf xs;
       Buf.add buf " ";
     end;
@@ -185,7 +185,7 @@ let string_of_constraint, string_of_type =
       let c = string_of_constraint i' c in
       Buf.add_list buf ["[\n"; i'];
       Buf.add buf c;
-      Buf.add_list buf ["\n"; i; "]\n"; i];
+      Buf.add_list buf ["\n"; i; "]"; i];
     end;
     if not (IdentMap.is_empty var_map) then
       Buf.add buf (string_of_var_map var_map);
@@ -233,6 +233,10 @@ let tv_tt x = (x: type_var :> type_term)
  * variables. For instance, generate_constraint_pattern X (a*b) returns
  * \exists Y Z. [ X = Y * Z and a < X and b < Y ] and { a => Y; b => Z }
  *
+ * We also return the list of all the existential variable that have been
+ * generated. The let - binding that called us will generate the `Exists
+ * constraint for us.
+ *
  * *)
 let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * type_var IdentMap.t * type_var list) =
   fun x { ppat_desc; ppat_loc } ->
@@ -246,22 +250,32 @@ let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * t
       | Ppat_tuple patterns ->
         (* as in "JIdentMap" *)
         let module JIM = Jmap.Make(IdentMap) in
+        (* This represents the sub patterns. If the pattern is (e1, e2, e3),
+         * then we generate x1 x2 x3 such that t = x1 * x2 * x3 *)
+        let xis = List.map (fun _ -> fresh_type_var ()) patterns in
         let rec combine known_vars known_map current_constraint = function
-          | new_pattern :: remaining_patterns ->
-              let xi = fresh_type_var () in
+          | (new_pattern :: remaining_patterns, xi :: xis) ->
+              (* sub_vars represents the existential variables that have been
+               * generated throughout the pattern *)
               let sub_constraint, sub_map, sub_vars = generate_constraint_pattern xi new_pattern in
               if not (IdentMap.is_empty (JIM.inter known_map sub_map)) then
                 failwith "Variable is bound several times in the matching";
               let new_map = JIM.union known_map sub_map in
               let new_constraint = `Conj (sub_constraint, current_constraint) in
+              (* All the variables that have been generated existentially for
+               * this pattern *)
               let new_vars = xi :: sub_vars @ known_vars in
-              combine new_vars new_map new_constraint remaining_patterns
-          | [] -> 
+              combine new_vars new_map new_constraint (remaining_patterns, xis)
+          | ([], []) -> 
               List.rev known_vars, known_map, current_constraint
+          | _ ->
+              assert false
         in
-        let sub_vars, sub_map, sub_constraint = combine [] IdentMap.empty `True patterns in
-        let sub_terms = (sub_vars: type_var list :> type_term list) in
-        let konstraint = `Equals (tv_tt x, type_cons "*" sub_terms) in
+        let sub_vars, sub_map, sub_constraint =
+          combine [] IdentMap.empty `True (patterns, xis)
+        in
+        let xis = (xis: type_var list :> type_term list) in
+        let konstraint = `Equals (tv_tt x, type_cons "*" xis) in
         let konstraint = `Conj (konstraint, sub_constraint) in
         konstraint, sub_map, sub_vars
       | _ -> failwith "This pattern is not implemented\n"
@@ -298,7 +312,7 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
       | Pexp_ident x ->
           `Instance (`Var x, tv_tt t)
       | Pexp_apply (e1, label_expr_list) ->
-          (* \exists xi. ti: xi *)
+          (* ti: xi *)
           let xis, sub_constraints = List.split
             (List.map
               (fun (_, expr) ->
@@ -309,37 +323,33 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
             )
           in
           (* build the type constructor t1 -> (t2 -> (... -> (tn -> t))) *)
-          let combine c1 c2 = type_cons "->" [c1; c2] in
-          let arrow_type = List.fold_right combine (xis: type_var list :> type_term list) (tv_tt t) in
+          let arrow_type = List.fold_right
+            (fun c1 c2 -> type_cons "->" [c1; c2])
+            (xis: type_var list :> type_term list)
+            (tv_tt t)
+          in
           (* \exists x1. *)
           let x1 = fresh_type_var ~letter:'x' () in
-          (* such that [[ e1: x1 ]] *)
-          let arrow_constr = generate_constraint_expression x1 e1 in
-          (* and x1 = t1 -> ... -> tn *)
+          (* x1 = t1 -> ... -> tn *)
           let equals_constr: type_constraint = `Equals (tv_tt x1, arrow_type) in
-          (* combine both *)
+          (* [[ e1: x1 ]] *)
+          let arrow_constr = generate_constraint_expression x1 e1 in
+          (* combine both: [[ e1: t1 -> t2 -> ... -> tn -> t ]] *)
           let constr: type_constraint = `Conj (arrow_constr, equals_constr) in
-          (* and add the subconstraints for each of the arguments *)
-          let big_constr =
+          (* the leftmost expression is an arrow and all the arguments have the right type *)
+          let konstraint =
             List.fold_left (fun c1 c2 -> `Conj (c1, c2)) constr sub_constraints
           in
-          `Exists (x1 :: xis, big_constr)
+          `Exists (x1 :: xis, konstraint)
       | Pexp_let (rec_flag, pat_expr_list, e2) ->
           if rec_flag <> Asttypes.Nonrecursive then
             failwith "Rec flag not supported";
-          let generate_value (pat, expr) =
-            let x = fresh_type_var ~letter:'x' () in
-            let c1, var_map, generated_vars = generate_constraint_pattern x pat in
-            let c1' = generate_constraint_expression x expr in
-            let konstraint = `Exists (generated_vars, `Conj (c1, c1')) in
-            [x], konstraint, var_map
-          in
           let c2 = generate_constraint_expression t e2 in
-          `Let (List.map generate_value pat_expr_list, c2)
+          `Let (List.map generate_constraint_pat_expr pat_expr_list, c2)
       | _ ->
           failwith "This expression is not supported\n"
 
-(* Parsetree.structure_item
+(* Parsetree.structure
  * 
  * structure_items are only for top-level definitions (modules, types, ...).
  * - Pstr_value is for let x = ...
@@ -347,11 +357,13 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
  *
  * For let x = ..., we use a fresh type variable T. After constraint resolution
  * is finished, the constraint on T will be the type of the top-level binding we
- * were looking for. It's quite unclear for the moment how we'll do that but
- * let's leave it like that.
+ * were looking for. The outermost var_map contains the bindings that end up in
+ * the environment. A single let-binding can bind multiple variables if the
+ * left-hand side is a pattern.
  *
- * The fact that pat_expr_list is there is for let ... and ... that are defined
- * simultaneously. We allow that through the type_scheme list in `Let type.
+ * The fact that pat_expr_list is a list is because of let ... and ... that are
+ * defined simultaneously. We allow that through the type_scheme list in `Let
+ * type.
  *
  * For top-level definitions, the variables end up free in the environment.
  *
@@ -361,17 +373,23 @@ and generate_constraint: structure -> type_constraint =
     let generate_constraint_structure_item = fun { pstr_desc; pstr_loc } c2 ->
       match pstr_desc with
         | Pstr_value (rec_flag, pat_expr_list) ->
-            if rec_flag = Asttypes.Nonrecursive then
-              let generate_value (pat, expr) =
-                let x = fresh_type_var ~letter:'x' () in
-                let c1, var_map, generated_vars = generate_constraint_pattern x pat in
-                let c1' = generate_constraint_expression x expr in
-                let konstraint = `Exists (generated_vars, `Conj (c1, c1')) in
-                [x], konstraint, var_map
-              in
-              `Let (List.map generate_value pat_expr_list, c2)
-            else
-              failwith "rec flag not implemented\n"
+            if rec_flag <> Asttypes.Nonrecursive then
+              failwith "rec flag not implemented\n";
+            `Let (List.map generate_constraint_pat_expr pat_expr_list, c2)
+        | Pstr_eval expr ->
+            let t = fresh_type_var ~letter:'t' () in
+            let c = generate_constraint_expression t expr in
+            let c = `Exists ([t], c) in
+            `Let ([[], c, IdentMap.empty], c2)
         | _ -> failwith "structure_item not implemented\n"
     in
     List.fold_right generate_constraint_structure_item structure `Dump
+
+(* Useful for let pattern = expression ... *)
+and generate_constraint_pat_expr: pattern * expression -> type_var list * type_constraint * type_var IdentMap.t =
+  fun (pat, expr) ->
+    let x = fresh_type_var ~letter:'x' () in
+    let c1, var_map, generated_vars = generate_constraint_pattern x pat in
+    let c1' = generate_constraint_expression x expr in
+    let konstraint = `Exists (generated_vars, `Conj (c1, c1')) in
+    [x], konstraint, var_map

@@ -66,11 +66,11 @@ type pattern =
     ppat_loc: Location.t }
 
 and pattern_desc =
-    Ppat_any
-  | Ppat_var of string
+    Ppat_any (**)
+  | Ppat_var of string (**)
   | Ppat_alias of pattern * string
   | Ppat_constant of constant
-  | Ppat_tuple of pattern list
+  | Ppat_tuple of pattern list (**)
   | Ppat_construct of Longident.t * pattern option * bool
   | Ppat_variant of label * pattern option
   | Ppat_record of (Longident.t * pattern) list * closed_flag
@@ -85,11 +85,11 @@ type expression =
     pexp_loc: Location.t }
 
 and expression_desc =
-    Pexp_ident of Longident.t
+    Pexp_ident of Longident.t (**)
   | Pexp_constant of constant
-  | Pexp_let of rec_flag * (pattern * expression) list * expression
-  | Pexp_function of label * expression option * (pattern * expression) list
-  | Pexp_apply of expression * (label * expression) list
+  | Pexp_let of rec_flag * (pattern * expression) list * expression (**)
+  | Pexp_function of label * expression option * (pattern * expression) list (**)
+  | Pexp_apply of expression * (label * expression) list (**)
   | Pexp_match of expression * (pattern * expression) list
   | Pexp_try of expression * (pattern * expression) list
   | Pexp_tuple of expression list
@@ -255,8 +255,8 @@ and structure_item =
     pstr_loc: Location.t }
 
 and structure_item_desc =
-    Pstr_eval of expression
-  | Pstr_value of rec_flag * (pattern * expression) list
+    Pstr_eval of expression (**)
+  | Pstr_value of rec_flag * (pattern * expression) list (**)
   | Pstr_primitive of string * value_description
   | Pstr_type of (string * type_declaration) list
   | Pstr_exception of string * exception_declaration

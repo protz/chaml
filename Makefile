@@ -1,4 +1,4 @@
-PATH := /home/yquem/cristal/protzenk/Code/yrg-mini-prototype-0.2/src/:$(PATH)
+PATH := /home/yquem/cristal/protzenk/Code/mini-trunk/trunk/src/:$(PATH)
 
 all:
 	ocamlbuild -I stdlib -I utils -I parsing chaml/chaml.native
