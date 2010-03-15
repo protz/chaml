@@ -8,3 +8,9 @@ let f1 = fun a -> function (a, c) -> c | (x, (y, z)) -> x
 let f2 x = match x with
   | (c, a)
   | (a, (_, c)) -> a
+
+(* Surprisingly, mini doesn't seem to recognize + *)
+let f3 x y = x + y
+
+(* More complex example *)
+let f4 = function (x,y) -> x | (_, (a, b)) -> 42 + 5

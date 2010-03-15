@@ -12,3 +12,4 @@ let _ = s k i and e = i i
 (* mini considers those two to be identical *)
 let f (x, y, z) = x
 let o (x, (y, z)) = x
+let n x y z = 1

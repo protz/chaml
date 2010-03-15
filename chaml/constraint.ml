@@ -82,6 +82,7 @@ and type_cons = {
   cons_arity: int;
 }
 
+(* (forall x1 x2 ...) * ([ constraint ]) * (mapping from idents to vars) *)
 type type_scheme = type_var list * type_constraint * type_var IdentMap.t
 
 (* C, D see p. 407.
@@ -106,8 +107,12 @@ and type_constraint = [
 (* Get a pre-existing type constructor. Create the tuples as needed. *)
 let type_cons: string -> type_term list -> type_term =
   let tbl = Hashtbl.create 8 in
-  (* Add this one. It's pre-defined. *)
+  (* Add those ones. They're pre-defined. *)
   Hashtbl.add tbl "->" { cons_name = "->"; cons_arity = 2 };
+  Hashtbl.add tbl "int" { cons_name = "int"; cons_arity = 0 };
+  Hashtbl.add tbl "char" { cons_name = "char"; cons_arity = 0 };
+  Hashtbl.add tbl "string" { cons_name = "string"; cons_arity = 0 };
+  Hashtbl.add tbl "float" { cons_name = "float"; cons_arity = 0 };
   (* The function *)
   fun cons_name args ->
     begin match Jhashtbl.find_opt tbl cons_name with
@@ -129,6 +134,11 @@ let type_cons: string -> type_term list -> type_term =
           failwith (Printf.sprintf "Unbound type constructor %s\n" cons_name)
     end
 
+let type_cons_arrow x y = type_cons "->" [x; y]
+let type_cons_int = type_cons "int" []
+let type_cons_char = type_cons "char" []
+let type_cons_string = type_cons "string" []
+let type_cons_float = type_cons "float" []
 
 (* ========== CONSTRAINT DUMP ========== *)
 
@@ -245,8 +255,14 @@ let string_of_constraint, string_of_type =
            let sub_types = List.map (string_of_type pp_env) types in
            String.concat " * " sub_types
        | _ as op ->
+           (* Will probably need something more elaborate here once we get data
+            * types *)
            let types = List.map (string_of_type pp_env) types in
-           let types = pp_env_paren pp_env (String.concat ", " types) in
+           let types = if List.length types > 0 then
+             pp_env_paren pp_env (String.concat ", " types)
+           else
+             ""
+           in
            String.concat "" [op; types]
   in
   (* Because of the value restrictiooooooooooon *)
@@ -348,6 +364,17 @@ let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * t
 and generate_constraint_expression: type_var -> expression -> type_constraint =
   fun t { pexp_desc; pexp_loc } ->
     match pexp_desc with
+      | Pexp_ident x ->
+          `Instance (`Var x, tv_tt t)
+      | Pexp_constant c ->
+          let open Asttypes in
+          begin match c with
+            | Const_int _ -> `Equals (tv_tt t, type_cons_int)
+            | Const_char _ -> `Equals (tv_tt t, type_cons_char)
+            | Const_string _ -> `Equals (tv_tt t, type_cons_string)
+            | Const_float _ -> `Equals (tv_tt t, type_cons_float)
+            | _ -> failwith "This type of constant is not supported."
+          end
       | Pexp_function (_, _, pat_expr_list) ->
           (* As in the definition. We could generate fresh variables for each
           * branch of the pattern-matching. The conjunction would then force
@@ -361,7 +388,7 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
             let c2 = generate_constraint_expression x2 expr in
             (* X1 -> X2 = T *)
             let arrow_constr: type_constraint =
-              `Equals (type_cons "->" [tv_tt x1; tv_tt x2], (tv_tt t))
+              `Equals (type_cons_arrow (tv_tt x1) (tv_tt x2), (tv_tt t))
             in
             let c2' = `Conj (arrow_constr, c2) in
             let let_constr: type_constraint = `Let ([[], c1, var_map], c2') in
@@ -373,8 +400,6 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
           in
           let constraints = List.map generate_branch pat_expr_list in
           `Exists ([x1; x2], constr_conj constraints)
-      | Pexp_ident x ->
-          `Instance (`Var x, tv_tt t)
       | Pexp_apply (e1, label_expr_list) ->
           (* ti: xi *)
           let xis, sub_constraints = List.split
@@ -388,7 +413,7 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
           in
           (* build the type constructor t1 -> (t2 -> (... -> (tn -> t))) *)
           let arrow_type = List.fold_right
-            (fun c1 c2 -> type_cons "->" [c1; c2])
+            type_cons_arrow
             (xis: type_var list :> type_term list)
             (tv_tt t)
           in
@@ -461,7 +486,31 @@ and generate_constraint: structure -> type_constraint =
             `Let ([[], c, IdentMap.empty], c2)
         | _ -> failwith "structure_item not implemented\n"
     in
-    List.fold_right generate_constraint_structure_item structure `Dump
+    let default_bindings =
+      let plus_scheme =
+        let plus_var = fresh_type_var ~letter:'z' () in
+        let plus_type =
+          type_cons_arrow type_cons_int (type_cons_arrow type_cons_int type_cons_int)
+        in
+        let plus_map = IdentMap.add (ident "+") plus_var IdentMap.empty in
+        [plus_var], `Equals (tv_tt plus_var, plus_type), plus_map
+      in
+      (* Disabled for the moment as this generates a constraint that looks like
+       * a comment *)
+      (* let mult_scheme =
+        let mult_var = fresh_type_var ~letter:'z' () in
+        let mult_type =
+          type_cons_arrow type_cons_int (type_cons_arrow type_cons_int type_cons_int)
+        in
+        let mult_map = IdentMap.add (ident "*") mult_var IdentMap.empty in
+        [mult_var], `Equals (tv_tt mult_var, mult_type), mult_map
+      in *)
+      [plus_scheme]
+    in
+    let topmost_constraint =
+      List.fold_right generate_constraint_structure_item structure `Dump
+    in
+    `Let (default_bindings, topmost_constraint)
 
 (* Useful for let pattern = expression ... *)
 and generate_constraint_pat_expr: pattern * expression -> type_var list * type_constraint * type_var IdentMap.t =
