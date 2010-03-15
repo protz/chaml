@@ -9,13 +9,13 @@ let d g x1 x2 =
 
 let _ = s k i and e = i i
 
-(* mini considers those two are identical *)
+(* mini considers those two to be identical *)
 let f (x, y, z) = x
 let o (x, (y, z)) = x
 
-(* mini doesn't parse this one but can solve the constraint... and flattens the
+(* mini doesn't parse those two but can solve the constraint... and flattens the
 * tuple *)
-(* let o = fun a -> function (a, c) -> c | (x, (y, z)) -> x *)
-(* let o x = match x with
+(*let o = fun a -> function (a, c) -> c | (x, (y, z)) -> x
+let o x = match x with
   | (a, c) -> c
-  | (a, (b, c)) -> b *)
+  | (a, (b, c)) -> a *)
