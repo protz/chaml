@@ -9,4 +9,10 @@ let d g x1 x2 =
 
 let _ = s k i and e = i i
 
+(* mini considers those two are identical *)
 let f (x, y, z) = x
+let o (x, (y, z)) = x
+
+(* mini doesn't parse this one but can solve the constraint... and flattens the
+* tuple *)
+(* let o = function (a, c) -> c | (x, (y, z)) -> x *)

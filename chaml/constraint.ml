@@ -229,13 +229,18 @@ let tv_tt x = (x: type_var :> type_term)
 (* Parsetree.pattern 
  *
  * We are given a type var that's supposed to match the given pattern. What we
- * return is a type constraint and a map from identifiers to corresponding type
- * variables. For instance, generate_constraint_pattern X (a*b) returns
+ * return is a type constraint and a map from identifiers to the corresponding
+ * type variables. For instance, generate_constraint_pattern X (a*b) returns
  * \exists Y Z. [ X = Y * Z and a < X and b < Y ] and { a => Y; b => Z }
  *
- * We also return the list of all the existential variable that have been
- * generated. The let - binding that called us will generate the `Exists
- * constraint for us.
+ * We also return the list of all the variables that have been generated and
+ * must be bound existentially for this pattern. The let - binding that encloses
+ * us will generate the `Exists constraint for us.
+ *
+ * NB: one might be tempted to think that the map's keys and the list of
+ * existentially bound variables are equal. This is not necessarily true, as we
+ * might generate intermediate existential variables that are not bound to a
+ * specific identifier.
  *
  * *)
 let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * type_var IdentMap.t * type_var list) =
@@ -253,7 +258,7 @@ let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * t
         (* This represents the sub patterns. If the pattern is (e1, e2, e3),
          * then we generate x1 x2 x3 such that t = x1 * x2 * x3 *)
         let xis = List.map (fun _ -> fresh_type_var ()) patterns in
-        let rec combine known_vars known_map current_constraint = function
+        let rec combine known_vars known_map current_constraint_list = function
           | (new_pattern :: remaining_patterns, xi :: xis) ->
               (* sub_vars represents the existential variables that have been
                * generated throughout the pattern *)
@@ -261,23 +266,29 @@ let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * t
               if not (IdentMap.is_empty (JIM.inter known_map sub_map)) then
                 failwith "Variable is bound several times in the matching";
               let new_map = JIM.union known_map sub_map in
-              let new_constraint = `Conj (sub_constraint, current_constraint) in
+              let new_constraint_list = sub_constraint :: current_constraint_list in
               (* All the variables that have been generated existentially for
                * this pattern *)
               let new_vars = xi :: sub_vars @ known_vars in
-              combine new_vars new_map new_constraint (remaining_patterns, xis)
+              combine new_vars new_map new_constraint_list (remaining_patterns, xis)
           | ([], []) -> 
-              List.rev known_vars, known_map, current_constraint
+              let konstraint = match current_constraint_list with
+                | hd :: tl ->
+                    List.fold_left (fun x y -> `Conj (x, y)) hd tl
+                | _ ->
+                    assert false
+              in
+              List.rev known_vars, known_map, konstraint
           | _ ->
               assert false
         in
-        let sub_vars, sub_map, sub_constraint =
-          combine [] IdentMap.empty `True (patterns, xis)
+        let pattern_vars, pattern_map, pattern_constraint =
+          combine [] IdentMap.empty [] (patterns, xis)
         in
         let xis = (xis: type_var list :> type_term list) in
         let konstraint = `Equals (tv_tt x, type_cons "*" xis) in
-        let konstraint = `Conj (konstraint, sub_constraint) in
-        konstraint, sub_map, sub_vars
+        let konstraint = `Conj (konstraint, pattern_constraint) in
+        konstraint, pattern_map, pattern_vars
       | _ -> failwith "This pattern is not implemented\n"
 
 (* Parsetree.expression
