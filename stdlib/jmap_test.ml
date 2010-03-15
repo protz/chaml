@@ -22,4 +22,14 @@ let _ =
   let m4 = JSM.inter m1 m2 in
   print_endline "m1 inter m2 -----";
   StringMap.iter (fun k v -> Printf.printf "%s: %d\n" k v) m4;
+  let m5 = JSM.minus m1 m2 in
+  print_endline "m1 minus m2 -----";
+  StringMap.iter (fun k v -> Printf.printf "%s: %d\n" k v) m5;
+  let m6 = JSM.minus m2 m1 in
+  print_endline "m2 minus m1 -----";
+  StringMap.iter (fun k v -> Printf.printf "%s: %d\n" k v) m6;
+  let m7 = JSM.xor m2 m1 in
+  print_endline "m2 xor m1 -----";
+  StringMap.iter (fun k v -> Printf.printf "%s: %d\n" k v) m7;
+
 

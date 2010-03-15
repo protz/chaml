@@ -320,6 +320,22 @@ let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * t
         let konstraint = `Equals (tv_tt x, type_cons "*" xis) in
         let konstraint = `Conj (konstraint, pattern_constraint) in
         konstraint, pattern_map, pattern_vars
+      | Ppat_or (pat1, pat2) ->
+        let module JIM = Jmap.Make(IdentMap) in
+        let c1, map1, vars1 = generate_constraint_pattern x pat1 in
+        let c2, map2, vars2 = generate_constraint_pattern x pat2 in
+        let xor_map = JIM.xor map1 map2 in
+        if not (IdentMap.is_empty xor_map) then begin
+          let bad_ident = List.hd (JIM.keys xor_map) in
+          failwith (Printf.sprintf "Variable %s must occur on both sides of this | pattern" (string_of_ident bad_ident))
+        end;
+        let constraints =
+          IdentMap.fold
+            (fun k v acc -> `Equals (tv_tt (IdentMap.find k map2), tv_tt v) :: acc)
+            map1
+            []
+        in
+        constr_conj (c1 :: c2 :: constraints), map1, vars1 @ vars2
       | _ -> failwith "This pattern is not implemented\n"
 
 (* Parsetree.expression
