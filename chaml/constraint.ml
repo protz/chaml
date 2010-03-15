@@ -225,6 +225,11 @@ let string_of_constraint, string_of_type =
 (* ========== CONSTRAINT GENERATION ========== *)
 
 let tv_tt x = (x: type_var :> type_term)
+let constr_conj = function
+  | hd :: tl ->
+      List.fold_left (fun x y -> `Conj (x, y)) hd tl
+  | _ ->
+      assert false
 
 (* Parsetree.pattern 
  *
@@ -272,12 +277,7 @@ let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * t
               let new_vars = xi :: sub_vars @ known_vars in
               combine new_vars new_map new_constraint_list (remaining_patterns, xis)
           | ([], []) -> 
-              let konstraint = match current_constraint_list with
-                | hd :: tl ->
-                    List.fold_left (fun x y -> `Conj (x, y)) hd tl
-                | _ ->
-                    assert false
-              in
+              let konstraint = constr_conj current_constraint_list in
               List.rev known_vars, known_map, konstraint
           | _ ->
               assert false
@@ -295,17 +295,19 @@ let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * t
  * 
  * - TODO figure out what label and the expression option are for in
  * Pexp_function then do things accordingly. label is probably when the argument
- * is labeled.
+ * is labeled. What is the expression option for?
  *
  * *)
 and generate_constraint_expression: type_var -> expression -> type_constraint =
   fun t { pexp_desc; pexp_loc } ->
     match pexp_desc with
       | Pexp_function (_, _, pat_expr_list) ->
+          (* As in the definition. We could generate fresh variables for each
+          * branch of the pattern-matching. The conjunction would then force
+          * them to be all equal. However, I find it nicer to share x1 and x2. *)
+          let x1 = fresh_type_var ~letter:'x' () in
+          let x2 = fresh_type_var ~letter:'x' () in
           let generate_branch (pat, expr) =
-            (* as in the definition *)
-            let x1 = fresh_type_var ~letter:'x' () in
-            let x2 = fresh_type_var ~letter:'x' () in
             (* ~ [[ pat: X1 ]] *)
             let c1, var_map, generated_vars = generate_constraint_pattern x1 pat in
             (* [[ t: X2 ]] *)
@@ -316,10 +318,14 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
             in
             let c2' = `Conj (arrow_constr, c2) in
             let let_constr: type_constraint = `Let ([[], c1, var_map], c2') in
-            `Exists ([x1; x2] @ generated_vars, let_constr)
+            (* This allows to properly scope the variables that are inner to
+             * each pattern. x1 and x2 are a level higher since they are shared
+             * accross patterns. This wouldn't change much as the variables are
+             * fresh anyway, but let's do that properly! *)
+            `Exists (generated_vars, let_constr)
           in
           let constraints = List.map generate_branch pat_expr_list in
-          List.fold_left (fun c1 c2 -> `Conj (c1, c2)) `True constraints
+          `Exists ([x1; x2], constr_conj constraints)
       | Pexp_ident x ->
           `Instance (`Var x, tv_tt t)
       | Pexp_apply (e1, label_expr_list) ->
@@ -357,6 +363,9 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
             failwith "Rec flag not supported";
           let c2 = generate_constraint_expression t e2 in
           `Let (List.map generate_constraint_pat_expr pat_expr_list, c2)
+      (*| Pexp_match (e1, pat_expr_list) ->
+          let x1 = fresh_type_var ~letter:'x' () in
+          `Exists (x1, *)
       | _ ->
           failwith "This expression is not supported\n"
 
