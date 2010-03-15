@@ -9,8 +9,8 @@ test_mini:
 	mini --do print-constraint test.ml
 
 test_chaml:
+	./chaml.native --print-constraint --pretty-printing test.ml
 	./chaml.native --print-constraint test.ml > _constraints
-	@cat _constraints
 	mini --start parse-constraint _constraints
 
 test_compare:
