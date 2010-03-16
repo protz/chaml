@@ -438,20 +438,33 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
       | Pexp_match (e1, pat_expr_list) ->
           let x1 = fresh_type_var ~letter:'x' () in
           let constr_e1 = generate_constraint_expression x1 e1 in
-          let generate_branch (pat, expr) =
-            let c1, var_map, generated_vars = generate_constraint_pattern x1 pat in
-            let c2 = generate_constraint_expression t expr in
-            (* XXX Try to generalize here when we have constants.
-             * Change `Exists (...) into `Let (generated_vars, ...). Also change
-             * the code for Pexp_function *)
-            let c = `Conj (constr_e1, c1) in
-            let let_constr: type_constraint =
-              `Let ([x1 :: generated_vars, c, var_map], c2)
+          if Opts.get_opt "generalize-match" then
+            (* We generalize here. See the draft version of ATTAPL p.98 for the
+             * exact rule. The important part is that we generate a `Let
+             * constraint for each branch and we copy the e1 constraint into each
+             * branch. *)
+            let generate_branch (pat, expr) =
+              let c1, var_map, generated_vars = generate_constraint_pattern x1 pat in
+              let c2 = generate_constraint_expression t expr in
+              let c = `Conj (constr_e1, c1) in
+              let let_constr: type_constraint =
+                `Let ([x1 :: generated_vars, c, var_map], c2)
+              in
+              let_constr
             in
-            let_constr
-          in
-          let constraints = List.map generate_branch pat_expr_list in
-          `Exists ([x1], constr_conj constraints)
+            let constraints = List.map generate_branch pat_expr_list in
+            `Exists ([x1], constr_conj constraints)
+          else
+            let generate_branch (pat, expr) =
+              let c1, var_map, generated_vars = generate_constraint_pattern x1 pat in
+              let c2 = generate_constraint_expression t expr in
+              (* This rule doesn't generalize. This allows *not* to duplicate the
+              * e1 constraint. That way, we don't explode with rectypes. *)
+              let let_constr: type_constraint = `Let ([[], c1, var_map], c2) in
+              `Exists (generated_vars, let_constr)
+            in
+            let constraints = List.map generate_branch pat_expr_list in
+            `Exists ([x1], constr_conj (constr_e1 :: constraints))
       | _ ->
           failwith "This expression is not supported\n"
 

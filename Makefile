@@ -14,8 +14,13 @@ test_chaml:
 	mini --start parse-constraint _constraints
 
 test_chaml2:
-	./chaml.native --print-constraint --pretty-printing test2.ml
-	./chaml.native --print-constraint test2.ml > _constraints
+	./chaml.native --print-constraint --disable generalize-match --pretty-printing test2.ml
+	./chaml.native --print-constraint --disable generalize-match test2.ml > _constraints
+	mini --start parse-constraint _constraints
+
+test_chaml3:
+	./chaml.native --print-constraint --pretty-printing test3.ml
+	./chaml.native --print-constraint test3.ml > _constraints
 	mini --start parse-constraint _constraints
 
 test_compare:

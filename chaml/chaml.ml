@@ -92,6 +92,7 @@ let _ =
   let arg_print_ast = ref false in
   let arg_print_constraint = ref false in
   let arg_pretty_printing = ref false in
+  let add_opt v k = Opts.add_opt k v in
   let usage = String.concat ""
                 ["ChaML: a type-checker for OCaml programs.\n";
                  "Usage: "; Sys.argv.(0); " [OPTIONS] FILE\n"] in
@@ -100,6 +101,8 @@ let _ =
       "--print-ast", Arg.Set arg_print_ast, "print the AST as parsed by the OCaml frontend";
       "--print-constraint", Arg.Set arg_print_constraint, "print the constraint in a format mini can parse";
       "--pretty-printing", Arg.Set arg_pretty_printing, "print the constraint using advanced terminal features";
+      "--enable", Arg.String (add_opt true), "enable one of the following options: generalize-match (on by default)";
+      "--disable", Arg.String (add_opt false), "disable one of the options above";
     ]
     (fun f -> if !arg_filename = "" then arg_filename := f else print_endline "*** More than one file given, keeping the first one.")
     usage;
