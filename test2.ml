@@ -14,3 +14,10 @@ let f3 x y = x + y
 
 (* More complex example *)
 let f4 = function (x,y) -> x | (_, (a, b)) -> 42 + 5
+
+(* Generalize under the let ? *)
+let v1 = match (fun x -> x) with
+  | f ->
+      let a = f 2 in
+      let b = f '2' in
+      f
