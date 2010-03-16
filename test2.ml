@@ -1,4 +1,4 @@
-(* Here are some examples that mini can't parse so we use ChaML for the
+(*(* Here are some examples that mini can't parse so we use ChaML for the
 * constraint generation. Mini then takes on from the constraints we have
 * generated and solves them. *)
 
@@ -13,7 +13,7 @@ let f2 x = match x with
 let f3 x y = x + y
 
 (* More complex example *)
-let f4 = function (x,y) -> x | (_, (a, b)) -> 42 + 5
+let f4 = function (x,y) -> x | (_, (a, b)) -> 42 + 5*)
 
 (* Generalize under the let ? *)
 let v1 = match (fun x -> x) with
