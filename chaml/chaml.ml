@@ -18,36 +18,6 @@
 (*****************************************************************************)
 
 exception Error
-
-(* Optionally preprocess a source file *)
-
-(*let preprocess sourcefile =
-  match !Clflags.preprocessor with
-    None -> sourcefile
-  | Some pp ->
-      let tmpfile = Filename.temp_file "camlpp" "" in
-      let comm = Printf.sprintf "%s %s > %s"
-                                pp (Filename.quote sourcefile) tmpfile
-      in
-      if Ccomp.command comm <> 0 then begin
-        Misc.remove_file tmpfile;
-        raise Error;
-      end;
-      tmpfile
-
-let remove_preprocessed inputfile =
-  match !Clflags.preprocessor with
-    None -> ()
-  | Some _ -> Misc.remove_file inputfile
-
-let remove_preprocessed_if_ast inputfile =
-  match !Clflags.preprocessor with
-    None -> ()
-  | Some _ ->
-      if inputfile <> !Location.input_name then Misc.remove_file inputfile*)
-
-(* Parse a file or get a dumped syntax tree in it *)
-
 exception Outdated_version
 
 (* Stolen from driver/pparse.ml *)
@@ -114,7 +84,7 @@ let _ =
       Format.fprintf Format.std_formatter "%a@." Printast.implementation ast;
     let konstraint = Constraint.generate_constraint ast in
     if !arg_print_constraint then begin
-      let pp_env = Constraint.fresh_pp_env ~pretty_printing:!arg_pretty_printing () in
-      print_string (Constraint.string_of_constraint pp_env konstraint)
+      let pp_env = ConstraintPrinter.fresh_pp_env ~pretty_printing:!arg_pretty_printing () in
+      print_string (ConstraintPrinter.string_of_constraint pp_env konstraint)
     end;
   end

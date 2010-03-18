@@ -5,7 +5,7 @@
 let f1 = fun a -> function (a, c) -> c | (x, (y, z)) -> x
 
 (* This one gives val o : ('b * 'a as 'a) * 'a -> 'a (using ocaml -rectypes) *)
-let f2 x = match x with
+let f2 d = match d with
   | (c, a)
   | (a, (_, c)) -> a
 
