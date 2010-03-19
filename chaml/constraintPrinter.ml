@@ -31,7 +31,7 @@ let fresh_pp_env ~pretty_printing () = {
 }
 
 let bash_color c =
-  Format.kprintf (Format.sprintf "\x1b[38;5;%dm%s\x1b[38;5;15m" c)
+  Printf.kprintf (Printf.sprintf "\x1b[38;5;%dm%s\x1b[38;5;15m" c)
 
 let pp_env_step pp_env = match pp_env.color_stack with
   | hd :: tl -> { pp_env with color_stack = tl }
@@ -41,13 +41,13 @@ let pp_env_brack pp_env s = match pp_env.color_stack with
   | hd :: _ when pp_env.pretty_printing ->
       String.concat "" [bash_color hd "["; s; bash_color hd "]"]
   | _ ->
-      Format.sprintf "[%s]" s
+      Printf.sprintf "[%s]" s
 
 let pp_env_paren pp_env s = match pp_env.color_stack with
   | hd :: _ when pp_env.pretty_printing ->
       String.concat "" [bash_color hd "("; s; bash_color hd ")"]
   | _ ->
-      Format.sprintf "(%s)" s
+      Printf.sprintf "(%s)" s
 
 (* Print the constraints in a format readable by mini *)
 let string_of_type_var = function
