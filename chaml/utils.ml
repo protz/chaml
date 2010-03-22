@@ -17,4 +17,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = unit
+let fresh_var =
+  let c = ref (-1) in
+  fun ?letter () ->
+    c := !c + 1; 
+    let letter = if !c >= 26 && letter = None then Some 'v' else letter in
+    match letter with
+      | Some l ->
+        (String.make 1 l) ^ (string_of_int !c)
+      | _ ->
+        String.make 1 (char_of_int (int_of_char 'a' + !c))
+
