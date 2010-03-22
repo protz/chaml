@@ -19,34 +19,10 @@
 
 open Error
 
-(* X *)
-type type_var = [
-  `Var of string
-]
-
-(* Generate fresh type variables on demand *)
-let fresh_var =
-  let c = ref (-1) in
-  fun ?letter () ->
-    c := !c + 1; 
-    let letter = if !c >= 26 && letter = None then Some 'v' else letter in
-    match letter with
-      | Some l ->
-        (String.make 1 l) ^ (string_of_int !c)
-      | _ ->
-        String.make 1 (char_of_int (int_of_char 'a' + !c))
-
-(* Wrap them automatically as type variables *)
-let fresh_type_var ?letter (): type_var =
-  `Var (fresh_var ?letter ())
-
 (* x, y ::= variable | constant | memory location *)
 type ident = [
   `Var of Longident.t
 ]
-
-(* Create an ident out of a string *)
-let ident x = `Var (Longident.Lident x)
 
 (* The mapping from all the bound identifiers in a pattern to the corresponding
  * type variables in the scheme. *)
@@ -65,10 +41,15 @@ type type_cons = {
   cons_arity: int;
 }
 
+(* X *)
+type 'var_type generic_var = [
+  `Var of 'var_type
+]
+
 (* T ::= X | F \vec{x} *)
-type type_term = [
-    type_var
-  | `Cons of type_cons * type_term list
+type 'var_type generic_term = [
+    'var_type generic_var
+  | `Cons of type_cons * 'var_type generic_term list
 ]
 
 (* (forall x1 x2 ...) * ([ constraint ]) * (mapping from idents to vars)
@@ -78,37 +59,46 @@ type type_term = [
  * variables. This is why we use a IdentMap.
  *
  * *)
-type type_scheme = type_var list * type_constraint * type_var IdentMap.t
+type 'var_type generic_scheme =
+    'var_type generic_var list
+  * 'var_type generic_constraint
+  * 'var_type generic_var IdentMap.t
 
 (* C, D see p. 407.
  *
  * We might have more than one type scheme if we use let p1 = e1 and p2 = e2 ...
+ * which is why we use a type_scheme list in the `Let branch.
  *
  * *)
-and type_constraint = [
+and 'var_type generic_constraint = [
     `True
-  | `Conj of type_constraint * type_constraint
-  | `Exists of type_var list * type_constraint
-  | `Equals of type_term * type_term
-  | `Instance of ident * type_term
-  | `Let of type_scheme list * type_constraint
+  | `Conj of 'var_type generic_constraint * 'var_type generic_constraint
+  | `Exists of 'var_type generic_var list * 'var_type generic_constraint
+  | `Equals of 'var_type generic_term * 'var_type generic_term
+  | `Instance of ident * 'var_type generic_term
+  | `Let of 'var_type generic_scheme list * 'var_type generic_constraint
   | `Dump
 ]
 
-(* Instanciate a type constructor with its type variables, thus creating a type
- * term. If the type constructor does not exist, raise an error, unless it's a
- * tuple (all tuples exist, so we create them on demand). *)
-let type_cons: string -> type_term list -> type_term =
+
+(* We have a set of pre-defined types, like the arrow. The ground types are also
+ * defined as constructors that take zero arguments. We have discarded int32,
+ * int64 and nativeint from OCaml. *)
+let global_constructor_table =
   let tbl = Hashtbl.create 8 in
-  (* Add those ones. They're pre-defined. *)
   Hashtbl.add tbl "->" { cons_name = "->"; cons_arity = 2 };
   Hashtbl.add tbl "int" { cons_name = "int"; cons_arity = 0 };
   Hashtbl.add tbl "char" { cons_name = "char"; cons_arity = 0 };
   Hashtbl.add tbl "string" { cons_name = "string"; cons_arity = 0 };
   Hashtbl.add tbl "float" { cons_name = "float"; cons_arity = 0 };
-  (* The function *)
+  tbl
+
+(* Instanciate a type constructor with its type variables, thus creating a type
+ * term. If the type constructor does not exist, raise an error, unless it's a
+ * tuple (all tuples exist, so we create them on demand). *)
+let type_cons: string -> 'var_type generic_term list -> 'var_type generic_term =
   fun cons_name args ->
-    begin match Jhashtbl.find_opt tbl cons_name with
+    begin match Jhashtbl.find_opt global_constructor_table cons_name with
     | Some cons ->
         if List.length args != cons.cons_arity then
           fatal_error "Bad number of arguments for type constructor %s" cons_name;
@@ -117,10 +107,10 @@ let type_cons: string -> type_term list -> type_term =
         if cons_name = "*" then
           let cons_arity = List.length args in
           let cons_key = "*" ^ (string_of_int cons_arity) in
-          match Jhashtbl.find_opt tbl cons_key with
+          match Jhashtbl.find_opt global_constructor_table cons_key with
           | None ->
               let cons = { cons_name; cons_arity } in
-              Hashtbl.add tbl cons_key cons;
+              Hashtbl.add global_constructor_table cons_key cons;
               `Cons (cons, args)
           | Some cons ->
               `Cons (cons, args)
@@ -128,6 +118,8 @@ let type_cons: string -> type_term list -> type_term =
           fatal_error "Unbound type constructor %s\n" cons_name
     end
 
+(* That way these constructors are global and we can test type equality by using
+ * == (faster) *)
 let type_cons_arrow x y = type_cons "->" [x; y]
 let type_cons_int = type_cons "int" []
 let type_cons_char = type_cons "char" []

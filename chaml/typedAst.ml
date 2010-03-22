@@ -17,30 +17,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Algebra
-
-(* - An equivalence class of variables is a [unification_variable].
- * - A multi-equation is a set of variables that are all equal to a given [term].
- *
- * - A descriptor represents a class of variables. If they have been equated
- * with a term, then [term] is non-null. Otherwise, it's [None].
- *
- * *)
-
-type descriptor = {
-  term: unification_variable generic_term option;
-  name: string option;
-}
-
-and unification_variable = descriptor UnionFind.point
-
-type unification_constraint = [
-  | `True
-  | `False
-  | `MultiEquation of unification_variable
-  | `Conj of unification_constraint * unification_constraint
-  | `Exists of unification_variable list * unification_constraint
-]
-
-let rec unify (v1: unification_variable) (v2: unification_variable) =
-  ()
+type t = ()

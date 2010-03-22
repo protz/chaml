@@ -21,9 +21,37 @@ open Parsetree
 open Algebra
 open Error
 
+(* Instanciate the types we need. Here, our type terms are only parameterized by
+ * strings, that is, 'x1, 'x2... the fresh variable names we generate as we go.
+ * Later on, type terms will be instanciated with unifier variables which will
+ * be union-find classes to actually perform unification. *)
+
+type type_var = string generic_var
+type type_term = string generic_term
+type type_constraint = string generic_constraint
+type type_scheme = string generic_scheme    
+
 (* The polymorphic variants allow us to make a difference between simply a
  * variable and a more general term. But we need to do the casts ourselves. *)
 let tv_tt x = (x: type_var :> type_term)
+
+
+(* Create an ident out of a string *)
+let ident x = `Var (Longident.Lident x)
+
+(* Generate fresh type variables on demand *)
+let fresh_type_var =
+  let c = ref (-1) in
+  fun ?letter () ->
+    c := !c + 1; 
+    let letter = if !c >= 26 && letter = None then Some 'v' else letter in
+    let r = match letter with
+      | Some l ->
+        (String.make 1 l) ^ (string_of_int !c)
+      | _ ->
+        String.make 1 (char_of_int (int_of_char 'a' + !c))
+    in
+    `Var r
 
 (* Returns c_1 and (c_2 and ( ... and c_n)) *)
 let constr_conj = function

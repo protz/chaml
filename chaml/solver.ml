@@ -17,4 +17,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Algebra
+open Unify
+open Constraint
 
+type solver_scheme = unification_variable generic_scheme
+type solver_constraint = unification_variable generic_constraint
+
+type solver_stack = [
+  | `Empty
+  | `Conj of solver_stack * solver_constraint
+  | `Let of solver_stack * solver_scheme
+]
+
+type solver_state = solver_stack * unification_constraint * type_constraint
+
+let solve (c: type_constraint) =
+  ()

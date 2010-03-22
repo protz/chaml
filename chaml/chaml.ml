@@ -60,6 +60,7 @@ let file ppf inputfile parse_fun ast_magic =
 let _ =
   let arg_filename = ref "" in
   let arg_print_ast = ref false in
+  let arg_print_typed_ast = ref false in
   let arg_print_constraint = ref false in
   let arg_pretty_printing = ref false in
   let add_opt v k = Opts.add_opt k v in
@@ -69,6 +70,7 @@ let _ =
   Arg.parse
     [
       "--print-ast", Arg.Set arg_print_ast, "print the AST as parsed by the OCaml frontend";
+      "--print-typed-ast", Arg.Set arg_print_typed_ast, "print the AST annotated with the types found by the solver";
       "--print-constraint", Arg.Set arg_print_constraint, "print the constraint in a format mini can parse";
       "--pretty-printing", Arg.Set arg_pretty_printing, "print the constraint using advanced terminal features";
       "--enable", Arg.String (add_opt true), "enable one of the following options: generalize-match (on by default)";
@@ -86,5 +88,9 @@ let _ =
     if !arg_print_constraint then begin
       let pp_env = ConstraintPrinter.fresh_pp_env ~pretty_printing:!arg_pretty_printing () in
       print_string (ConstraintPrinter.string_of_constraint pp_env konstraint)
+    end;
+    let typed_ast = Solver.solve konstraint in
+    if !arg_print_typed_ast then begin
+      print_string (TypedAstPrinter.string_of_typed_ast typed_ast)
     end;
   end
