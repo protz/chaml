@@ -17,4 +17,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let fatal_error () = Printf.kprintf failwith
+let fatal_error f = Printf.kprintf failwith f

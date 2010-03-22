@@ -70,7 +70,7 @@ let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * t
                * generated throughout the pattern *)
               let sub_constraint, sub_map, sub_vars = generate_constraint_pattern xi new_pattern in
               if not (IdentMap.is_empty (JIM.inter known_map sub_map)) then
-                fatal_error () "Variable is bound several times in the matching";
+                fatal_error "Variable is bound several times in the matching";
               let new_map = JIM.union known_map sub_map in
               let new_constraint_list = sub_constraint :: current_constraint_list in
               (* All the variables that have been generated existentially for
@@ -97,7 +97,7 @@ let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * t
         let xor_map = JIM.xor map1 map2 in
         if not (IdentMap.is_empty xor_map) then begin
           let bad_ident = List.hd (JIM.keys xor_map) in
-          fatal_error () "Variable %s must occur on both sides of this | pattern" (ConstraintPrinter.string_of_ident bad_ident)
+          fatal_error "Variable %s must occur on both sides of this | pattern" (ConstraintPrinter.string_of_ident bad_ident)
         end;
         let constraints =
           IdentMap.fold
@@ -106,7 +106,7 @@ let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * t
             []
         in
         constr_conj (c1 :: c2 :: constraints), map1, vars1 @ vars2
-      | _ -> fatal_error () "This pattern is not implemented\n"
+      | _ -> fatal_error "This pattern is not implemented\n"
 
 (* Parsetree.expression
  * 
@@ -127,7 +127,7 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
             | Const_char _ -> `Equals (tv_tt t, type_cons_char)
             | Const_string _ -> `Equals (tv_tt t, type_cons_string)
             | Const_float _ -> `Equals (tv_tt t, type_cons_float)
-            | _ -> fatal_error () "This type of constant is not supported."
+            | _ -> fatal_error "This type of constant is not supported."
           end
       | Pexp_function (_, _, pat_expr_list) ->
           (* As in the definition. We could generate fresh variables for each
@@ -185,7 +185,7 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
           `Exists (x1 :: xis, konstraint)
       | Pexp_let (rec_flag, pat_expr_list, e2) ->
           if rec_flag <> Asttypes.Nonrecursive then
-            fatal_error () "Rec flag not supported";
+            fatal_error "Rec flag not supported";
           let c2 = generate_constraint_expression t e2 in
           `Let (List.map generate_constraint_pat_expr pat_expr_list, c2)
       | Pexp_match (e1, pat_expr_list) ->
@@ -218,7 +218,7 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
             let constraints = List.map generate_branch pat_expr_list in
             `Exists ([x1], constr_conj (constr_e1 :: constraints))
       | _ ->
-          fatal_error () "This expression is not supported\n"
+          fatal_error "This expression is not supported\n"
 
 (* Parsetree.structure
  * 
@@ -245,14 +245,14 @@ and generate_constraint: structure -> type_constraint =
       match pstr_desc with
         | Pstr_value (rec_flag, pat_expr_list) ->
             if rec_flag <> Asttypes.Nonrecursive then
-              fatal_error () "rec flag not implemented\n";
+              fatal_error "rec flag not implemented\n";
             `Let (List.map generate_constraint_pat_expr pat_expr_list, c2)
         | Pstr_eval expr ->
             let t = fresh_type_var ~letter:'t' () in
             let c = generate_constraint_expression t expr in
             let c = `Exists ([t], c) in
             `Let ([[], c, IdentMap.empty], c2)
-        | _ -> fatal_error () "structure_item not implemented\n"
+        | _ -> fatal_error "structure_item not implemented\n"
     in
     let default_bindings =
       let plus_scheme =

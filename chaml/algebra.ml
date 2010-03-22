@@ -55,7 +55,7 @@ module IdentMap = Map.Make (struct
   let compare (`Var x) (`Var y) =
     match x, y with
       | Longident.Lident a, Longident.Lident b -> String.compare a b
-      | _ -> fatal_error () "Only simple identifiers are implemented\n"
+      | _ -> fatal_error "Only simple identifiers are implemented\n"
 end)
 
 (* The trick is to use one instance per constructor so that we can use
@@ -71,14 +71,16 @@ type type_term = [
   | `Cons of type_cons * type_term list
 ]
 
-(* (forall x1 x2 ...) * ([ constraint ]) * (mapping from idents to vars) *)
-type type_scheme = type_var list * type_constraint * type_var IdentMap.t
-
-(* C, D see p. 407.
+(* (forall x1 x2 ...) * ([ constraint ]) * (mapping from idents to vars)
  *
  * If there is a pattern on the left-hand side of a let binding, then
  * generate_constraint_pattern will have to bind several identifiers to type
  * variables. This is why we use a IdentMap.
+ *
+ * *)
+type type_scheme = type_var list * type_constraint * type_var IdentMap.t
+
+(* C, D see p. 407.
  *
  * We might have more than one type scheme if we use let p1 = e1 and p2 = e2 ...
  *
@@ -109,7 +111,7 @@ let type_cons: string -> type_term list -> type_term =
     begin match Jhashtbl.find_opt tbl cons_name with
     | Some cons ->
         if List.length args != cons.cons_arity then
-          fatal_error () "Bad number of arguments for type constructor %s" cons_name;
+          fatal_error "Bad number of arguments for type constructor %s" cons_name;
         `Cons (cons, args)
     | None ->
         if cons_name = "*" then
@@ -123,7 +125,7 @@ let type_cons: string -> type_term list -> type_term =
           | Some cons ->
               `Cons (cons, args)
         else
-          fatal_error () "Unbound type constructor %s\n" cons_name
+          fatal_error "Unbound type constructor %s\n" cons_name
     end
 
 let type_cons_arrow x y = type_cons "->" [x; y]
