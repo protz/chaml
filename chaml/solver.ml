@@ -30,36 +30,33 @@ type solver_stack = [
   | `Let of solver_stack * solver_scheme
 ]
 
-type solver_state = solver_stack * unification_constraint * type_constraint
+type solver_state = solver_stack * unification_env * type_constraint
 
 let solve: type_constraint -> TypedAst.t = fun konstraint ->
-  let rec analyze: unification_env -> solver_state -> solver_state =
-    fun unification_env solver_state ->
-    let solver_stack, unification_constraint, type_constraint = solver_state in
+  let rec analyze: solver_state -> solver_state =
+    fun solver_state ->
+    let _solver_stack, unification_env, type_constraint = solver_state in
     match type_constraint with
       | `True ->
-          move_into unification_env solver_state
+          move_into solver_state
       | `Equals (t1, t2) ->
           let t1 = uterm_of_tterm unification_env t1 in
           let t2 = uterm_of_tterm unification_env t2 in
-          let konstraint =
-            unify_terms unification_env t1 t2 unification_constraint
-          in
-          let new_state = solver_stack, konstraint, type_constraint in
-          analyze unification_env new_state
+          unify unification_env t1 t2;
+          analyze solver_state
       | _ ->
           assert false
-  and move_into: unification_env -> solver_state -> solver_state =
-    fun unification_env solver_state ->
-    let solver_stack, unification_constraint, type_constraint = solver_state in
+  and move_into: solver_state -> solver_state =
+    fun solver_state ->
+    let _solver_stack, _unification_env, _type_constraint = solver_state in
     assert false
   in
-  let initial_state: solver_state = `Empty, `True, konstraint in
   let initial_env = {
     current_rank = 0;
     pools = [];
     tvar_to_uvar = Hashtbl.create 64
   } in
-  match analyze initial_env initial_state with
+  let initial_state: solver_state = `Empty, initial_env, konstraint in
+  match analyze initial_state with
     | `Empty, knowledge, `True -> ()
     | _ -> assert false
