@@ -35,7 +35,9 @@ type descriptor = {
 }
 
 and unification_var = descriptor UnionFind.point
-and unification_term = unification_var generic_term
+and unification_term = [
+  `Cons of type_cons * unification_var list
+]
 
 (* A pool contains all the variables with a given rank *)
 module Pool = struct
@@ -55,13 +57,15 @@ type unification_env = {
 }
 
 
-(* Recursively change terms that depend on constraint vars into terms that
- * depend on unification vars. This function implements the "explicit sharing"
- * concept by making sure we only have pointers to equivalence classes (and not
- * whole terms). This is discussed on p.442, see rule S-NAME-1. *)
-let rec uterm_of_tterm: unification_env -> type_term -> unification_term =
+(* Recursively change terms that depend on constraint vars into unification
+ * vars. This function implements the "explicit sharing" concept by making sure
+ * we only have pointers to equivalence classes (and not whole terms). This is
+ * discussed on p.442, see rule S-NAME-1. This includes creating variables
+ * on-the-fly when dealing with type constructors, so that when duplicating the
+ * associated var, the pointer to the equivalence class is retained. *)
+let rec uvar_of_tterm: unification_env -> type_term -> unification_var =
   fun unification_env type_term ->
-    let rec uterm_of_tterm: type_term -> unification_term = function
+    let rec uvar_of_tterm: type_term -> unification_var = function
     | `Var s as tvar ->
         begin match Jhashtbl.find_opt unification_env.tvar_to_uvar tvar with
           | None ->
@@ -72,51 +76,41 @@ let rec uterm_of_tterm: unification_env -> type_term -> unification_term =
               }
               in
               Hashtbl.add unification_env.tvar_to_uvar tvar uvar;
-              `Var uvar
+              uvar
           | Some uvar ->
-              `Var uvar
+              uvar
         end
     | `Cons (cons, args) ->
-        `Cons (cons, List.map uterm_of_tterm args)
+        let uterm = `Cons (cons, List.map uvar_of_tterm args) in
+        let uvar = UnionFind.fresh {
+          term = Some uterm;
+          name = None;
+          rank = unification_env.current_rank
+        }
+        in
+        uvar
     in
-    uterm_of_tterm type_term
-
-(* Useful when introducing new terms *)
-let fresh_unification_var ?term ?name unification_env =
-  let uvar = UnionFind.fresh { term; name; rank = unification_env.current_rank } in
-  `Var uvar
+    uvar_of_tterm type_term
 
 (* Update all the mutable data structures to take into account the new equation *)
-let rec unify: unification_env -> unification_term -> unification_term -> unit =
-  fun unification_env t1 t2 ->
-  begin match t1, t2 with
-    | `Cons (c1, args1), `Cons (c2, args2) ->
+let rec unify: unification_env -> unification_var -> unification_var -> unit =
+  fun unification_env v1 v2 ->
+  begin match UnionFind.find v1, UnionFind.find v2 with
+    (* NB: can I use == here? *)
+    | r1, r2 when r1 = r2 ->
+        ()
+    | { term = Some t1 }, { term = Some t2 } ->
+        let `Cons (c1, args1) = t1 and `Cons (c2, args2) = t2 in
         if not (c1 == c2) then
           Error.fatal_error "%s cannot be unified with %s\n" c1.cons_name c2.cons_name;
         if not (List.length args1 == List.length args2) then
           Error.fatal_error "wrong number of arguments for this tuple\n";
         List.iter2 (fun arg1 arg2 -> unify unification_env arg1 arg2) args1 args2;
-    | `Var v1, `Var v2 ->
-      begin match UnionFind.find v1, UnionFind.find v2 with
-        (* NB: can I use == here? *)
-        | r1, r2 when r1 = r2 ->
-            ()
-        | { term = Some t1 }, { term = Some t2 } ->
-            unify unification_env t1 t2;
-            UnionFind.union v1 v2;
-        | { term = Some _ }, { term = None } ->
-            UnionFind.union v2 v1;
-        | { term = None }, { term = Some _ } ->
-            UnionFind.union v1 v2;
-        | { term = None }, { term = None } ->
-            UnionFind.union v1 v2;
-      end
-    | `Var v, (`Cons _ as t1)
-    | (`Cons _ as t1), `Var v ->
-        begin match UnionFind.find v with
-          | { term = Some t2 } ->
-              unify unification_env t1 t2;
-          | { term = None } as descriptor ->
-              descriptor.term <- Some t1;
-        end
+        UnionFind.union v1 v2;
+    | { term = Some _ }, { term = None } ->
+        UnionFind.union v2 v1;
+    | { term = None }, { term = Some _ } ->
+        UnionFind.union v1 v2;
+    | { term = None }, { term = None } ->
+        UnionFind.union v1 v2;
   end

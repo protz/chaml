@@ -40,8 +40,8 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
       | `True ->
           move_into solver_state
       | `Equals (t1, t2) ->
-          let t1 = uterm_of_tterm unification_env (t1: type_var :> type_term) in
-          let t2 = uterm_of_tterm unification_env t2 in
+          let t1 = uvar_of_tterm unification_env (t1: type_var :> type_term) in
+          let t2 = uvar_of_tterm unification_env t2 in
           unify unification_env t1 t2;
           analyze solver_state
       | _ ->
