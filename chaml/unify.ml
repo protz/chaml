@@ -29,7 +29,7 @@ open Constraint
  * *)
 
 type descriptor = {
-  term: unification_term option;
+  mutable term: unification_term option;
   name: string option;
   rank: int;
 }
@@ -92,10 +92,54 @@ let fresh_unification_var ?term ?name unification_env =
   let uvar = UnionFind.fresh { term; name; rank = unification_env.current_rank } in
   `Var uvar
 
+(* Apply "standard" rules *)
 let rec unify unification_env unification_constraint =
   unification_constraint
 
-and unify_terms unification_env (t1: unification_term) (t2: unification_term) unification_constraint =
-  (*let v1: unification_term = fresh_unification_var ~term:t1 unification_env in
-  let v2: unification_term = fresh_unification_var ~term:t2 unification_env in*)
-  unification_constraint
+(* Introduce a new equality into the base set of constraints *)
+and unify_terms: unification_env -> unification_term -> unification_term -> unification_constraint -> unification_constraint =
+  fun unification_env t1 t2 unification_constraint ->
+  begin match t1, t2 with
+    | `Cons (c1, args1), `Cons (c2, args2) ->
+        if not (c1 == c2) then
+          Error.fatal_error "%s cannot be unified with %s\n" c1.cons_name c2.cons_name;
+        if not (List.length args1 == List.length args2) then
+          Error.fatal_error "wrong number of arguments for this tuple\n";
+        let konstraint: unification_constraint =
+          List.fold_left2
+            (fun c arg1 arg2 -> unify_terms unification_env arg1 arg2 c)
+            unification_constraint args1 args2
+        in
+        konstraint
+    | `Var v1, `Var v2 ->
+      begin match UnionFind.find v1, UnionFind.find v2 with
+        (* NB: can I use == here? *)
+        | r1, r2 when r1 = r2 ->
+            unification_constraint
+        | { term = Some t1 }, { term = Some t2 } ->
+            let konstraint = unify_terms unification_env t1 t2 unification_constraint in
+            UnionFind.union v1 v2;
+            konstraint
+        | { term = Some _ }, { term = None } ->
+            UnionFind.union v2 v1;
+            unification_constraint
+        | { term = None }, { term = Some _ } ->
+            UnionFind.union v1 v2;
+            unification_constraint
+        | { term = None }, { term = None } ->
+            UnionFind.union v1 v2;
+            unification_constraint
+      end
+    | `Var v, (`Cons _ as t1)
+    | (`Cons _ as t1), `Var v ->
+        begin match UnionFind.find v with
+          | { term = Some t2 } ->
+              let konstraint = unify_terms unification_env t1 t2 unification_constraint in
+              konstraint
+          | { term = None } as descriptor ->
+              descriptor.term <- Some t1;
+              unification_constraint
+        end
+    | _ ->
+      unification_constraint
+  end
