@@ -74,7 +74,7 @@ and 'var_type generic_constraint = [
     `True
   | `Conj of 'var_type generic_constraint * 'var_type generic_constraint
   | `Exists of 'var_type generic_var list * 'var_type generic_constraint
-  | `Equals of 'var_type generic_term * 'var_type generic_term
+  | `Equals of 'var_type generic_var * 'var_type generic_term
   | `Instance of ident * 'var_type generic_term
   | `Let of 'var_type generic_scheme list * 'var_type generic_constraint
   | `Dump

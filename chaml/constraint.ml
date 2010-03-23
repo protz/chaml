@@ -105,7 +105,7 @@ let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * t
           combine [] IdentMap.empty [] (patterns, xis)
         in
         let xis = (xis: type_var list :> type_term list) in
-        let konstraint = `Equals (tv_tt x, type_cons "*" xis) in
+        let konstraint = `Equals (x, type_cons "*" xis) in
         let konstraint = `Conj (konstraint, pattern_constraint) in
         konstraint, pattern_map, pattern_vars
       | Ppat_or (pat1, pat2) ->
@@ -119,7 +119,7 @@ let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * t
         end;
         let constraints =
           IdentMap.fold
-            (fun k v acc -> `Equals (tv_tt (IdentMap.find k map2), tv_tt v) :: acc)
+            (fun k v acc -> `Equals (IdentMap.find k map2, tv_tt v) :: acc)
             map1
             []
         in
@@ -141,10 +141,10 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
       | Pexp_constant c ->
           let open Asttypes in
           begin match c with
-            | Const_int _ -> `Equals (tv_tt t, type_cons_int)
-            | Const_char _ -> `Equals (tv_tt t, type_cons_char)
-            | Const_string _ -> `Equals (tv_tt t, type_cons_string)
-            | Const_float _ -> `Equals (tv_tt t, type_cons_float)
+            | Const_int _ -> `Equals (t, type_cons_int)
+            | Const_char _ -> `Equals (t, type_cons_char)
+            | Const_string _ -> `Equals (t, type_cons_string)
+            | Const_float _ -> `Equals (t, type_cons_float)
             | _ -> fatal_error "This type of constant is not supported."
           end
       | Pexp_function (_, _, pat_expr_list) ->
@@ -155,7 +155,7 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
           let x2 = fresh_type_var ~letter:'x' () in
           (* X1 -> X2 = T *)
           let arrow_constr: type_constraint =
-            `Equals (type_cons_arrow (tv_tt x1) (tv_tt x2), (tv_tt t))
+            `Equals (t, type_cons_arrow (tv_tt x1) (tv_tt x2))
           in
           let generate_branch (pat, expr) =
             (* ~ [[ pat: X1 ]] *)
@@ -191,7 +191,7 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
           (* \exists x1. *)
           let x1 = fresh_type_var ~letter:'x' () in
           (* x1 = t1 -> ... -> tn *)
-          let equals_constr: type_constraint = `Equals (tv_tt x1, arrow_type) in
+          let equals_constr: type_constraint = `Equals (x1, arrow_type) in
           (* [[ e1: x1 ]] *)
           let arrow_constr = generate_constraint_expression x1 e1 in
           (* combine both: [[ e1: t1 -> t2 -> ... -> tn -> t ]] *)
@@ -279,7 +279,7 @@ and generate_constraint: structure -> type_constraint =
           type_cons_arrow type_cons_int (type_cons_arrow type_cons_int type_cons_int)
         in
         let plus_map = IdentMap.add (ident "+") plus_var IdentMap.empty in
-        [plus_var], `Equals (tv_tt plus_var, plus_type), plus_map
+        [plus_var], `Equals (plus_var, plus_type), plus_map
       in
       (* Disabled for the moment as this generates a constraint that looks like
        * a comment *)

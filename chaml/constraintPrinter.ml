@@ -82,7 +82,7 @@ let string_of_constraint, string_of_type =
         else
           c
     | `Equals (t1, t2) ->
-        let t1 = string_of_type pp_env t1 in
+        let t1 = string_of_type_var t1 in
         let t2 = string_of_type pp_env t2 in
         String.concat "" [t1; " = "; t2]
     | `Instance (x, t) ->
