@@ -87,7 +87,7 @@ let string_of_constraint, string_of_type =
         String.concat "" [t1; " = "; t2]
     | `Instance (x, t) ->
         let x = string_of_ident x in
-        let t = string_of_type pp_env t in
+        let t = string_of_type_var t in
         String.concat "" [x; " < "; t]
     | `Let (schemes, c) ->
         let i' = inc i in

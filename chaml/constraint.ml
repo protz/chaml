@@ -137,7 +137,7 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
   fun t { pexp_desc; pexp_loc } ->
     match pexp_desc with
       | Pexp_ident x ->
-          `Instance (`Var x, tv_tt t)
+          `Instance (`Var x, t)
       | Pexp_constant c ->
           let open Asttypes in
           begin match c with
