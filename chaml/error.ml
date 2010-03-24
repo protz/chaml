@@ -18,3 +18,5 @@
 (*****************************************************************************)
 
 let fatal_error f = Printf.kprintf failwith f
+
+let debug f = Printf.fprintf stderr f

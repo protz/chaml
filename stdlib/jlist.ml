@@ -29,3 +29,6 @@ let rec append_rev_front x y = match x,y with
       l
   | x::xs, l ->
       append_rev_front xs (x :: l)
+
+let ignore_map f l =
+  ignore (List.map (fun x -> ignore (f x)) l)
