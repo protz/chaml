@@ -44,6 +44,7 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
       | `Instance (ident, t) ->
           let t1 = IdentMap.find ident unifier_env.ident_to_uvar in
           let t2 = uvar_of_tterm unifier_env (t: type_var :> type_term) in
+          (* XXX fixme here *)
           (* let t2 = fresh_copy unifier_env t2 in *)
           Error.debug "[SI] %s < %s\n" (uvar_name t1) (uvar_name t2);
           unify unifier_env t1 t2;
@@ -111,8 +112,8 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
     ident_to_uvar = IdentMap.empty;
   } in
   let initial_state: solver_state = initial_env, konstraint in
+  let c = ref 0 in
   let fresh_greek_var =
-    let c = ref 0 in
     let alpha = 0xB0 in
     fun () ->
       c := !c + 1;
@@ -123,39 +124,44 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
       ]
   in
   let print_type: ident -> unifier_var -> unit =
-    let greek_of_repr = Hashtbl.create 24 in
-    let rec print_type uvar =
-      let repr = UnionFind.find uvar in
-      match repr.term with
-        | None ->
-            begin match Jhashtbl.find_opt greek_of_repr repr with
-              | None -> 
-                  let letter = fresh_greek_var () in
-                  Hashtbl.add greek_of_repr repr letter;
-                  letter
-              | Some letter ->
-                  letter
-            end
-        | Some (`Cons (cons_name, cons_args)) ->
-            let types = List.map print_type cons_args in
-            begin match cons_name with
-              | { cons_name = "->" } ->
-                  let t1 = List.nth types 0 in
-                  let t2 = List.nth types 1 in
-                  Printf.sprintf "%s -> %s" t1 t2
-              | { cons_name = "*" } ->
-                  String.concat " * " types
-              | { cons_name; } ->
-                  let args = String.concat ", " types in
-                  if List.length types > 0 then
-                    Printf.sprintf "%s (%s)" cons_name args
-                  else
-                    Printf.sprintf "%s" cons_name
-            end
-    in
     fun ident uvar ->
+      let greek_of_repr = Hashtbl.create 24 in
+      let rec print_type paren uvar =
+        let repr = UnionFind.find uvar in
+        match repr.term with
+          | None ->
+              begin match Jhashtbl.find_opt greek_of_repr repr with
+                | None -> 
+                    let letter = fresh_greek_var () in
+                    Hashtbl.add greek_of_repr repr letter;
+                    letter
+                | Some letter ->
+                    letter
+              end
+          | Some (`Cons (cons_name, cons_args)) ->
+              begin match cons_name with
+                | { cons_name = "->" } ->
+                    let t1 = print_type true (List.nth cons_args 0) in
+                    let t2 = print_type false (List.nth cons_args 1) in
+                    if paren then
+                      Printf.sprintf "(%s -> %s)" t1 t2
+                    else
+                      Printf.sprintf "%s -> %s" t1 t2
+                | { cons_name = "*" } ->
+                    let types = List.map (print_type true) cons_args in
+                    Printf.sprintf "(%s)" (String.concat " * " types)
+                | { cons_name; } ->
+                    let types = List.map (print_type true) cons_args in
+                    let args = String.concat ", " types in
+                    if List.length types > 0 then
+                      Printf.sprintf "(%s (%s))" cons_name args
+                    else
+                      Printf.sprintf "%s" cons_name
+              end
+      in
       let ident = ConstraintPrinter.string_of_ident ident in
-      Printf.printf "val %s: %s\n" ident (print_type uvar)
+      c := 0;
+      Printf.printf "val %s: %s\n" ident (print_type false uvar)
   in
   match analyze initial_state with
     | knowledge, `Dump ->
