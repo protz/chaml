@@ -3,6 +3,10 @@ PATH := /home/yquem/cristal/protzenk/Code/mini-trunk/trunk/src/:$(PATH)
 all:
 	ocamlbuild -I stdlib -I utils -I parsing chaml/chaml.native
 
+debug:
+	ocamlbuild -cflag -g -lflag -g -I stdlib -I utils -I parsing chaml/chaml.byte
+	OCAMLRUNPARAM=b=1 ./chaml.byte --print-constraint --pretty-printing --debug test_chaml.ml 
+
 test: test_mini test_chaml
 
 test_mini:

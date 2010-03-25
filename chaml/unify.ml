@@ -68,13 +68,13 @@ end
 
 (* This is used by the solver to pass information down the recursive calls.
 * - We can use a Hashtbl because all variables are distinct (although strictly
-* speaking we should use a map for scopes.
+* speaking we should use a map for scopes).
 * - The map is required because we need different ident maps for each branch of
 * multiple simultaneous let bindings. *)
 type unifier_env = {
   pools: Pool.t list;
-  tvar_to_uvar: (type_var, unifier_var) Hashtbl.t;
-  ident_to_uvar: unifier_var IdentMap.t;
+  uvar_of_tvar: (type_var, unifier_var) Hashtbl.t;
+  scheme_of_ident: type_scheme IdentMap.t;
 }
 
 (* This creates a new environment with a fresh pool inside that has
@@ -167,10 +167,10 @@ let rec uvar_of_tterm: unifier_env -> type_term -> unifier_var =
   fun unifier_env type_term ->
     let rec uvar_of_tterm: type_term -> unifier_var = function
     | `Var s as tvar ->
-        begin match Jhashtbl.find_opt unifier_env.tvar_to_uvar tvar with
+        begin match Jhashtbl.find_opt unifier_env.uvar_of_tvar tvar with
           | None ->
               let uvar = fresh_unifier_var ~name:s unifier_env in
-              Hashtbl.add unifier_env.tvar_to_uvar tvar uvar;
+              Hashtbl.add unifier_env.uvar_of_tvar tvar uvar;
               uvar
           | Some uvar ->
               uvar
