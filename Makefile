@@ -35,3 +35,6 @@ test_stdlib:
 
 clean:
 	ocamlbuild -clean
+
+count:
+	wc -l `find . -iname '*.ml' -iname '*.mli'`

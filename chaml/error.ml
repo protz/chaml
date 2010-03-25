@@ -19,4 +19,11 @@
 
 let fatal_error f = Printf.kprintf failwith f
 
-let debug f = Printf.fprintf stderr f
+let debug_enabled = ref false
+let enable_debug () = debug_enabled := true
+let dev_null = open_out "/dev/null"
+let debug f =
+  if !debug_enabled then
+    Printf.fprintf stderr f
+  else
+    Printf.fprintf dev_null f

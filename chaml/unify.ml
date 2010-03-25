@@ -85,12 +85,43 @@ let step_env env = { env with pools = (Pool.next (List.hd env.pools)) :: env.poo
 let current_pool env = List.hd env.pools
 
 (* Create a fresh variable and add it to the current pool *)
-let fresh_unifier_var ?term ?name unifier_env =
-  let current_pool = current_pool unifier_env in
-  let rank = current_pool.Pool.rank in
-  let uvar = UnionFind.fresh { term; name; rank; } in
-  Pool.add current_pool uvar;
-  uvar
+let fresh_unifier_var =
+  let c = ref (-1) in
+    fun ?term ?name unifier_env ->
+    let current_pool = current_pool unifier_env in
+    let rank = current_pool.Pool.rank in
+    let name =
+      match name with None -> c := !c + 1; Some (Printf.sprintf "uvar_%d" !c) | x -> x
+    in
+    let uvar = UnionFind.fresh { term; name; rank; } in
+      Pool.add current_pool uvar;
+      uvar
+
+(* This is mainly for debugging *)
+let rec uvar_name =
+  let ucons_name = function `Cons (cons_name, cons_args) ->
+    let types = List.map uvar_name cons_args in
+    begin match cons_name with
+      | { cons_name = "->" } ->
+          let t1 = List.nth types 0 in
+          let t2 = List.nth types 1 in
+          Printf.sprintf "%s -> %s" t1 t2
+      | { cons_name = "*" } ->
+          String.concat " * " types
+      | { cons_name; } ->
+          let args = String.concat ", " types in
+          if List.length types > 0 then
+            Printf.sprintf "%s (%s)" cons_name args
+          else
+            Printf.sprintf "%s" cons_name
+    end
+  in
+  fun uvar -> match UnionFind.find uvar with
+    | { name = Some s; term = None } -> s
+    | { name = None; term = Some cons; } -> ucons_name cons
+    | { name = Some s; term = Some cons } -> Printf.sprintf "(%s = %s)" s (ucons_name cons)
+    | { name = None; term = None } -> assert false
+
 
 (* When we take an instance of a scheme, if we unify the identifier's type
  * variable with the scheme, the scheme will be constrained and other instances
@@ -114,7 +145,9 @@ let fresh_copy: unifier_env -> unifier_var -> unifier_var = fun unifier_env ->
                   Some (`Cons (cons_name, List.map fresh_copy cons_args));
                 copy
   in
-  fun uvar -> fresh_copy uvar
+  fun uvar ->
+    Error.debug "[UF] Creating a fresh copy of %s\n" (uvar_name uvar);
+    fresh_copy uvar
           
 
 (* Recursively change terms that depend on constraint vars into unification
@@ -142,6 +175,10 @@ let rec uvar_of_tterm: unifier_env -> type_term -> unifier_var =
     in
     uvar_of_tterm type_term
 
+let debug_unify =
+  fun v1 v2 ->
+    Error.debug "[UU] Unifying %s with %s\n" (uvar_name v1) (uvar_name v2)
+
 (* Update all the mutable data structures to take into account the new equation *)
 let rec unify: unifier_env -> unifier_var -> unifier_var -> unit =
   fun unifier_env v1 v2 ->
@@ -156,8 +193,11 @@ let rec unify: unifier_env -> unifier_var -> unifier_var -> unit =
           List.iter2 (fun arg1 arg2 -> unify unifier_env arg1 arg2) args1 args2;
           UnionFind.union v1 v2;
       | { term = Some _ }, { term = None } ->
+          debug_unify v2 v1;
           UnionFind.union v2 v1;
       | { term = None }, { term = Some _ } ->
+          debug_unify v2 v1;
           UnionFind.union v1 v2;
       | { term = None }, { term = None } ->
+          debug_unify v2 v1;
           UnionFind.union v1 v2;

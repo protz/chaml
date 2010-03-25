@@ -33,16 +33,19 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
     let unifier_env, type_constraint = solver_state in
     match type_constraint with
       | `True ->
+          Error.debug "[ST] Returning from True\n";
           solver_state
       | `Equals (t1, t2) ->
           let t1 = uvar_of_tterm unifier_env (t1: type_var :> type_term) in
           let t2 = uvar_of_tterm unifier_env t2 in
+          Error.debug "[SE] %s = %s\n" (uvar_name t1) (uvar_name t2);
           unify unifier_env t1 t2;
           analyze (unifier_env, `True)
       | `Instance (ident, t) ->
           let t1 = IdentMap.find ident unifier_env.ident_to_uvar in
           let t2 = uvar_of_tterm unifier_env (t: type_var :> type_term) in
-          let t2 = fresh_copy unifier_env t2 in
+          (* let t2 = fresh_copy unifier_env t2 in *)
+          Error.debug "[SI] %s < %s\n" (uvar_name t1) (uvar_name t2);
           unify unifier_env t1 t2;
           unifier_env, `True
       | `Conj (c1, c2) ->
@@ -80,6 +83,7 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
        * only after all the solve_branches have been called is it used.
        * *)
       let solve_branch new_map (vars, konstraint, var_map) =
+        Error.debug "[SL] Solving scheme\n";
         Jlist.ignore_map
           (uvar_of_tterm unifier_env)
           (vars: type_var list :> type_term list);
@@ -96,7 +100,8 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
       let new_map =
         List.fold_left solve_branch unifier_env.ident_to_uvar schemes
       in
-      (* Perform all generalizations here *)
+      (* XXX Perform all generalizations here *)
+      Error.debug "[SR] Moving to the right branch\n";
       let new_state = { unifier_env with ident_to_uvar = new_map }, c in
       analyze new_state
   in
@@ -108,7 +113,7 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
   let initial_state: solver_state = initial_env, konstraint in
   let fresh_greek_var =
     let c = ref 0 in
-    let alpha = 0xB1 in
+    let alpha = 0xB0 in
     fun () ->
       c := !c + 1;
       if (!c > 24) then Error.fatal_error "Out of Greek letters!\n";
@@ -118,15 +123,15 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
       ]
   in
   let print_type: ident -> unifier_var -> unit =
-    let greek_of_uvar = Hashtbl.create 24 in
+    let greek_of_repr = Hashtbl.create 24 in
     let rec print_type uvar =
       let repr = UnionFind.find uvar in
       match repr.term with
         | None ->
-            begin match Jhashtbl.find_opt greek_of_uvar uvar with
+            begin match Jhashtbl.find_opt greek_of_repr repr with
               | None -> 
                   let letter = fresh_greek_var () in
-                  Hashtbl.add greek_of_uvar uvar letter;
+                  Hashtbl.add greek_of_repr repr letter;
                   letter
               | Some letter ->
                   letter
@@ -154,5 +159,7 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
   in
   match analyze initial_state with
     | knowledge, `Dump ->
+        flush stderr;
+        flush stdout;
         IdentMap.iter print_type knowledge.ident_to_uvar
     | _ -> assert false

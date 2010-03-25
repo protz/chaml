@@ -63,6 +63,7 @@ let _ =
   let arg_print_typed_ast = ref false in
   let arg_print_constraint = ref false in
   let arg_pretty_printing = ref false in
+  let arg_debug = ref false in
   let add_opt v k = Opts.add_opt k v in
   let usage = String.concat ""
                 ["ChaML: a type-checker for OCaml programs.\n";
@@ -73,6 +74,7 @@ let _ =
       "--print-typed-ast", Arg.Set arg_print_typed_ast, "print the AST annotated with the types found by the solver";
       "--print-constraint", Arg.Set arg_print_constraint, "print the constraint in a format mini can parse";
       "--pretty-printing", Arg.Set arg_pretty_printing, "print the constraint using advanced terminal features";
+      "--debug", Arg.Set arg_debug, "debug unification and solving";
       "--enable", Arg.String (add_opt true), "enable one of the following options: generalize-match (on by default)";
       "--disable", Arg.String (add_opt false), "disable one of the options above";
     ]
@@ -89,6 +91,9 @@ let _ =
       let pp_env = ConstraintPrinter.fresh_pp_env ~pretty_printing:!arg_pretty_printing () in
       print_string (ConstraintPrinter.string_of_constraint pp_env konstraint);
       flush stdout;
+    end;
+    if !arg_debug then begin
+      Error.enable_debug ();
     end;
     let typed_ast = Solver.solve konstraint in
     if !arg_print_typed_ast then begin
