@@ -77,9 +77,45 @@ type unifier_env = {
   ident_to_uvar: unifier_var IdentMap.t;
 }
 
+(* This creates a new environment with a fresh pool inside that has
+ * current_rank+1 *)
 let step_env env = { env with pools = (Pool.next (List.hd env.pools)) :: env.pools }
+
+(* This occurs quite frequently *)
 let current_pool env = List.hd env.pools
 
+(* Create a fresh variable and add it to the current pool *)
+let fresh_unifier_var ?term ?name unifier_env =
+  let current_pool = current_pool unifier_env in
+  let rank = current_pool.Pool.rank in
+  let uvar = UnionFind.fresh { term; name; rank; } in
+  Pool.add current_pool uvar;
+  uvar
+
+(* When we take an instance of a scheme, if we unify the identifier's type
+ * variable with the scheme, the scheme will be constrained and other instances
+ * won't be allowed to refine it further. This is why we must create a fresh
+ * term with only fresh type variables. Warning; this probably has a bad
+ * complexity but as ATTAPL says, the constraint has been simplified before. *)
+let fresh_copy: unifier_env -> unifier_var -> unifier_var = fun unifier_env ->
+  let mapping = Hashtbl.create 32 in
+  let rec fresh_copy uvar =
+    let descriptor = UnionFind.find uvar in
+    match Jhashtbl.find_opt mapping uvar with
+      | Some copy -> copy
+      | None ->
+          let copy = fresh_unifier_var unifier_env in
+          match descriptor.term with
+            | None ->
+                copy
+            | Some (`Cons (cons_name, cons_args)) ->
+                let copy_descriptor = UnionFind.find copy in
+                copy_descriptor.term <-
+                  Some (`Cons (cons_name, List.map fresh_copy cons_args));
+                copy
+  in
+  fun uvar -> fresh_copy uvar
+          
 
 (* Recursively change terms that depend on constraint vars into unification
  * vars. This function implements the "explicit sharing" concept by making sure
@@ -93,27 +129,15 @@ let rec uvar_of_tterm: unifier_env -> type_term -> unifier_var =
     | `Var s as tvar ->
         begin match Jhashtbl.find_opt unifier_env.tvar_to_uvar tvar with
           | None ->
-              let uvar = UnionFind.fresh {
-                term = None;
-                name = Some s;
-                rank = (current_pool unifier_env).Pool.rank
-              }
-              in
+              let uvar = fresh_unifier_var ~name:s unifier_env in
               Hashtbl.add unifier_env.tvar_to_uvar tvar uvar;
-              Pool.add (current_pool unifier_env) uvar;
               uvar
           | Some uvar ->
               uvar
         end
     | `Cons (cons, args) ->
         let uterm = `Cons (cons, List.map uvar_of_tterm args) in
-        let uvar = UnionFind.fresh {
-          term = Some uterm;
-          name = None;
-          rank = (current_pool unifier_env).Pool.rank
-        }
-        in
-        Pool.add (current_pool unifier_env) uvar;
+        let uvar = fresh_unifier_var ~term:uterm unifier_env in
         uvar
     in
     uvar_of_tterm type_term

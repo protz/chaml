@@ -87,10 +87,12 @@ let _ =
     let konstraint = Constraint.generate_constraint ast in
     if !arg_print_constraint then begin
       let pp_env = ConstraintPrinter.fresh_pp_env ~pretty_printing:!arg_pretty_printing () in
-      print_string (ConstraintPrinter.string_of_constraint pp_env konstraint)
+      print_string (ConstraintPrinter.string_of_constraint pp_env konstraint);
+      flush stdout;
     end;
     let typed_ast = Solver.solve konstraint in
     if !arg_print_typed_ast then begin
-      print_string (TypedAstPrinter.string_of_typed_ast typed_ast)
+      print_string (TypedAstPrinter.string_of_typed_ast typed_ast);
+      flush stdout;
     end;
   end

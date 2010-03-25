@@ -38,10 +38,13 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
           let t1 = uvar_of_tterm unifier_env (t1: type_var :> type_term) in
           let t2 = uvar_of_tterm unifier_env t2 in
           unify unifier_env t1 t2;
-          analyze solver_state
+          analyze (unifier_env, `True)
       | `Instance (ident, t) ->
-          (*let scheme = *)
-          failwith "TODO"
+          let t1 = IdentMap.find ident unifier_env.ident_to_uvar in
+          let t2 = uvar_of_tterm unifier_env (t: type_var :> type_term) in
+          let t2 = fresh_copy unifier_env t2 in
+          unify unifier_env t1 t2;
+          unifier_env, `True
       | `Conj (c1, c2) ->
           let unifier_env, c = analyze (unifier_env, c2) in
           assert (c = `True);
@@ -103,6 +106,53 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
     ident_to_uvar = IdentMap.empty;
   } in
   let initial_state: solver_state = initial_env, konstraint in
+  let fresh_greek_var =
+    let c = ref 0 in
+    let alpha = 0xB1 in
+    fun () ->
+      c := !c + 1;
+      if (!c > 24) then Error.fatal_error "Out of Greek letters!\n";
+      String.concat "" [
+        "\xCE";
+        String.make 1 (char_of_int (alpha + !c));
+      ]
+  in
+  let print_type: ident -> unifier_var -> unit =
+    let greek_of_uvar = Hashtbl.create 24 in
+    let rec print_type uvar =
+      let repr = UnionFind.find uvar in
+      match repr.term with
+        | None ->
+            begin match Jhashtbl.find_opt greek_of_uvar uvar with
+              | None -> 
+                  let letter = fresh_greek_var () in
+                  Hashtbl.add greek_of_uvar uvar letter;
+                  letter
+              | Some letter ->
+                  letter
+            end
+        | Some (`Cons (cons_name, cons_args)) ->
+            let types = List.map print_type cons_args in
+            begin match cons_name with
+              | { cons_name = "->" } ->
+                  let t1 = List.nth types 0 in
+                  let t2 = List.nth types 1 in
+                  Printf.sprintf "%s -> %s" t1 t2
+              | { cons_name = "*" } ->
+                  String.concat " * " types
+              | { cons_name; } ->
+                  let args = String.concat ", " types in
+                  if List.length types > 0 then
+                    Printf.sprintf "%s (%s)" cons_name args
+                  else
+                    Printf.sprintf "%s" cons_name
+            end
+    in
+    fun ident uvar ->
+      let ident = ConstraintPrinter.string_of_ident ident in
+      Printf.printf "val %s: %s\n" ident (print_type uvar)
+  in
   match analyze initial_state with
-    | knowledge, `Dump -> ()
+    | knowledge, `Dump ->
+        IdentMap.iter print_type knowledge.ident_to_uvar
     | _ -> assert false
