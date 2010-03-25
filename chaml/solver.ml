@@ -34,24 +34,38 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
     match type_constraint with
       | `True ->
           Error.debug "[ST] Returning from True\n";
-          solver_state
+          unifier_env
       | `Equals (t1, t2) ->
           let t1 = uvar_of_tterm unifier_env (t1: type_var :> type_term) in
           let t2 = uvar_of_tterm unifier_env t2 in
           Error.debug "[SE] %s = %s\n" (uvar_name t1) (uvar_name t2);
           unify unifier_env t1 t2;
-          analyze (unifier_env, `True)
+          unifier_env
       | `Instance (ident, t) ->
-          let t1 = IdentMap.find ident unifier_env.ident_to_uvar in
-          let t2 = uvar_of_tterm unifier_env (t: type_var :> type_term) in
-          (* XXX fixme here *)
-          (* let t2 = fresh_copy unifier_env t2 in *)
-          Error.debug "[SI] %s < %s\n" (uvar_name t1) (uvar_name t2);
-          unify unifier_env t1 t2;
-          unifier_env, `True
+          (* We need to get the constraint associated to ident *)
+          let scheme = scheme_of_ident ident in
+          let vars, konstraint, var_map = scheme in
+          (* We make a copy of that constraint, i.e. we "instanciate" the scheme *)
+          let mapping, konstraint = fresh_copy konstraint in
+          (* And we translate the old vars to instance ones *)
+          let vars = List.map (Hashtbl.find mapping) vars in
+          (* We solve that constraint *)
+          let unifier_env = analyze (unifier_env, `Exists (vars, konstraint)) in
+          (* This is the old var *)
+          let uvar = IdentMap.find ident unifier_env.ident_to_uvar in
+          (* It was referencing type variable tvar *)
+          let tvar = IdentMap.find ident var_map in
+          (* That is now remapped to subvar *)
+          let subvar = IdentMap.find tvar unifier_env.tvar_to_uvar in
+          (* So we unify the two *)
+          unify unifier_env uvar subvar;
+          (* And make sure we unify the subvar with the term we instanciate to *)
+          let tterm = uvar_of_tterm identifier_env t in
+          unify unifier_env uvar tterm;
+          (* We're done! *)
+          unifier_env
       | `Conj (c1, c2) ->
-          let unifier_env, c = analyze (unifier_env, c2) in
-          assert (c = `True);
+          let unifier_env = analyze (unifier_env, c2) in
           analyze (unifier_env, c1)
       | `Exists (xis, c) ->
           (* This makes sure we add the existentially defined variables as
@@ -69,7 +83,7 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
           (* We take all the schemes, and schedule them for execution. *)
           schedule_schemes new_env schemes c2
       | `Dump ->
-          solver_state
+          unifier_env
   (* This one only implements scheduling and merging multiple simultaneous let
    * definitions. This roughly corresponds to S-SOLVE-LET. *)
   and schedule_schemes: unifier_env -> type_scheme list -> type_constraint -> solver_state =
@@ -88,10 +102,9 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
         Jlist.ignore_map
           (uvar_of_tterm unifier_env)
           (vars: type_var list :> type_term list);
-        let _unifier_env', type_constraint' =
+        let _unifier_env' =
           analyze (unifier_env, konstraint)
         in
-        assert (type_constraint' = `True);
         IdentMap.fold
           (fun ident type_var map ->
             IdentMap.add ident (uvar_of_tterm unifier_env type_var) map)
@@ -163,9 +176,7 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
       c := 0;
       Printf.printf "val %s: %s\n" ident (print_type false uvar)
   in
-  match analyze initial_state with
-    | knowledge, `Dump ->
-        flush stderr;
-        flush stdout;
-        IdentMap.iter print_type knowledge.ident_to_uvar
-    | _ -> assert false
+  let knowledge = analyze initial_state in 
+  flush stderr;
+  flush stdout;
+  IdentMap.iter print_type knowledge.ident_to_uvar

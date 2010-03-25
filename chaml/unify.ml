@@ -126,28 +126,35 @@ let rec uvar_name =
 (* When we take an instance of a scheme, if we unify the identifier's type
  * variable with the scheme, the scheme will be constrained and other instances
  * won't be allowed to refine it further. This is why we must create a fresh
- * term with only fresh type variables. Warning; this probably has a bad
- * complexity but as ATTAPL says, the constraint has been simplified before. *)
-let fresh_copy: unifier_env -> unifier_var -> unifier_var = fun unifier_env ->
+ * constraint with only fresh type variables. Warning; this probably has a bad
+ * complexity but as ATTAPL says, the constraint has supposedly been simplified
+ * before. *)
+let fresh_copy: type_constraint -> (type_var, type_var) Hashtbl.t * type_constraint =
+  fun konstraint ->
   let mapping = Hashtbl.create 32 in
-  let rec fresh_copy uvar =
-    let descriptor = UnionFind.find uvar in
-    match Jhashtbl.find_opt mapping uvar with
-      | Some copy -> copy
-      | None ->
-          let copy = fresh_unifier_var unifier_env in
-          match descriptor.term with
-            | None ->
-                copy
-            | Some (`Cons (cons_name, cons_args)) ->
-                let copy_descriptor = UnionFind.find copy in
-                copy_descriptor.term <-
-                  Some (`Cons (cons_name, List.map fresh_copy cons_args));
-                copy
+  let rec fresh_var: type_var -> type_var = fun v ->
+    match Jhashtbl.find_opt mapping v with
+      | Some v' -> v'
+      | None -> let v' = fresh_type_var () in Hashtbl.add mapping v v'; v'
+  and fresh_cons: type_constraint -> type_constraint = function
+    | `True | `Dump as x -> x
+    | `Conj (c1, c2) -> `Conj (fresh_cons c1, fresh_cons c2)
+    | `Exists (vars, c) -> `Exists (List.map fresh_var vars, fresh_cons c)
+    | `Equals (v, t) -> `Equals (fresh_var v, fresh_type t)
+    | `Instance (i, v) -> `Instance (i, fresh_var v)
+    | `Let (schemes, c) -> `Let (List.map fresh_scheme schemes, fresh_cons c)
+  and fresh_type: type_term -> type_term = function
+    | `Var _ as v -> (fresh_var v: type_var :> type_term)
+    | `Cons (type_cons, type_args) -> `Cons (type_cons, List.map fresh_type type_args)
+  and fresh_scheme: type_scheme -> type_scheme = function
+    | vars, konstraint, var_map ->
+        let vars = List.map fresh_var vars in
+        let konstraint = fresh_cons konstraint in
+        let var_map = IdentMap.map fresh_var var_map in
+        vars, konstraint, var_map
   in
-  fun uvar ->
-    Error.debug "[UF] Creating a fresh copy of %s\n" (uvar_name uvar);
-    fresh_copy uvar
+  Error.debug "[UF] Creating a fresh copy of a constraint\n";
+  mapping, fresh_cons konstraint
           
 
 (* Recursively change terms that depend on constraint vars into unification
