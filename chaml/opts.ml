@@ -19,7 +19,8 @@
 
 let options = Hashtbl.create 8
 let _defaults =
-  Hashtbl.add options "generalize-match" true
+  Hashtbl.add options "generalize-match" true;
+  Hashtbl.add options "default-bindings" true
 
 let add_opt: string -> bool -> unit = fun k v ->
   Hashtbl.replace options k v

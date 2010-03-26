@@ -5,7 +5,9 @@ all:
 
 debug:
 	ocamlbuild -cflag -g -lflag -g -I stdlib -I utils -I parsing chaml/chaml.byte
-	OCAMLRUNPARAM=b=1 ./chaml.byte --print-constraint --pretty-printing --debug test_chaml.ml 
+	OCAMLRUNPARAM=b=1 ./chaml.byte \
+		--print-constraint --pretty-printing --debug\
+		--disable default-bindings test_chaml.ml 
 
 test: test_mini test_chaml
 

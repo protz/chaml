@@ -281,22 +281,23 @@ and generate_constraint: structure -> type_constraint =
         let plus_map = IdentMap.add (ident "+") plus_var IdentMap.empty in
         [plus_var], `Equals (plus_var, plus_type), plus_map
       in
-      (* Disabled for the moment as this generates a constraint that looks like
-       * a comment *)
-      (* let mult_scheme =
+      let mult_scheme =
         let mult_var = fresh_type_var ~letter:'z' () in
         let mult_type =
           type_cons_arrow type_cons_int (type_cons_arrow type_cons_int type_cons_int)
         in
         let mult_map = IdentMap.add (ident "*") mult_var IdentMap.empty in
-        [mult_var], `Equals (tv_tt mult_var, mult_type), mult_map
-      in *)
-      [plus_scheme]
+        [mult_var], `Equals (mult_var, mult_type), mult_map
+      in
+      [plus_scheme; mult_scheme]
     in
     let topmost_constraint =
       List.fold_right generate_constraint_structure_item structure `Dump
     in
-    `Let (default_bindings, topmost_constraint)
+    if Opts.get_opt "default-bindings" then
+      `Let (default_bindings, topmost_constraint)
+    else
+      topmost_constraint
 
 (* Useful for let pattern = expression ... *)
 and generate_constraint_pat_expr: pattern * expression -> type_var list * type_constraint * type_var IdentMap.t =

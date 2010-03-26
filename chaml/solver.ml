@@ -55,11 +55,19 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
           let vars = List.map (Hashtbl.find mapping) vars in
           (* We solve that constraint *)
           let unifier_env = analyze (unifier_env, `Exists (vars, konstraint)) in
-          (* There is now a fresh type variable for ident *)
-          let new_tvar = Hashtbl.find mapping old_tvar in
-          (* That is now remapped to new_uvar *)
-          let new_uvar = Hashtbl.find unifier_env.uvar_of_tvar new_tvar in
-          (* So we unify the two *)
+          let new_uvar = match Jhashtbl.find_opt mapping old_tvar with
+            (* The variable wasn't quantified in the scheme so it's not
+             * necessary to duplicate it *)
+            | None ->
+                Error.debug "[CD] Variable %s was NOT quantified in the scheme\n" (uvar_name old_uvar);
+                old_uvar
+            (* There is now a fresh type variable for ident *)
+            | Some new_tvar ->
+                let new_uvar = Hashtbl.find unifier_env.uvar_of_tvar old_tvar in
+                Error.debug "[CD] Variable %s was quantified in the scheme\n" (uvar_name new_uvar);
+                new_uvar
+          in
+          (* So we unify the two. Useless if None above. *)
           unify unifier_env old_uvar new_uvar;
           (* And make sure we unify the subvar with the term we instanciate to *)
           let tterm = uvar_of_tterm unifier_env (t: type_var :> type_term) in

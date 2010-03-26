@@ -135,7 +135,7 @@ let fresh_copy: type_constraint -> (type_var, type_var) Hashtbl.t * type_constra
   let rec fresh_var: type_var -> type_var = fun v ->
     match Jhashtbl.find_opt mapping v with
       | Some v' -> v'
-      | None -> let v' = fresh_type_var () in Hashtbl.add mapping v v'; v'
+      | None -> let v' = fresh_type_var ~letter:'d' () in Hashtbl.add mapping v v'; v'
   and fresh_cons: type_constraint -> type_constraint = function
     | `True | `Dump as x -> x
     | `Conj (c1, c2) -> `Conj (fresh_cons c1, fresh_cons c2)
