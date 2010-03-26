@@ -63,7 +63,7 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
                 old_uvar
             (* There is now a fresh type variable for ident *)
             | Some new_tvar ->
-                let new_uvar = Hashtbl.find unifier_env.uvar_of_tvar old_tvar in
+                let new_uvar = Hashtbl.find unifier_env.uvar_of_tvar new_tvar in
                 Error.debug "[CD] Variable %s was quantified in the scheme\n" (uvar_name new_uvar);
                 new_uvar
           in
