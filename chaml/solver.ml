@@ -42,6 +42,7 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
           unify unifier_env t1 t2;
           unifier_env
       | `Instance (ident, t) ->
+          (* For instance: ident = f (let f x = x), t = int -> int *)
           (* We need to get the constraint associated to ident *)
           let scheme = IdentMap.find ident unifier_env.scheme_of_ident in
           let vars, konstraint, var_map = scheme in
@@ -51,6 +52,10 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
           let old_uvar = Hashtbl.find unifier_env.uvar_of_tvar old_tvar in
           (* We make a copy of that constraint, i.e. we "instanciate" the scheme *)
           let mapping, konstraint = fresh_copy konstraint in
+          Error.debug
+            "Translation: { %s }\n"
+            (String.concat ", "
+               (Jhashtbl.map_list mapping (fun (`Var k) (`Var v) -> Printf.sprintf "%s: %s" k v)));
           (* And we translate the old vars to new ones for the instance *)
           let vars = List.map (Hashtbl.find mapping) vars in
           (* We solve that constraint *)
@@ -173,9 +178,9 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
                     let t1 = print_type true (List.nth cons_args 0) in
                     let t2 = print_type false (List.nth cons_args 1) in
                     if paren then
-                      Printf.sprintf "(%s -> %s)" t1 t2
+                      Printf.sprintf "(%s → %s)" t1 t2
                     else
-                      Printf.sprintf "%s -> %s" t1 t2
+                      Printf.sprintf "%s → %s" t1 t2
                 | { cons_name = "*" } ->
                     let types = List.map (print_type true) cons_args in
                     Printf.sprintf "(%s)" (String.concat " * " types)

@@ -33,6 +33,12 @@ test_compare:
 	@printf '\x1b[38;5;204mMini output\x1b[38;5;15m\n'
 	@mini test.ml
 	@printf '\x1b[38;5;204mChaML output\x1b[38;5;15m\n'
+	@./chaml.native test.ml
+
+test_compare_constraints:
+	@printf '\x1b[38;5;204mMini output\x1b[38;5;15m\n'
+	@mini test.ml
+	@printf '\x1b[38;5;204mChaML output\x1b[38;5;15m\n'
 	@./chaml.native --print-constraint test.ml > _constraints
 	@mini --start parse-constraint _constraints
 

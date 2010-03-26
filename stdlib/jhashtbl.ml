@@ -22,3 +22,8 @@ let find_opt tbl key =
     Some (Hashtbl.find tbl key)
   else
     None
+
+let map_list tbl f =
+  let acc = ref [] in
+  Hashtbl.iter (fun k v -> acc := (f k v) :: !acc) tbl;
+  !acc
