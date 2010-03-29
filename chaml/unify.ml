@@ -31,16 +31,16 @@ open Constraint
 type descriptor = {
   mutable term: unifier_term option;
   name: string option;
-  rank: int;
+  mutable rank: int;
 }
 
 and unifier_var = descriptor UnionFind.point
 and unifier_term = [
   `Cons of type_cons * unifier_var list
 ]
-and unifier_scheme = unifier_var generic_scheme
+and unifier_scheme = unifier_var list * unifier_var
 
-(* A pool contains all the variables with a given rank *)
+(* A pool contains all the variables with a given rank. *)
 module Pool = struct
 
   type t = {
@@ -67,29 +67,33 @@ module Pool = struct
 end
 
 (* This is used by the solver to pass information down the recursive calls.
-* - We can use a Hashtbl because all variables are distinct (although strictly
-* speaking we should use a map for scopes).
+* - We can use a Hashtbl because all type variables are distinct (although
+ * strictly speaking we should use a map for scopes).
 * - The map is required because we need different ident maps for each branch of
 * multiple simultaneous let bindings. *)
 type unifier_env = {
-  pools: Pool.t list;
+  current_pool: Pool.t;
   uvar_of_tvar: (type_var, unifier_var) Hashtbl.t;
-  scheme_of_ident: type_scheme IdentMap.t;
+  scheme_of_ident: unifier_scheme IdentMap.t;
 }
+
+(* This occurs quite frequently *)
+let current_pool env = env.current_pool
+let current_rank env = env.current_pool.Pool.rank
 
 (* This creates a new environment with a fresh pool inside that has
  * current_rank+1 *)
-let step_env env = { env with pools = (Pool.next (List.hd env.pools)) :: env.pools }
-
-(* This occurs quite frequently *)
-let current_pool env = List.hd env.pools
+let step_env env =
+  let new_rank = current_rank env + 1 in
+  let new_pool = { Pool.base_pool with Pool.rank = new_rank } in
+  { env with current_pool = new_pool }
 
 (* Create a fresh variable and add it to the current pool *)
 let fresh_unifier_var =
   let c = ref (-1) in
     fun ?term ?name unifier_env ->
     let current_pool = current_pool unifier_env in
-    let rank = current_pool.Pool.rank in
+    let rank = current_rank unifier_env in
     let name =
       match name with None -> c := !c + 1; Some (Printf.sprintf "uvar_%d" !c) | x -> x
     in
@@ -122,41 +126,6 @@ let rec uvar_name =
     | { name = Some s; term = Some cons } -> Printf.sprintf "(%s = %s)" s (ucons_name cons)
     | { name = None; term = None } -> assert false
 
-
-(* When we take an instance of a scheme, if we unify the identifier's type
- * variable with the scheme, the scheme will be constrained and other instances
- * won't be allowed to refine it further. This is why we must create a fresh
- * constraint with only fresh type variables. Warning; this probably has a bad
- * complexity but as ATTAPL says, the constraint has supposedly been simplified
- * before. *)
-let fresh_copy: type_constraint -> (type_var, type_var) Hashtbl.t * type_constraint =
-  fun konstraint ->
-  let mapping = Hashtbl.create 32 in
-  let rec fresh_var: type_var -> type_var = fun v ->
-    match Jhashtbl.find_opt mapping v with
-      | Some v' -> v'
-      | None -> let v' = fresh_type_var ~letter:'d' () in Hashtbl.add mapping v v'; v'
-  and fresh_cons: type_constraint -> type_constraint = function
-    | `True | `Dump as x -> x
-    | `Conj (c1, c2) -> `Conj (fresh_cons c1, fresh_cons c2)
-    | `Exists (vars, c) -> `Exists (List.map fresh_var vars, fresh_cons c)
-    | `Equals (v, t) -> `Equals (fresh_var v, fresh_type t)
-    | `Instance (i, v) -> `Instance (i, fresh_var v)
-    | `Let (schemes, c) -> `Let (List.map fresh_scheme schemes, fresh_cons c)
-  and fresh_type: type_term -> type_term = function
-    | `Var _ as v -> (fresh_var v: type_var :> type_term)
-    | `Cons (type_cons, type_args) -> `Cons (type_cons, List.map fresh_type type_args)
-  and fresh_scheme: type_scheme -> type_scheme = function
-    | vars, konstraint, var_map ->
-        let vars = List.map fresh_var vars in
-        let konstraint = fresh_cons konstraint in
-        let var_map = IdentMap.map fresh_var var_map in
-        vars, konstraint, var_map
-  in
-  Error.debug "[UF] Creating a fresh copy of a constraint\n";
-  mapping, fresh_cons konstraint
-          
-
 (* Recursively change terms that depend on constraint vars into unification
  * vars. This function implements the "explicit sharing" concept by making sure
  * we only have pointers to equivalence classes (and not whole terms). This is
@@ -186,10 +155,18 @@ let debug_unify =
   fun v1 v2 ->
     Error.debug "[UU] Unifying %s with %s\n" (uvar_name v1) (uvar_name v2)
 
-(* Update all the mutable data structures to take into account the new equation *)
+(* Update all the mutable data structures to take into account the new equation.
+* The descriptor that is kept by UnionFind is that of the *second* argument. *)
 let rec unify: unifier_env -> unifier_var -> unifier_var -> unit =
   fun unifier_env v1 v2 ->
   if not (UnionFind.equivalent v1 v2) then
+    (* Keeps the second argument's descriptor and updates the rank *)
+    let merge v1 v2 =
+      let repr1, repr2 = UnionFind.find v1, UnionFind.find v2 in
+      let r = min repr1.rank repr2.rank in
+      UnionFind.union v1 v2;
+      repr2.rank <- r
+    in
     match UnionFind.find v1, UnionFind.find v2 with
       | { term = Some t1 }, { term = Some t2 } ->
           let `Cons (c1, args1) = t1 and `Cons (c2, args2) = t2 in
@@ -198,13 +175,13 @@ let rec unify: unifier_env -> unifier_var -> unifier_var -> unit =
           if not (List.length args1 == List.length args2) then
             Error.fatal_error "wrong number of arguments for this tuple\n";
           List.iter2 (fun arg1 arg2 -> unify unifier_env arg1 arg2) args1 args2;
-          UnionFind.union v1 v2;
+          merge v1 v2;
       | { term = Some _ }, { term = None } ->
           debug_unify v2 v1;
-          UnionFind.union v2 v1;
+          merge v2 v1;
       | { term = None }, { term = Some _ } ->
           debug_unify v2 v1;
-          UnionFind.union v1 v2;
+          merge v1 v2;
       | { term = None }, { term = None } ->
           debug_unify v2 v1;
-          UnionFind.union v1 v2;
+          merge v1 v2;
