@@ -151,8 +151,8 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
       ]
   in
   let knowledge = analyze initial_state in 
-  let print_type: ident * unifier_scheme -> unit =
-    fun (ident, scheme) ->
+  let print_type: ident -> unifier_scheme -> unit =
+    fun ident scheme ->
       let greek_of_repr = Hashtbl.create 24 in
       let rec print_type paren uvar =
         let repr = UnionFind.find uvar in
@@ -168,17 +168,17 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
               end
           | Some (`Cons (cons_name, cons_args)) ->
               begin match cons_name with
-                | { cons_name = "->"; _ } ->
+                | { cons_name = "->" } ->
                     let t1 = print_type true (List.nth cons_args 0) in
                     let t2 = print_type false (List.nth cons_args 1) in
                     if paren then
                       Printf.sprintf "(%s → %s)" t1 t2
                     else
                       Printf.sprintf "%s → %s" t1 t2
-                | { cons_name = "*"; _ } ->
+                | { cons_name = "*" } ->
                     let types = List.map (print_type true) cons_args in
                     Printf.sprintf "(%s)" (String.concat " * " types)
-                | { cons_name; _ } ->
+                | { cons_name; } ->
                     let types = List.map (print_type true) cons_args in
                     let args = String.concat ", " types in
                     if List.length types > 0 then
@@ -194,8 +194,4 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
   in
   flush stderr;
   flush stdout;
-  let module JIM = Jmap.Make(IdentMap) in
-  let kv = JIM.to_list knowledge.scheme_of_ident in
-  let kv = List.filter (fun ((_, pos), _) -> not pos.Location.loc_ghost) kv in
-  let kv = List.sort (fun ((_, pos), _) ((_, pos'), _) -> compare pos pos') kv in
-  List.iter print_type kv 
+  IdentMap.iter print_type knowledge.scheme_of_ident

@@ -34,7 +34,7 @@ let bash_color c =
   Printf.kprintf (Printf.sprintf "\x1b[38;5;%dm%s\x1b[38;5;15m" c)
 
 let pp_env_step pp_env = match pp_env.color_stack with
-  | _ :: tl -> { pp_env with color_stack = tl }
+  | hd :: tl -> { pp_env with color_stack = tl }
   | [] -> pp_env
 
 let pp_env_brack pp_env s = match pp_env.color_stack with
@@ -54,7 +54,7 @@ let string_of_type_var = function
   | `Var s -> s
 
 let string_of_ident = function
-  | `Var (Longident.Lident x), _ -> x
+  | `Var (Longident.Lident x) -> x
   | _ -> failwith "This kind of ident is not supported\n"
 
 let string_of_constraint, string_of_type =
@@ -132,7 +132,7 @@ let string_of_constraint, string_of_type =
     pp_env_paren pp_env (Buf.flush buf)
   and string_of_type pp_env = function
     | `Var _ as v -> string_of_type_var v
-    | `Cons ({ Algebra.cons_name; _ }, types) ->
+    | `Cons ({ Algebra.cons_name; Algebra.cons_arity }, types) ->
        match cons_name with
        | "->" as op ->
            let t1 = string_of_type pp_env (List.nth types 0) in
