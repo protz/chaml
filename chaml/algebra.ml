@@ -22,15 +22,16 @@ open Error
 (* x, y ::= variable | constant | memory location *)
 type ident = [
   `Var of Longident.t
-]
+] * Location.t
 
 (* The mapping from all the bound identifiers in a pattern to the corresponding
  * type variables in the scheme. *)
 module IdentMap = Map.Make (struct
   type t = ident
-  let compare (`Var x) (`Var y) =
+  let compare (`Var x, pos1) (`Var y, pos2) =
     match x, y with
-      | Longident.Lident a, Longident.Lident b -> String.compare a b
+      | Longident.Lident a, Longident.Lident b ->
+          String.compare a b
       | _ -> fatal_error "Only simple identifiers are implemented\n"
 end)
 
