@@ -50,12 +50,16 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
             IdentMap.find ident unifier_env.scheme_of_ident
           in
           let desc = UnionFind.find scheme_uvar in
-          if desc.rank < current_rank unifier_env then begin
-            let t_uvar = uvar_of_tterm unifier_env (tv_tt t) in
+          let t_uvar = uvar_of_tterm unifier_env (tv_tt t) in
+          if desc.rank >= current_rank unifier_env then begin
+            Error.debug "[S-Old] Not generalizing\n";
             unify unifier_env scheme_uvar t_uvar;
             unifier_env
           end else begin
-            assert false
+            Error.debug "[S-Young] Generalizing\n";
+            let instance = fresh_copy unifier_env scheme_uvar in
+            unify unifier_env instance t_uvar;
+            unifier_env
           end
       | `Conj (c1, c2) ->
           (* Given that analyze returns the environment with the same pool it

@@ -95,11 +95,34 @@ let fresh_unifier_var =
     let current_pool = current_pool unifier_env in
     let rank = current_rank unifier_env in
     let name =
-      match name with None -> c := !c + 1; Some (Printf.sprintf "uvar_%d" !c) | x -> x
+      let base = match name with None -> "uvar" | Some x -> x in
+      c := !c + 1; Some (Printf.sprintf "%s_%d" base !c)
     in
     let uvar = UnionFind.fresh { term; name; rank; } in
       Pool.add current_pool uvar;
       uvar
+
+(* Create a fresh copy of a scheme for instanciation *)
+let fresh_copy unifier_env =
+  let mapping = Hashtbl.create 16 in
+  let rec fresh_copy uvar =
+    let repr = UnionFind.find uvar in
+    match Jhashtbl.find_opt mapping repr with
+      | Some uvar -> uvar
+      | None ->
+          match repr.term with
+            | None ->
+              let uvar = fresh_unifier_var ~name:"dup" unifier_env in
+              Hashtbl.add mapping repr uvar;
+              uvar
+            | Some (`Cons (cons_name, cons_args)) ->
+              let cons_args' = List.map fresh_copy cons_args in
+              let term = `Cons (cons_name, cons_args') in
+              let uvar = fresh_unifier_var ~term unifier_env in
+              Hashtbl.add mapping repr uvar;
+              uvar
+  in
+  fun uvar -> fresh_copy uvar
 
 (* This is mainly for debugging *)
 let rec uvar_name =
