@@ -50,13 +50,15 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
           let scheme = IdentMap.find ident unifier_env.scheme_of_ident in
           let young_vars, scheme_uvar = scheme in
           let scheme_desc = UnionFind.find scheme_uvar in
+          let ident_s = ConstraintPrinter.string_of_ident ident in
           if scheme_desc.rank < current_rank unifier_env then begin
-            Error.debug "[S-Young] Generalizing\n";
             let instance = fresh_copy unifier_env scheme in
+            let instance_s = uvar_name instance in
+            Error.debug "[S-Old] Taking an instance of %s: %s\n" ident_s instance_s;
             unify unifier_env instance t_uvar;
             unifier_env
           end else begin
-            Error.debug "[S-Old] Not generalizing\n";
+            Error.debug "[S-Young] Unifying %s\n" ident_s;
             unify unifier_env scheme_uvar t_uvar;
             unifier_env
           end
@@ -90,9 +92,15 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
        * *)
       let solve_branch: unifier_scheme IdentMap.t -> type_scheme -> unifier_scheme IdentMap.t =
         fun new_map scheme ->
-        Error.debug "[SL] Solving scheme\n";
-        let sub_env = step_env unifier_env in
         let vars, konstraint, var_map = scheme in
+        (* --- Debug *)
+        let module JIM = Jmap.Make(IdentMap) in
+        let idents = JIM.keys var_map in
+        let idents = List.map ConstraintPrinter.string_of_ident idents in
+        let idents = String.concat ", " idents in
+        Error.debug "\x1b[38;5;219m[SL] Solving scheme for %s\x1b[38;5;15m\n" idents;
+        (* --- End Debug *)
+        let sub_env = step_env unifier_env in
         (* This makes sure all the universally quantified variables appear in
          * the Pool. *)
         Jlist.ignore_map
@@ -113,6 +121,23 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
         (* We can just get rid of the old vars: they have been unified with a
          * var that's already in its own pool, with a lower rank. *)
         let young_vars = List.filter is_young current_pool.Pool.members in
+        (* Filter out duplicates *)
+        let young_vars =
+          let seen = Hashtbl.create 16 in
+          let l = ref [] in
+          List.iter
+            (fun x ->
+               let v = UnionFind.find x in
+               match Jhashtbl.find_opt seen v with
+                 | None ->
+                    Hashtbl.add seen v ();
+                    l := x :: !l
+                 | Some () ->
+                    ()
+            )
+            young_vars;
+          !l
+        in
         (* Each identifier is assigned a scheme. It's a list of the young vars
          * and a pointer to a variable that contains the constraint associated
          * to the identifier. *)
@@ -135,7 +160,7 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
   in
   let initial_env = {
     current_pool = Pool.base_pool;
-    uvar_of_tvar = Hashtbl.create 64;
+    uvar_of_tterm = Hashtbl.create 64;
     scheme_of_ident = IdentMap.empty;
   } in
   let initial_state: solver_state = initial_env, konstraint in
