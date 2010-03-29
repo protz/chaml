@@ -4,7 +4,7 @@ all:
 	ocamlbuild -I stdlib -I utils -I parsing chaml/chaml.native
 
 debug:
-	ocamlbuild -tag warn_A -tag warn_e -tag warn_z -tag debug -lflag -g -I stdlib -I utils -I parsing chaml/chaml.byte
+	ocamlbuild -cflag -g -lflag -g -I stdlib -I utils -I parsing chaml/chaml.byte
 	OCAMLRUNPARAM=b=1 ./chaml.byte \
 		--print-constraint --pretty-printing --debug\
 		--disable default-bindings test_chaml.ml 

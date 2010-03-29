@@ -140,13 +140,13 @@ let rec uvar_name =
   let ucons_name = function `Cons (cons_name, cons_args) ->
     let types = List.map uvar_name cons_args in
     begin match cons_name with
-      | { cons_name = "->"; _ } ->
+      | { cons_name = "->" } ->
           let t1 = List.nth types 0 in
           let t2 = List.nth types 1 in
           Printf.sprintf "%s -> %s" t1 t2
-      | { cons_name = "*"; _ } ->
+      | { cons_name = "*" } ->
           String.concat " * " types
-      | { cons_name; _ } ->
+      | { cons_name; } ->
           let args = String.concat ", " types in
           if List.length types > 0 then
             Printf.sprintf "%s (%s)" cons_name args
@@ -155,10 +155,10 @@ let rec uvar_name =
     end
   in
   fun uvar -> match UnionFind.find uvar with
-    | { name = Some s; term = None; _ } -> s
-    | { name = None; term = Some cons; _ } -> ucons_name cons
-    | { name = Some s; term = Some cons; _ } -> Printf.sprintf "(%s = %s)" s (ucons_name cons)
-    | { name = None; term = None; _ } -> assert false
+    | { name = Some s; term = None } -> s
+    | { name = None; term = Some cons; } -> ucons_name cons
+    | { name = Some s; term = Some cons } -> Printf.sprintf "(%s = %s)" s (ucons_name cons)
+    | { name = None; term = None } -> assert false
 
 (* Recursively change terms that depend on constraint vars into unification
  * vars. This function implements the "explicit sharing" concept by making sure
@@ -202,7 +202,7 @@ let rec unify: unifier_env -> unifier_var -> unifier_var -> unit =
       repr2.rank <- r
     in
     match UnionFind.find v1, UnionFind.find v2 with
-      | { term = Some t1; _ }, { term = Some t2; _ } ->
+      | { term = Some t1 }, { term = Some t2 } ->
           let `Cons (c1, args1) = t1 and `Cons (c2, args2) = t2 in
           if not (c1 == c2) then
             Error.fatal_error "%s cannot be unified with %s\n" c1.cons_name c2.cons_name;
@@ -210,12 +210,12 @@ let rec unify: unifier_env -> unifier_var -> unifier_var -> unit =
             Error.fatal_error "wrong number of arguments for this tuple\n";
           List.iter2 (fun arg1 arg2 -> unify unifier_env arg1 arg2) args1 args2;
           merge v1 v2;
-      | { term = Some _; _ }, { term = None; _ } ->
+      | { term = Some _ }, { term = None } ->
           debug_unify v2 v1;
           merge v2 v1;
-      | { term = None; _ }, { term = Some _; _ } ->
+      | { term = None }, { term = Some _ } ->
           debug_unify v2 v1;
           merge v1 v2;
-      | { term = None; _ }, { term = None; _ } ->
+      | { term = None }, { term = None } ->
           debug_unify v2 v1;
           merge v1 v2;

@@ -21,19 +21,6 @@ open Parsetree
 open Algebra
 open Error
 
-let ghost_location () =
-  let position = {
-    Lexing.pos_fname =  "__builtin";
-    Lexing.pos_lnum =  0;
-    Lexing.pos_bol =  0;
-    Lexing.pos_cnum =  0
-  } in
-  {
-    Location.loc_start = position;
-    Location.loc_end = position;
-    Location.loc_ghost = true
-  };;
-
 (* Instanciate the types we need. Here, our type terms are only parameterized by
  * strings, that is, 'x1, 'x2... the fresh variable names we generate as we go.
  * Later on, type terms will be instanciated with unifier variables which will
@@ -50,7 +37,7 @@ let tv_tt x = (x: type_var :> type_term)
 
 
 (* Create an ident out of a string *)
-let ident x pos = `Var (Longident.Lident x), pos
+let ident x = `Var (Longident.Lident x)
 
 (* Generate fresh type variables on demand *)
 let fresh_type_var ?letter () =
@@ -86,7 +73,7 @@ let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * t
       | Ppat_any ->
           `True, IdentMap.empty, []
       | Ppat_var v ->
-          let var = ident v ppat_loc in
+          let var = ident v in
           let var_map = IdentMap.add var x IdentMap.empty in
           `True, var_map, []
       | Ppat_tuple patterns ->
@@ -150,7 +137,7 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
   fun t { pexp_desc; pexp_loc } ->
     match pexp_desc with
       | Pexp_ident x ->
-          `Instance ((`Var x, pexp_loc), t)
+          `Instance (`Var x, t)
       | Pexp_constant c ->
           let open Asttypes in
           begin match c with
@@ -291,8 +278,7 @@ and generate_constraint: structure -> type_constraint =
         let plus_type =
           type_cons_arrow type_cons_int (type_cons_arrow type_cons_int type_cons_int)
         in
-        let pos = ghost_location () in
-        let plus_map = IdentMap.add (ident "+" pos) plus_var IdentMap.empty in
+        let plus_map = IdentMap.add (ident "+") plus_var IdentMap.empty in
         [plus_var], `Equals (plus_var, plus_type), plus_map
       in
       let mult_scheme =
@@ -300,8 +286,7 @@ and generate_constraint: structure -> type_constraint =
         let mult_type =
           type_cons_arrow type_cons_int (type_cons_arrow type_cons_int type_cons_int)
         in
-        let pos = ghost_location () in
-        let mult_map = IdentMap.add (ident "*" pos) mult_var IdentMap.empty in
+        let mult_map = IdentMap.add (ident "*") mult_var IdentMap.empty in
         [mult_var], `Equals (mult_var, mult_type), mult_map
       in
       [plus_scheme; mult_scheme]
