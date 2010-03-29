@@ -9,33 +9,31 @@ debug:
 		--print-constraint --pretty-printing --debug\
 		--disable default-bindings test_chaml.ml 
 
-test: test_mini test_chaml
-
-test_mini:
+print_constraint_mini:
 	mini --do print-constraint test.ml
 
-test_chaml:
+test_constraint_1:
 	./chaml.native --print-constraint --pretty-printing test.ml
-	./chaml.native --print-constraint test.ml > _constraints
+	./chaml.native --print-constraint test.ml --disable default-bindings --disable solver > _constraints
 	mini --start parse-constraint _constraints
 
-test_chaml2:
+test_constraint_2:
 	./chaml.native --print-constraint --disable generalize-match --pretty-printing test2.ml
-	./chaml.native --print-constraint --disable generalize-match test2.ml > _constraints
+	./chaml.native --print-constraint --disable generalize-match --disable solver --disable default-bindings test2.ml > _constraints
 	mini --start parse-constraint _constraints
 
-test_chaml3:
+test_constraint_3:
 	./chaml.native --print-constraint --pretty-printing test3.ml
-	./chaml.native --print-constraint test3.ml > _constraints
+	./chaml.native --print-constraint --disable solver --disable default-bindings test3.ml > _constraints
 	mini --start parse-constraint _constraints
 
-test_compare:
+test_solve_compare:
 	@printf '\x1b[38;5;204mMini output\x1b[38;5;15m\n'
 	@mini test.ml
 	@printf '\x1b[38;5;204mChaML output\x1b[38;5;15m\n'
 	@./chaml.native test.ml
 
-test_compare_constraints:
+test_constraint_compare:
 	@printf '\x1b[38;5;204mMini output\x1b[38;5;15m\n'
 	@mini test.ml
 	@printf '\x1b[38;5;204mChaML output\x1b[38;5;15m\n'
@@ -49,4 +47,4 @@ clean:
 	ocamlbuild -clean
 
 count:
-	wc -l `find . -iname '*.ml' -iname '*.mli'`
+	wc -l `find chaml stdlib -iname '*.ml' -or -iname '*.mli'`

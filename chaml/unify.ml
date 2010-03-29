@@ -91,12 +91,16 @@ let step_env env =
 (* Create a fresh variable and add it to the current pool *)
 let fresh_unifier_var =
   let c = ref (-1) in
-    fun ?term ?name unifier_env ->
+    fun ?term ?prefix ?name unifier_env ->
     let current_pool = current_pool unifier_env in
     let rank = current_rank unifier_env in
     let name =
-      let base = match name with None -> "uvar" | Some x -> x in
-      c := !c + 1; Some (Printf.sprintf "%s_%d" base !c)
+      match name with
+        | None ->
+            let base = match prefix with None -> "uvar" | Some x -> x in
+            c := !c + 1; Some (Printf.sprintf "%s_%d" base !c)
+        | Some _ ->
+            name
     in
     let uvar = UnionFind.fresh { term; name; rank; } in
       Pool.add current_pool uvar;
@@ -112,8 +116,6 @@ let fresh_copy unifier_env =
       | None ->
           match repr.term with
             | None ->
-              let uvar = fresh_unifier_var ~name:"dup" unifier_env in
-              Hashtbl.add mapping repr uvar;
               uvar
             | Some (`Cons (cons_name, cons_args)) ->
               let cons_args' = List.map fresh_copy cons_args in
@@ -122,7 +124,13 @@ let fresh_copy unifier_env =
               Hashtbl.add mapping repr uvar;
               uvar
   in
-  fun uvar -> fresh_copy uvar
+  fun (young_vars, scheme_uvar) ->
+    List.iter
+      (fun v ->
+         let v' = fresh_unifier_var ~prefix:"dup" unifier_env in
+         Hashtbl.add mapping (UnionFind.find v) v')
+      young_vars;
+    fresh_copy scheme_uvar
 
 (* This is mainly for debugging *)
 let rec uvar_name =

@@ -46,19 +46,18 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
           (* scheme is basically what came out of solving the left branch of the
            * let. young_vars is all the young variables that are possibly
            * quantified inside that scheme *)
-          let young_vars, scheme_uvar =
-            IdentMap.find ident unifier_env.scheme_of_ident
-          in
-          let desc = UnionFind.find scheme_uvar in
           let t_uvar = uvar_of_tterm unifier_env (tv_tt t) in
-          if desc.rank >= current_rank unifier_env then begin
-            Error.debug "[S-Old] Not generalizing\n";
-            unify unifier_env scheme_uvar t_uvar;
+          let scheme = IdentMap.find ident unifier_env.scheme_of_ident in
+          let young_vars, scheme_uvar = scheme in
+          let scheme_desc = UnionFind.find scheme_uvar in
+          if scheme_desc.rank < current_rank unifier_env then begin
+            Error.debug "[S-Young] Generalizing\n";
+            let instance = fresh_copy unifier_env scheme in
+            unify unifier_env instance t_uvar;
             unifier_env
           end else begin
-            Error.debug "[S-Young] Generalizing\n";
-            let instance = fresh_copy unifier_env scheme_uvar in
-            unify unifier_env instance t_uvar;
+            Error.debug "[S-Old] Not generalizing\n";
+            unify unifier_env scheme_uvar t_uvar;
             unifier_env
           end
       | `Conj (c1, c2) ->
