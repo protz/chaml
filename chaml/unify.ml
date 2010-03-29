@@ -118,11 +118,14 @@ let fresh_copy unifier_env =
             | None ->
               uvar
             | Some (`Cons (cons_name, cons_args)) ->
-              let cons_args' = List.map fresh_copy cons_args in
-              let term = `Cons (cons_name, cons_args') in
-              let uvar = fresh_unifier_var ~term unifier_env in
-              Hashtbl.add mapping repr uvar;
-              uvar
+                (* Add the variable first to avoid infinite loops *)
+                let uvar = fresh_unifier_var unifier_env in
+                Hashtbl.add mapping repr uvar;
+                (* Generate recursively *)
+                let cons_args' = List.map fresh_copy cons_args in
+                let term = `Cons (cons_name, cons_args') in
+                (UnionFind.find uvar).term <- Some term;
+                uvar
   in
   fun (young_vars, scheme_uvar) ->
     List.iter
