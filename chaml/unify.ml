@@ -139,6 +139,10 @@ let fresh_copy unifier_env (young_vars, scheme_uvar) =
           (* We don't create fresh variables. The young variables have already
            * been created for us, so if we can't find it, it's and old variable
            * that we musn't duplicate. *)
+          let uvar = match Jhashtbl.find_opt mapping repr with
+            | Some uvar -> uvar
+            | None -> uvar
+          in
           uvar
       | Some (`Cons (cons_name, cons_args)) ->
           let uvar = match Jhashtbl.find_opt mapping repr with
