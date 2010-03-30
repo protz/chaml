@@ -17,18 +17,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let options = Hashtbl.create 8
-let _defaults =
-  Hashtbl.add options "generalize-match" true;
-  Hashtbl.add options "default-bindings" true;
-  Hashtbl.add options "solver" true;
-  Hashtbl.add options "caml-types" false;
-  ()
+let constraint_files = [
+  "test_chaml.ml";
+  "test.ml";
+  "test2.ml";
+  "test3.ml";
+]
 
-let add_opt: string -> bool -> unit = fun k v ->
-  Hashtbl.replace options k v
+let test_constraint f =
+  Ocamlbuild_plugin.run_and_read
 
-let get_opt: string -> bool = fun k ->
-  match Jhashtbl.find_opt options k with
-    | None -> false
-    | Some v -> v
+let parse_output output =
+  let lexbuf = Lexing.from_string output in
+  let result = Parser.main Lexer.token lexbuf in
+  result
+
+let _ =
+  let o = Ocamlbuild_plugin.run_and_read
+    "./chaml.native --enable caml-types tests/test.ml"
+  in
+  try 
+    let t = parse_output o in
+    print_endline o;
+    ignore t;
+  with Lexer.LexingError e ->
+    Printf.printf "Lexing Error: %s\nThe output was:\n%s\n" e o

@@ -169,14 +169,20 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
   let initial_state: solver_state = initial_env, konstraint in
   let c = ref 0 in
   let fresh_greek_var =
-    let alpha = 0xB0 in
-    fun () ->
-      c := !c + 1;
-      if (!c > 24) then Error.fatal_error "Out of Greek letters!\n";
-      String.concat "" [
-        "\xCE";
-        String.make 1 (char_of_int (alpha + !c));
-      ]
+    if Opts.get_opt "caml-types" then
+      let a = (int_of_char 'a') - 1 in
+      fun () ->
+        c := !c + 1;
+        Printf.sprintf "'%c" (char_of_int (!c + a))
+    else
+      let alpha = 0xB0 in
+      fun () ->
+        c := !c + 1;
+        if (!c > 24) then Error.fatal_error "Out of Greek letters!\n";
+        String.concat "" [
+          "\xCE";
+          String.make 1 (char_of_int (alpha + !c));
+        ]
   in
   let knowledge = analyze initial_state in 
   let print_type: ident * unifier_scheme -> unit =
@@ -197,12 +203,15 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
           | Some (`Cons (cons_name, cons_args)) ->
               begin match cons_name with
                 | { cons_name = "->"; _ } ->
+                    let op =
+                      if Opts.get_opt "caml-types" then "->" else "→"
+                    in
                     let t1 = print_type true (List.nth cons_args 0) in
                     let t2 = print_type false (List.nth cons_args 1) in
                     if paren then
-                      Printf.sprintf "(%s → %s)" t1 t2
+                      Printf.sprintf "(%s %s %s)" t1 op t2
                     else
-                      Printf.sprintf "%s → %s" t1 t2
+                      Printf.sprintf "%s %s %s" t1 op t2
                 | { cons_name = "*"; _ } ->
                     let types = List.map (print_type true) cons_args in
                     Printf.sprintf "(%s)" (String.concat " * " types)

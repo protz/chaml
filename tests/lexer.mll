@@ -17,18 +17,75 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let options = Hashtbl.create 8
-let _defaults =
-  Hashtbl.add options "generalize-match" true;
-  Hashtbl.add options "default-bindings" true;
-  Hashtbl.add options "solver" true;
-  Hashtbl.add options "caml-types" false;
-  ()
+{
+  open Parser
+  exception LexingError of string
 
-let add_opt: string -> bool -> unit = fun k v ->
-  Hashtbl.replace options k v
+  let keywords = 
+    let t = Hashtbl.create 8 in
+      List.iter
+        (fun (keyword, token) -> Hashtbl.add t keyword token)
+        [
+          "val", VAL;
+          "int", INT;
+          "unit", UNIT;
+          "float", FLOAT;
+          "string", STRING;
+          "char", CHAR;
+        ];
+      t
+        
+  let filter lexbuf =
+    let ident = Lexing.lexeme lexbuf in
+    match Jhashtbl.find_opt keywords ident with
+    | Some kw -> kw
+    | None ->
+        IDENT (ident)
 
-let get_opt: string -> bool = fun k ->
-  match Jhashtbl.find_opt options k with
-    | None -> false
-    | Some v -> v
+}
+
+let lowercase = [ 'a'-'z' ]
+let whitespace = [ ' ' '\t' ]
+let number = [ '0'-'9' ]
+
+rule token = parse
+| '\n'
+  { EOL }
+
+| '\''
+  { QUOTE }
+
+| '_'
+  { UNDERSCORE }
+
+| '*'
+  { TIMES }
+
+| '('
+  { LPAREN }
+
+| ')'
+  { RPAREN }
+
+| '-' '>'
+  { ARROW }
+
+| ':'
+  { COLON }
+
+| (lowercase|number)+
+  { filter lexbuf }
+
+| whitespace
+  { token lexbuf }
+
+| eof
+  { exit 0 }
+
+| _
+  {
+    raise (LexingError (Printf.sprintf
+                          "At offset %d: unexpected character %s\n"
+                          (Lexing.lexeme_start lexbuf)
+                          (Lexing.lexeme lexbuf)))
+  }

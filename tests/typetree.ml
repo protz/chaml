@@ -17,18 +17,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let options = Hashtbl.create 8
-let _defaults =
-  Hashtbl.add options "generalize-match" true;
-  Hashtbl.add options "default-bindings" true;
-  Hashtbl.add options "solver" true;
-  Hashtbl.add options "caml-types" false;
-  ()
+type t =
+    TArrow of t * t
+  | TTuple of t list
+  | TVar of string
+  | TInt | TChar | TFloat | TString | TUnit
 
-let add_opt: string -> bool -> unit = fun k v ->
-  Hashtbl.replace options k v
-
-let get_opt: string -> bool = fun k ->
-  match Jhashtbl.find_opt options k with
-    | None -> false
-    | Some v -> v
+type type_decl = string * t

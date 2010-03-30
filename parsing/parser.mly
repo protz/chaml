@@ -1339,7 +1339,7 @@ simple_core_type:
     simple_core_type2  %prec below_SHARP
       { $1 }
   | LPAREN core_type_comma_list RPAREN %prec below_SHARP
-      { match $2 with [sty] -> sty | _ -> raise Parse_error }
+      { match $2 with [sty] -> sty | _ -> raise Parsing.Parse_error }
 ;
 simple_core_type2:
     QUOTE ident
