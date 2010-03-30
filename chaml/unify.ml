@@ -96,9 +96,9 @@ let rec uvar_name =
       | { cons_name = "->"; _ } ->
           let t1 = List.nth types 0 in
           let t2 = List.nth types 1 in
-          Printf.sprintf "%s -> %s" t1 t2
+          Printf.sprintf "(%s -> %s)" t1 t2
       | { cons_name = "*"; _ } ->
-          String.concat " * " types
+          Printf.sprintf "(%s)" (String.concat " * " types)
       | { cons_name; _ } ->
           let args = String.concat ", " types in
           if List.length types > 0 then
@@ -134,31 +134,40 @@ let fresh_copy unifier_env (young_vars, scheme_uvar) =
   let mapping = Hashtbl.create 16 in
   let rec fresh_copy uvar =
     let repr = UnionFind.find uvar in
-    match Jhashtbl.find_opt mapping repr with
-      | Some uvar -> uvar
+    match repr.term with
       | None ->
-          match repr.term with
-            | None ->
-              uvar
-            | Some (`Cons (cons_name, cons_args)) ->
-                (* Add the variable first to avoid infinite loops *)
+          (* We don't create fresh variables. The young variables have already
+           * been created for us, so if we can't find it, it's and old variable
+           * that we musn't duplicate. *)
+          uvar
+      | Some (`Cons (cons_name, cons_args)) ->
+          let uvar = match Jhashtbl.find_opt mapping repr with
+            | Some uvar ->
+                uvar
+            | None -> 
+                (* Add the variable first to avoid infinite loops. This should
+                 * allow some sharing of variables (XXX check). *)
                 let uvar = fresh_unifier_var unifier_env in
                 Hashtbl.add mapping repr uvar;
-                (* Generate recursively *)
-                let cons_args' = List.map fresh_copy cons_args in
-                let term = `Cons (cons_name, cons_args') in
-                (UnionFind.find uvar).term <- Some term;
                 uvar
+          in
+          (* Generate recursively *)
+          let cons_args' = List.map fresh_copy cons_args in
+          let term = `Cons (cons_name, cons_args') in
+          (UnionFind.find uvar).term <- Some term;
+          uvar
   in
   List.iter
     (fun v ->
        let v' = fresh_unifier_var ~prefix:"dup" unifier_env in
+         Error.debug "[Copy] %s is a copy of %s\n" (UnionFind.find v').name
+           (UnionFind.find v).name;
          Hashtbl.add mapping (UnionFind.find v) v')
     young_vars;
   let pairs = Jhashtbl.map_list mapping (fun k v -> let n = k.name in
                                    Printf.sprintf "%s: %s" n (uvar_name v))
   in
-  Error.debug "[UF] Mapping: %s\n" (String.concat ", " pairs);
+  Error.debug "[UCopy] Mapping: %s\n" (String.concat ", " pairs);
   fresh_copy scheme_uvar
 
 (* Recursively change terms that depend on constraint vars into unification
@@ -189,7 +198,7 @@ let rec uvar_of_tterm: unifier_env -> type_term -> unifier_var =
 
 let debug_unify =
   fun v1 v2 ->
-    Error.debug "[UU] Unifying %s with %s\n" (uvar_name v1) (uvar_name v2)
+    Error.debug "[UUnify] Unifying %s with %s\n" (uvar_name v1) (uvar_name v2)
 
 (* Update all the mutable data structures to take into account the new equation.
 * The descriptor that is kept by UnionFind is that of the *second* argument. *)

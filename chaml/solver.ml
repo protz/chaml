@@ -33,12 +33,12 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
     let unifier_env, type_constraint = solver_state in
     match type_constraint with
       | `True ->
-          Error.debug "[ST] Returning from True\n";
+          Error.debug "[STrue] Returning from True\n";
           unifier_env
       | `Equals (t1, t2) ->
           let t1 = uvar_of_tterm unifier_env (tv_tt t1) in
           let t2 = uvar_of_tterm unifier_env t2 in
-          Error.debug "[SE] %s = %s\n" (uvar_name t1) (uvar_name t2);
+          Error.debug "[SEquals] %s = %s\n" (uvar_name t1) (uvar_name t2);
           unify unifier_env t1 t2;
           unifier_env
       | `Instance (ident, t) ->
@@ -54,6 +54,7 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
           if scheme_desc.rank < current_rank unifier_env then begin
             let instance = fresh_copy unifier_env scheme in
             let instance_s = uvar_name instance in
+            Error.debug "[SCopy] %s is a copy of %s\n" instance_s (uvar_name scheme_uvar);
             Error.debug "[S-Old] Taking an instance of %s: %s\n" ident_s instance_s;
             unify unifier_env instance t_uvar;
             unifier_env
@@ -87,19 +88,21 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
     fun unifier_env schemes c ->
       (* This auxiliary function 
        * - solves the constraint
-       * - generalizes variables as needed
+       * - generalizes variables as needed)
        * - associates schemes to identifiers in the environment
        * *)
       let solve_branch: unifier_scheme IdentMap.t -> type_scheme -> unifier_scheme IdentMap.t =
         fun new_map scheme ->
         let vars, konstraint, var_map = scheme in
-        (* --- Debug *)
+        (* --- Debug --- *)
         let module JIM = Jmap.Make(IdentMap) in
+        let open ConstraintPrinter in
         let idents = JIM.keys var_map in
         let idents = List.map ConstraintPrinter.string_of_ident idents in
         let idents = String.concat ", " idents in
-        Error.debug "\x1b[38;5;219m[SL] Solving scheme for %s\x1b[38;5;15m\n" idents;
-        (* --- End Debug *)
+        Error.debug_simple
+          (bash_color 219 "[SLeft] Solving scheme for %s\n" idents);
+        (* --- End Debug --- *)
         let sub_env = step_env unifier_env in
         (* This makes sure all the universally quantified variables appear in
          * the Pool. *)
@@ -154,7 +157,7 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
       let new_map =
         List.fold_left solve_branch unifier_env.scheme_of_ident schemes
       in
-      Error.debug "[SR] Moving to the right branch\n";
+      Error.debug "[SRight] Moving to the right branch\n";
       let new_state = { unifier_env with scheme_of_ident = new_map }, c in
       analyze new_state
   in
