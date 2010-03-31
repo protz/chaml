@@ -43,9 +43,9 @@ let init lexbuf fname =
   }
 ;;
 
-let symbol_rloc () = {
-  loc_start = Parsing.symbol_start_pos ();
-  loc_end = Parsing.symbol_end_pos ();
+let symbol_rloc loc_start loc_end = {
+  loc_start;
+  loc_end;
   loc_ghost = false;
 };;
 
@@ -55,9 +55,9 @@ let symbol_gloc () = {
   loc_ghost = true;
 };;
 
-let rhs_loc n = {
-  loc_start = Parsing.rhs_start_pos n;
-  loc_end = Parsing.rhs_end_pos n;
+let rhs_loc loc_start loc_end = {
+  loc_start;
+  loc_end;
   loc_ghost = false;
 };;
 
