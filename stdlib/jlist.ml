@@ -32,3 +32,11 @@ let rec append_rev_front x y = match x,y with
 
 let ignore_map f l =
   ignore (List.map (fun x -> ignore (f x)) l)
+
+let iter2i f l l' =
+  let rec iter2i i f l l' = match l, l' with
+    | ([], []) -> ()
+    | (e :: rest, e' :: rest') -> f i e e'; iter2i (i + 1) f rest rest'
+    | _ -> failwith "iter2i: lengths do not match"
+  in
+  iter2i 0 f l l'

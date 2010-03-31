@@ -1,1 +1,1 @@
-true: use_ocamlbuild, use_unix
+true: use_ocamlbuild, use_unix, debug

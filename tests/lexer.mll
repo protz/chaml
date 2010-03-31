@@ -73,14 +73,14 @@ rule token = parse
 | ':'
   { COLON }
 
-| (lowercase|number)+
+| lowercase (lowercase|number|'\'')*
   { filter lexbuf }
 
 | whitespace
   { token lexbuf }
 
 | eof
-  { exit 0 }
+  { EOF }
 
 | _
   {
