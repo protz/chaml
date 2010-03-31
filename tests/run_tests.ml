@@ -17,6 +17,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* This currently runs a series of tests that determine whether the ChaML
+ * inferred types and the OCaml-inferred types are equal.
+ * - '_a is considered as equal to 'a, because of the value restriction
+ * - there are still two files to deal with: test_solving_chaml_only.ml that
+ * emphasizes the extra typing features of ChaML and test_constraint.ml that
+ * is meant to give the generated constraints to mini and compare these with the
+ * output of OCaml. This will require to update the parser and lexer so that
+ * mini-like types can be understood too.
+ *
+ * The parser and lexer aren't that useful right now, but they will be more
+ * useful when we recognize mini's syntax for types. Plus, it also allows us to
+ * discard the subtle differences in parenthesing between ChaML and OCaml.
+ * *)
+
 open ConstraintPrinter
 
 let parse_output output =
@@ -27,15 +41,18 @@ let parse_output output =
 type colors = { green: int; red: int; blue: int; }
 let colors = { green = 82; red = 196; blue = 81; }
 
-let test_pass, test_fail =
+let twidth, theight =
   let height, width = ref 0, ref 0 in
   Scanf.sscanf
     (Ocamlbuild_plugin.run_and_read "stty size")
     "%d %d" 
     (fun h w -> width := w; height := h);
+  !width, !height
+
+let test_pass, test_fail =
   let fill s =
     let l = String.length s in
-    let spaces = String.make (!width - 3 - l) ' ' in
+    let spaces = String.make (twidth - 3 - l) ' ' in
     s ^ spaces
   in
   let pass = bash_color colors.green "✓" in
@@ -44,7 +61,12 @@ let test_pass, test_fail =
   (fun x -> Printf.printf "%s%s  \n" (fill x) fail)
 
 let _ =
-  print_endline (bash_color colors.blue "Constraint Solving - first series of tests");
+  let title =
+    let txt = "Constraint Solving - first series of tests" in
+    let ws = String.make ((twidth - (String.length txt)) / 2) ' ' in
+    bash_color colors.blue "%s%s" ws txt
+  in
+  print_endline title;
   let o = Ocamlbuild_plugin.run_and_read
     "./chaml.native --enable caml-types tests/test_solving.ml"
   in

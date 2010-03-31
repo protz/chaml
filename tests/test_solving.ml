@@ -31,8 +31,23 @@ let f' =
 
 let id x = x
 
-(* Issues start here *)
 let fst (x, y) = x
 let snd (x, y) = y
 let fst3 (x, y, z) = x
 let fst12 (x, (y, z)) = x
+
+(* Misc *)
+let f1 (x, y) = y x
+let f2 x = match x with (x, y) -> y x
+let f3 f =
+  let g x = x in
+  let a = g 2 and b = g 2. in
+  a + (f b)
+
+let v4 f v =
+  let g (x, y) =
+    let a, b = f x in
+    a + y
+  in
+  g v
+

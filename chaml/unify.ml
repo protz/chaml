@@ -132,6 +132,7 @@ let fresh_unifier_var =
 (* Create a fresh copy of a scheme for instanciation *)
 let fresh_copy unifier_env (young_vars, scheme_uvar) =
   let mapping = Hashtbl.create 16 in
+  let base_rank = (UnionFind.find scheme_uvar).rank in
   let rec fresh_copy uvar =
     let repr = UnionFind.find uvar in
     match repr.term with
@@ -145,21 +146,32 @@ let fresh_copy unifier_env (young_vars, scheme_uvar) =
           in
           uvar
       | Some (`Cons (cons_name, cons_args)) ->
-          let uvar = match Jhashtbl.find_opt mapping repr with
+          let uvar, deep = match Jhashtbl.find_opt mapping repr with
             | Some uvar ->
-                uvar
+                if repr.rank < base_rank then
+                  uvar, false
+                else
+                  uvar, true
             | None -> 
                 (* Add the variable first to avoid infinite loops. This should
-                 * allow some sharing of variables (XXX check). *)
-                let uvar = fresh_unifier_var unifier_env in
-                Hashtbl.add mapping repr uvar;
-                uvar
+                 * allow some sharing of variables (XXX check this actually
+                 * helps). *)
+                (* XXX explain *)
+                if repr.rank < base_rank then
+                  uvar, false
+                else
+                  let uvar = fresh_unifier_var unifier_env in
+                  Hashtbl.add mapping repr uvar;
+                  uvar, true
           in
-          (* Generate recursively *)
-          let cons_args' = List.map fresh_copy cons_args in
-          let term = `Cons (cons_name, cons_args') in
-          (UnionFind.find uvar).term <- Some term;
-          uvar
+          if deep then
+            (* Generate recursively *)
+            let cons_args' = List.map fresh_copy cons_args in
+            let term = `Cons (cons_name, cons_args') in
+            (UnionFind.find uvar).term <- Some term;
+            uvar
+          else
+            uvar
   in
   List.iter
     (fun v ->
