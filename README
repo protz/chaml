@@ -1,4 +1,17 @@
-Imported from OCaml source tree:
+ChaML - a type-checker that uses constraints and a kernel language
+==================================================================
+
+Requires OCaml 3.12 or higher, as well as ocamlbuild.
+
+Run make to build the executable.
+Run make tests to launch the test suite.
+Run make clean to clean.
+
+As of 2010-03-31, the OCaml parser has been modified to work with Menhir.
+However, only part of the locations have meaningful contents. There is still
+some work needed to convert the whole parser to $startpos and $endpos.
+
+The following folders are imports from the OCaml source tree.
 - driver
 - parsing
 - utils

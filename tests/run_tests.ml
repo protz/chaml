@@ -63,18 +63,37 @@ let test_pass, test_fail =
 let _ =
   let title =
     let txt = "Constraint Solving - first series of tests" in
-    let ws = String.make ((twidth - (String.length txt)) / 2) ' ' in
-    bash_color colors.blue "%s%s" ws txt
+    let boxw = String.length txt + 4 in
+    let whitespace = String.make ((twidth - boxw) / 2) ' ' in
+    let charw = String.length "║" in
+    let line = "═" in
+    let top = String.make (charw * boxw) ' ' in
+    for i = 1 to boxw - 2 do
+      String.blit line 0 top (i * charw) charw;
+    done;
+    String.blit "╔" 0 top 0 charw;
+    String.blit "╗" 0 top (charw * (boxw - 1)) charw;
+    let middle = Printf.sprintf "║ %s ║" txt in
+    let bottom = String.make (charw * boxw) ' ' in
+    for i = 1 to boxw - 2 do
+      String.blit line 0 bottom (i * charw) charw;
+    done;
+    String.blit "╚" 0 bottom 0 charw;
+    String.blit "╝" 0 bottom (charw * (boxw - 1)) charw;
+    bash_color colors.blue "%s%s\n%s%s\n%s%s\n"
+      whitespace top whitespace middle whitespace bottom
   in
   print_endline title;
   let o = Ocamlbuild_plugin.run_and_read
     "./chaml.native --enable caml-types tests/test_solving.ml"
   in
+  (* Disable all warnings. It's a test, so there WILL be useless things such as
+   * redundant patterns. *)
   let o' = Ocamlbuild_plugin.run_and_read
-    "ocamlc -i tests/test_solving.ml"
+    "ocamlc -i -w a tests/test_solving.ml"
   in
-  let error =
-    Printf.kprintf (fun s -> print_endline (bash_color colors.red "%s\n" s))
+  let error f =
+    Printf.kprintf (fun s -> print_endline (bash_color colors.red "%s\n" s)) f
   in
   try 
     let t = parse_output o in
@@ -106,4 +125,5 @@ let _ =
       (bash_color colors.green "%d%% good" (100 * !good / l))
       (bash_color colors.red "%d%% bad" (100 * !bad / l));
   with Lexer.LexingError e ->
-    Printf.printf "Lexing Error: %s\nThe output was:\n%s\n" e o
+    error "Lexing Error: %s" e;
+    Printf.printf "The output was:\n%s\n" o;

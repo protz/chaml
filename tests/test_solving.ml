@@ -51,3 +51,6 @@ let v4 f v =
   in
   g v
 
+let f5 arg = match arg with
+  | (x, _) | (_, (x, _)) -> x
+  | (_, (_, (_, t))) -> t + 1

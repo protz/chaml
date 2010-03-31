@@ -21,16 +21,9 @@ open Algebra
 open Unify
 open Constraint
 
-type solver_scheme = unifier_var generic_scheme
-type solver_constraint = unifier_var generic_constraint
-type solver_state = unifier_env * type_constraint
-
-(* We try to enforce many invariants. When we arrive at a leaf of the calls, we
- * return iff the constraint is `True. *)
 let solve: type_constraint -> TypedAst.t = fun konstraint ->
-  let rec analyze: solver_state -> unifier_env =
-    fun solver_state ->
-    let unifier_env, type_constraint = solver_state in
+  let rec analyze: unifier_env -> type_constraint -> unifier_env =
+    fun unifier_env type_constraint ->
     match type_constraint with
       | `True ->
           Error.debug "[STrue] Returning from True\n";
@@ -66,8 +59,8 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
       | `Conj (c1, c2) ->
           (* Given that analyze returns the environment with the same pool it
            * was given, we can forward the environment throughout the calls. *)
-          let unifier_env = analyze (unifier_env, c2) in
-          analyze (unifier_env, c1)
+          let unifier_env = analyze unifier_env c2 in
+          analyze unifier_env c1
       | `Exists (xis, c) ->
           (* This makes sure we add the existentially defined variables as
            * universally quantified in the currently enclosing let definition.
@@ -75,8 +68,7 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
           Jlist.ignore_map
             (uvar_of_tterm unifier_env)
             (xis: type_var list :> type_term list);
-          let solver_state = unifier_env, c in
-          analyze solver_state
+          analyze unifier_env c
       | `Let (schemes, c2) ->
           (* We take all the schemes, and schedule them for execution. *)
           schedule_schemes unifier_env schemes c2
@@ -88,7 +80,7 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
     fun unifier_env schemes c ->
       (* This auxiliary function 
        * - solves the constraint
-       * - generalizes variables as needed)
+       * - generalizes variables as needed
        * - associates schemes to identifiers in the environment
        * *)
       let solve_branch: unifier_scheme IdentMap.t -> type_scheme -> unifier_scheme IdentMap.t =
@@ -103,15 +95,17 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
         Error.debug_simple
           (bash_color 219 "[SLeft] Solving scheme for %s\n" idents);
         (* --- End Debug --- *)
+
         let sub_env = step_env unifier_env in
         (* This makes sure all the universally quantified variables appear in
          * the Pool. *)
         Jlist.ignore_map
           (uvar_of_tterm unifier_env)
           (vars: type_var list :> type_term list);
+
         (* Solve the constraint in the scheme. *)
         let _unifier_env' =
-          analyze (sub_env, konstraint)
+          analyze sub_env konstraint
         in
         (* A young variable is a variable that hasn't been unified with a
          * variable defined before. *)
@@ -126,20 +120,10 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
         let young_vars = List.filter is_young current_pool.Pool.members in
         (* Filter out duplicates *)
         let young_vars =
-          let seen = Hashtbl.create 16 in
-          let l = ref [] in
-          List.iter
-            (fun x ->
-               let v = UnionFind.find x in
-               match Jhashtbl.find_opt seen v with
-                 | None ->
-                    Hashtbl.add seen v ();
-                    l := x :: !l
-                 | Some () ->
-                    ()
-            )
-            young_vars;
-          !l
+          Jlist.remove_duplicates
+            ~hash_func:(fun x -> Hashtbl.hash (UnionFind.find x))
+            ~equal_func:UnionFind.equivalent
+            young_vars
         in
         (* Each identifier is assigned a scheme. It's a list of the young vars
          * and a pointer to a variable that contains the constraint associated
@@ -158,81 +142,17 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
         List.fold_left solve_branch unifier_env.scheme_of_ident schemes
       in
       Error.debug "[SRight] Moving to the right branch\n";
-      let new_state = { unifier_env with scheme_of_ident = new_map }, c in
-      analyze new_state
+      let new_env = { unifier_env with scheme_of_ident = new_map } in
+      analyze new_env c
   in
   let initial_env = {
     current_pool = Pool.base_pool;
     uvar_of_tterm = Hashtbl.create 64;
     scheme_of_ident = IdentMap.empty;
   } in
-  let initial_state: solver_state = initial_env, konstraint in
-  let c = ref 0 in
-  let fresh_greek_var =
-    if Opts.get_opt "caml-types" then
-      let a = (int_of_char 'a') - 1 in
-      fun () ->
-        c := !c + 1;
-        Printf.sprintf "'%c" (char_of_int (!c + a))
-    else
-      let alpha = 0xB0 in
-      fun () ->
-        c := !c + 1;
-        if (!c > 24) then Error.fatal_error "Out of Greek letters!\n";
-        String.concat "" [
-          "\xCE";
-          String.make 1 (char_of_int (alpha + !c));
-        ]
-  in
-  let knowledge = analyze initial_state in 
-  let print_type: ident * unifier_scheme -> unit =
-    fun (ident, scheme) ->
-      let greek_of_repr = Hashtbl.create 24 in
-      let rec print_type paren uvar =
-        let repr = UnionFind.find uvar in
-        match repr.term with
-          | None ->
-              begin match Jhashtbl.find_opt greek_of_repr repr with
-                | None -> 
-                    let letter = fresh_greek_var () in
-                    Hashtbl.add greek_of_repr repr letter;
-                    letter
-                | Some letter ->
-                    letter
-              end
-          | Some (`Cons (cons_name, cons_args)) ->
-              begin match cons_name with
-                | { cons_name = "->"; _ } ->
-                    let op =
-                      if Opts.get_opt "caml-types" then "->" else "→"
-                    in
-                    let t1 = print_type true (List.nth cons_args 0) in
-                    let t2 = print_type false (List.nth cons_args 1) in
-                    if paren then
-                      Printf.sprintf "(%s %s %s)" t1 op t2
-                    else
-                      Printf.sprintf "%s %s %s" t1 op t2
-                | { cons_name = "*"; _ } ->
-                    let types = List.map (print_type true) cons_args in
-                    Printf.sprintf "(%s)" (String.concat " * " types)
-                | { cons_name; _ } ->
-                    let types = List.map (print_type true) cons_args in
-                    let args = String.concat ", " types in
-                    if List.length types > 0 then
-                      Printf.sprintf "(%s (%s))" cons_name args
-                    else
-                      Printf.sprintf "%s" cons_name
-              end
-      in
-      let _, uvar = scheme in
-      let ident = ConstraintPrinter.string_of_ident ident in
-      c := 0;
-      Printf.printf "val %s: %s\n" ident (print_type false uvar)
-  in
-  flush stderr;
-  flush stdout;
+  let knowledge = analyze initial_env konstraint in 
   let module JIM = Jmap.Make(IdentMap) in
   let kv = JIM.to_list knowledge.scheme_of_ident in
   let kv = List.filter (fun ((_, pos), _) -> not pos.Location.loc_ghost) kv in
   let kv = List.sort (fun ((_, pos), _) ((_, pos'), _) -> compare pos pos') kv in
-  List.iter print_type kv 
+  List.iter TypePrinter.print_type kv 

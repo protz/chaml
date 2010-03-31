@@ -18,11 +18,12 @@ tests:
 	ocamlbuild $(BUILDFLAGS) -I chaml tests/run_tests.byte chaml/chaml.native
 	./run_tests.byte
 
-test_stdlib:
-	cd stdlib && ocamlbuild jmap_test.native && ./jmap_test.native
+stdlib_tests:
+	ocamlbuild stdlib/tests.native
+	./tests.native
 
 clean:
 	ocamlbuild -clean
 
 count:
-	wc -l `find chaml stdlib -iname '*.ml' -or -iname '*.mli'`
+	wc -l `find chaml stdlib -iname '*.ml' -or -iname '*.mli'` | sort -n

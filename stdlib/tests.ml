@@ -30,6 +30,14 @@ let _ =
   StringMap.iter (fun k v -> Printf.printf "%s: %d\n" k v) m6;
   let m7 = JSM.xor m2 m1 in
   print_endline "m2 xor m1 -----";
-  StringMap.iter (fun k v -> Printf.printf "%s: %d\n" k v) m7;
+  StringMap.iter (fun k v -> Printf.printf "%s: %d\n" k v) m7
 
-
+let _ =
+  let l = [1; 2; 3; 3; 5; 5; 6] in
+  let l' = Jlist.remove_duplicates l in
+  let l = List.map string_of_int l in
+  let l' = List.map string_of_int l' in
+  Printf.printf
+    "remove_duplicates: [%s] -> [%s]\n" 
+    (String.concat "; " l)
+    (String.concat "; " l')

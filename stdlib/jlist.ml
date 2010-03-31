@@ -24,12 +24,6 @@ let rec split3 = function
   | [] ->
       [], [], []
 
-let rec append_rev_front x y = match x,y with
-  | [], l ->
-      l
-  | x::xs, l ->
-      append_rev_front xs (x :: l)
-
 let ignore_map f l =
   ignore (List.map (fun x -> ignore (f x)) l)
 
@@ -40,3 +34,29 @@ let iter2i f l l' =
     | _ -> failwith "iter2i: lengths do not match"
   in
   iter2i 0 f l l'
+
+let rec append_rev_front x y = match x,y with
+  | [], l ->
+      l
+  | x::xs, l ->
+      append_rev_front xs (x :: l)
+
+(* Removes duplicates from a list. The default behaviour is to remove identical
+ * elements. You can provide your own equality function (and possibly a better
+ * hash function) to optimize things or compare elements using a custom
+ * criterion. *)
+let remove_duplicates (type t') ?(hash_func=Hashtbl.hash) ?(equal_func=(=)) (l: t' list) =
+  let module S = struct
+    type t = t'
+    let equal = equal_func
+    let hash = hash_func
+  end in
+  let module MHT = Hashtbl.Make(S) in
+  let seen = MHT.create 16 in
+  let l' = ref [] in
+  List.iter
+    (fun x ->
+       if not (MHT.mem seen x) then begin MHT.add seen x (); l' := x :: !l' end
+    )
+    l;
+  !l'

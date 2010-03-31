@@ -21,23 +21,10 @@ open Parsetree
 open Algebra
 open Error
 
-let ghost_location () =
-  let position = {
-    Lexing.pos_fname =  "__builtin";
-    Lexing.pos_lnum =  0;
-    Lexing.pos_bol =  0;
-    Lexing.pos_cnum =  0
-  } in
-  {
-    Location.loc_start = position;
-    Location.loc_end = position;
-    Location.loc_ghost = true
-  };;
-
 (* Instanciate the types we need. Here, our type terms are only parameterized by
- * strings, that is, 'x1, 'x2... the fresh variable names we generate as we go.
- * Later on, type terms will be instanciated with unifier variables which will
- * be union-find classes to actually perform unification. *)
+ * strings, that is, 'x1, 'x2... = the fresh variable names we generate as we
+ * go.  Later on, type terms will be instanciated with unifier variables which
+ * will be union-find classes to actually perform unification. *)
 
 type type_var = string generic_var
 type type_term = string generic_term
@@ -47,7 +34,7 @@ type type_scheme = string generic_scheme
 (* The polymorphic variants allow us to make a difference between simply a
  * variable and a more general term. But we need to do the casts ourselves. *)
 let tv_tt x = (x: type_var :> type_term)
-
+let tvl_ttl x = (x: type_var list :> type_term list)
 
 (* Create an ident out of a string *)
 let ident x pos = `Var (Longident.Lident x), pos
@@ -95,6 +82,9 @@ let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * t
         (* This represents the sub patterns. If the pattern is (e1, e2, e3),
          * then we generate x1 x2 x3 such that t = x1 * x2 * x3 *)
         let xis = List.map (fun _ -> fresh_type_var ()) patterns in
+        (* This function uses known_* and current_constraint_list as
+         * accumulators. It is tail-recursive and combines all the sub-patterns
+         * for the members of the tuple into one big pattern. *)
         let rec combine known_vars known_map current_constraint_list = function
           | (new_pattern :: remaining_patterns, xi :: xis) ->
               (* sub_vars represents the existential variables that have been
@@ -117,11 +107,16 @@ let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * t
         let pattern_vars, pattern_map, pattern_constraint =
           combine [] IdentMap.empty [] (patterns, xis)
         in
-        let xis = (xis: type_var list :> type_term list) in
-        let konstraint = `Equals (x, type_cons "*" xis) in
+        let konstraint = `Equals (x, type_cons "*" (tvl_ttl xis)) in
         let konstraint = `Conj (konstraint, pattern_constraint) in
         konstraint, pattern_map, pattern_vars
       | Ppat_or (pat1, pat2) ->
+        (* Ppat_or example: match ... with pat1 | pat2 -> ...
+         *
+         * It's the opposite of the pattern above: we want every bound identifier
+         * to occur on both sides. The folding allows use to generate equality
+         * constraints for each of the type variables that's been generated on
+         * the two sides. *)
         let module JIM = Jmap.Make(IdentMap) in
         let c1, map1, vars1 = generate_constraint_pattern x pat1 in
         let c2, map2, vars2 = generate_constraint_pattern x pat2 in
@@ -162,8 +157,9 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
           end
       | Pexp_function (_, _, pat_expr_list) ->
           (* As in the definition. We could generate fresh variables for each
-          * branch of the pattern-matching. The conjunction would then force
-          * them to be all equal. However, I find it nicer to share x1 and x2. *)
+           * branch of the pattern-matching. The conjunction would then force
+           * them to be all equal. However, I find it nicer to share x1 and x2.
+           * *)
           let x1 = fresh_type_var ~letter:'x' () in
           let x2 = fresh_type_var ~letter:'x' () in
           (* X1 -> X2 = T *)
@@ -171,7 +167,7 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
             `Equals (t, type_cons_arrow (tv_tt x1) (tv_tt x2))
           in
           let generate_branch (pat, expr) =
-            (* ~ [[ pat: X1 ]] *)
+            (* roughly [[ pat: X1 ]] *)
             let c1, var_map, generated_vars = generate_constraint_pattern x1 pat in
             (* [[ t: X2 ]] *)
             let c2 = generate_constraint_expression x2 expr in
@@ -196,11 +192,7 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
             )
           in
           (* build the type constructor t1 -> (t2 -> (... -> (tn -> t))) *)
-          let arrow_type = List.fold_right
-            type_cons_arrow
-            (xis: type_var list :> type_term list)
-            (tv_tt t)
-          in
+          let arrow_type = List.fold_right type_cons_arrow (tvl_ttl xis) (tv_tt t) in
           (* \exists x1. *)
           let x1 = fresh_type_var ~letter:'x' () in
           (* x1 = t1 -> ... -> tn *)
@@ -215,6 +207,8 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
           in
           `Exists (x1 :: xis, konstraint)
       | Pexp_let (rec_flag, pat_expr_list, e2) ->
+          (* Once again, the list of pattern/expressions is here because of
+           * let ... and ... in e2 (multiple simultaneous definitions *)
           if rec_flag <> Asttypes.Nonrecursive then
             fatal_error "Rec flag not supported";
           let c2 = generate_constraint_expression t e2 in
@@ -242,7 +236,7 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
             let generate_branch (pat, expr) =
               let c1, var_map, generated_vars = generate_constraint_pattern x1 pat in
               let c2 = generate_constraint_expression t expr in
-              (* This rule doesn't generalize. More caml-style. *)
+              (* This rule doesn't generalize, ocaml-style. *)
               let let_constr: type_constraint = `Let ([[], c1, var_map], c2) in
               `Exists (generated_vars, let_constr)
             in
@@ -291,7 +285,7 @@ and generate_constraint: structure -> type_constraint =
         let plus_type =
           type_cons_arrow type_cons_int (type_cons_arrow type_cons_int type_cons_int)
         in
-        let pos = ghost_location () in
+        let pos = Location.none in
         let plus_map = IdentMap.add (ident "+" pos) plus_var IdentMap.empty in
         [plus_var], `Equals (plus_var, plus_type), plus_map
       in
@@ -300,7 +294,7 @@ and generate_constraint: structure -> type_constraint =
         let mult_type =
           type_cons_arrow type_cons_int (type_cons_arrow type_cons_int type_cons_int)
         in
-        let pos = ghost_location () in
+        let pos = Location.none in
         let mult_map = IdentMap.add (ident "*" pos) mult_var IdentMap.empty in
         [mult_var], `Equals (mult_var, mult_type), mult_map
       in
