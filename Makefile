@@ -11,7 +11,7 @@ debug:
 	  $(BUILDFLAGS) chaml/chaml.byte
 	OCAMLRUNPARAM=b=1 ./chaml.byte \
 		--print-constraint --pretty-printing --debug\
-		--disable default-bindings tests/test_chaml.ml 
+		--disable default-bindings --disable generalize-match test.ml
 
 tests:
 	#ocamlbuild $(BUILDFLAGS) -I chaml -menhir "menhir --trace" tests/run_tests.byte chaml/chaml.native

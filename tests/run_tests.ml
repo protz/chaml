@@ -188,7 +188,8 @@ let _ =
   let test3 () =
     print_endline (box "Constraint Generation - first series of tests"); 
     let o = Ocamlbuild_plugin.run_and_read
-      "./chaml.native --disable solver --disable default-bindings --print-constraint tests/test_constraint.ml"
+      ("./chaml.native --disable solver --disable generalize-match " ^
+      "--disable default-bindings --print-constraint tests/test_constraint.ml")
     in
     let fd = open_out "_constraint" in
     output_string fd o;
@@ -197,7 +198,7 @@ let _ =
       "mini --start parse-constraint _constraint"
     in
     let o' = Ocamlbuild_plugin.run_and_read
-      "ocamlc -i -w a -rectypes tests/test_constraint.ml"
+      "ocamlc -i -w a tests/test_constraint.ml"
     in
     compare ~alpha_conversion:true o' o;
   in
