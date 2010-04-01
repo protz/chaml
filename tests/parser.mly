@@ -22,7 +22,7 @@
 %}
 
 %token <string> IDENT
-%token VAL INT UNIT FLOAT CHAR STRING
+%token VAL INT UNIT FLOAT CHAR STRING FORALL DOT
 %token QUOTE UNDERSCORE COLON
 %token ARROW
 %token TIMES
@@ -37,11 +37,13 @@
 %%
 
 main:
-| l = list(type_decl) EOF
+| l = list(type_decl) list(EOL) EOF
   { l }
 
 type_decl:
 | VAL i = IDENT COLON e = type_expr EOL
+  { (i, e) }
+| VAL i = IDENT COLON FORALL list(IDENT) DOT e = type_expr EOL
   { (i, e) }
 
 type_expr:
@@ -58,6 +60,8 @@ type_var:
 | QUOTE UNDERSCORE v = IDENT
   { TVar v }
 | QUOTE v = IDENT
+  { TVar v }
+| v = IDENT
   { TVar v }
 | INT
   { TInt }

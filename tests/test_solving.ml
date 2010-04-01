@@ -54,3 +54,13 @@ let v4 f v =
 let f5 arg = match arg with
   | (x, _) | (_, (x, _)) -> x
   | (_, (_, (_, t))) -> t + 1
+
+let v6 =
+  let f x = 3 in
+  let a = 2 and b = 2. in
+  let a = f b and b = f a in
+  a + b
+
+(* More complex example *)
+let f7 = function (x,y) -> x | (_, (a, b)) -> 42
+

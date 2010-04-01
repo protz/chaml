@@ -2,15 +2,13 @@
 * constraint generation. Mini then takes on from the constraints we have
 * generated and solves them. *)
 
-let f1 = fun a -> function (a, c) -> c | (x, (y, z)) -> x
+(* FIXME cannot compare because (a * b) * (c * d) = a * b * c * d for Mini :( *)
+(* let f1 = fun a -> function (a, c) -> c | (x, (y, z)) -> x *)
 
-(* This one gives val o : ('b * 'a as 'a) * 'a -> 'a (using ocaml -rectypes) *)
-let f2 d = match d with
+let f2 x = match x with (x, y) -> y x
+
+(* This one gives val o : ('b * 'a as 'a) * 'a -> 'a (using ocaml -rectypes) and
+* makes mini crash :-( *)
+(* let f5 d = match d with
   | (c, a)
-  | (a, (_, c)) -> a
-
-(* Surprisingly, mini doesn't seem to recognize + *)
-let f3 x y = x + y
-
-(* More complex example *)
-let f4 = function (x,y) -> x | (_, (a, b)) -> 42 + 5
+  | (a, (_, c)) -> a *)

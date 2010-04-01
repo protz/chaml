@@ -32,6 +32,7 @@
           "float", FLOAT;
           "string", STRING;
           "char", CHAR;
+          "forall", FORALL;
         ];
       t
         
@@ -73,7 +74,10 @@ rule token = parse
 | ':'
   { COLON }
 
-| lowercase (lowercase|number|'\'')*
+| '.'
+  { DOT }
+
+| lowercase (lowercase|number|'\''|'_')*
   { filter lexbuf }
 
 | whitespace
