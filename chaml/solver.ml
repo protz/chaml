@@ -57,9 +57,9 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
             unifier_env
           end
       | `Conj (c1, c2) ->
-          (* Given that analyze returns the environment with the same pool it
-           * was given, we can forward the environment throughout the calls. *)
-          let unifier_env = analyze unifier_env c2 in
+          (* Do *NOT* forward _unifier_env! Identifiers in c1's scope must not
+           * go through c2's scope, this would be fatal. *)
+          let _unifier_env = analyze unifier_env c2 in
           analyze unifier_env c1
       | `Exists (xis, c) ->
           (* This makes sure we add the existentially defined variables as
@@ -118,6 +118,8 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
         (* We can just get rid of the old vars: they have been unified with a
          * var that's already in its own pool, with a lower rank. *)
         let young_vars = List.filter is_young current_pool.Pool.members in
+        (* XXX verify this works 
+        List.iter (fun x -> print_string (uvar_name x)) young_vars; *)
         (* Filter out duplicates *)
         let young_vars =
           Jlist.remove_duplicates
