@@ -92,6 +92,7 @@ let global_constructor_table =
   Hashtbl.add tbl "char" { cons_name = "char"; cons_arity = 0 };
   Hashtbl.add tbl "string" { cons_name = "string"; cons_arity = 0 };
   Hashtbl.add tbl "float" { cons_name = "float"; cons_arity = 0 };
+  Hashtbl.add tbl "unit" { cons_name = "unit"; cons_arity = 0 };
   tbl
 
 (* Instanciate a type constructor with its type variables, thus creating a type
@@ -126,5 +127,4 @@ let type_cons_int = type_cons "int" []
 let type_cons_char = type_cons "char" []
 let type_cons_string = type_cons "string" []
 let type_cons_float = type_cons "float" []
-
-
+let type_cons_unit = type_cons "unit" []

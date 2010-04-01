@@ -118,8 +118,6 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
         (* We can just get rid of the old vars: they have been unified with a
          * var that's already in its own pool, with a lower rank. *)
         let young_vars = List.filter is_young current_pool.Pool.members in
-        (* XXX verify this works 
-        List.iter (fun x -> print_string (uvar_name x)) young_vars; *)
         (* Filter out duplicates *)
         let young_vars =
           Jlist.remove_duplicates
@@ -157,4 +155,9 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
   let kv = JIM.to_list knowledge.scheme_of_ident in
   let kv = List.filter (fun ((_, pos), _) -> not pos.Location.loc_ghost) kv in
   let kv = List.sort (fun ((_, pos), _) ((_, pos'), _) -> compare pos pos') kv in
-  List.iter TypePrinter.print_type kv 
+  let print_kv (ident, scheme) =
+    let ident = ConstraintPrinter.string_of_ident ident in
+    let s = string_of_scheme ident scheme in
+    print_endline s
+  in
+  List.iter print_kv kv 

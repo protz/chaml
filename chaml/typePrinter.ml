@@ -17,12 +17,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Unify
 open Algebra
-open Constraint
 
-let print_type: ident * unifier_scheme -> unit =
-  fun (ident, scheme) ->
+type ('key, 'var) inspected_var = [
+  | `Key of 'key
+  | `Cons of type_cons * 'var list
+]
+
+let string_of_type:
+  'var -> ('var -> ('key, 'var) inspected_var) -> string =
+  fun uvar inspect_var ->
     let c = ref 0 in
     let fresh_greek_var =
       if Opts.get_opt "caml-types" then
@@ -42,18 +46,17 @@ let print_type: ident * unifier_scheme -> unit =
     in
     let greek_of_repr = Hashtbl.create 24 in
     let rec print_type paren uvar =
-      let repr = UnionFind.find uvar in
-      match repr.term with
-        | None ->
-            begin match Jhashtbl.find_opt greek_of_repr repr with
+      match inspect_var uvar with
+        | `Key key ->
+            begin match Jhashtbl.find_opt greek_of_repr key with
               | None -> 
                   let letter = fresh_greek_var () in
-                  Hashtbl.add greek_of_repr repr letter;
+                  Hashtbl.add greek_of_repr key letter;
                   letter
               | Some letter ->
                   letter
             end
-        | Some (`Cons (cons_name, cons_args)) ->
+        | `Cons (cons_name, cons_args) ->
             begin match cons_name with
               | { cons_name = "->"; _ } ->
                   let op =
@@ -77,8 +80,12 @@ let print_type: ident * unifier_scheme -> unit =
                     Printf.sprintf "%s" cons_name
             end
     in
-    let _, uvar = scheme in
-    let ident = ConstraintPrinter.string_of_ident ident in
-    Printf.printf "val %s: %s\n" ident (print_type false uvar)
+    print_type false uvar
 
- 
+let string_of_term: 'var generic_term -> string =
+  let inspect_var: 'var generic_term -> ('var, 'var generic_term) inspected_var =
+    function
+      | `Var v -> `Key v
+      | `Cons (cons_name, cons_args) -> `Cons (cons_name, cons_args)
+  in
+  fun type_term -> string_of_type type_term inspect_var

@@ -19,6 +19,7 @@
 
 open Algebra
 open Constraint
+open TypePrinter
 
 (* - An equivalence class of variables is a [unifier_var].
  * - A multi-equation is a set of variables that are all equal to a given [term].
@@ -245,4 +246,18 @@ let rec unify: unifier_env -> unifier_var -> unifier_var -> unit =
           merge v1 v2;
       | { term = None; _ }, { term = None; _ } ->
           debug_unify v2 v1;
-          merge v1 v2;
+          merge v1 v2
+
+(* For printing type schemes *)
+let string_of_scheme ident scheme =
+  let _, uvar = scheme in
+  let inspect_var: unifier_var -> (descriptor, unifier_var) inspected_var =
+    fun uvar ->
+    let repr = UnionFind.find uvar in
+    match repr.term with
+      | Some (`Cons (type_cons, cons_args)) ->
+          `Cons (type_cons, cons_args)
+      | None ->
+          `Key repr
+  in
+  Printf.sprintf "val %s: %s" ident (string_of_type uvar inspect_var)

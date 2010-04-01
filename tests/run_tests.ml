@@ -32,6 +32,7 @@
  * discard the subtle differences in parenthesing between ChaML and OCaml.
  * *)
 
+open TypePrinter
 open ConstraintPrinter
 
 let parse_output output =
@@ -82,48 +83,13 @@ let box txt =
   bash_color colors.blue "%s%s\n%s%s\n%s%s\n"
     whitespace top whitespace middle whitespace bottom
 
-let alpha_convert t =
-  let open Typetree in
-  let mapping = Hashtbl.create 16 in
-  let c = ref (int_of_char 'a' - 1) in
-  let lookup n = match Jhashtbl.find_opt mapping n with
-    | Some n' ->
-        n'
-    | None ->
-        c := !c + 1;
-        let n' = char_of_int !c in
-        Hashtbl.add mapping n n';
-        n'
-  in
-  let rec alpha_convert = function
-    | TArrow (t, t') -> TArrow (alpha_convert t, alpha_convert t')
-    | TTuple ts -> TTuple (List.map alpha_convert ts)
-    | TVar n -> TVar (String.make 1 (lookup n))
-    | _ as x -> x
-  in
-  alpha_convert t
-
-let print_type t =
-  let open Typetree in
-  let rec print_type = function
-    | TArrow (t, t') -> Printf.sprintf "(%s -> %s)" (print_type t) (print_type t')
-    | TTuple ts -> "(" ^ (String.concat " * " (List.map print_type ts)) ^ ")"
-    | TVar s -> s
-    | TInt -> "int"
-    | TChar -> "char"
-    | TFloat -> "float"
-    | TString -> "string"
-    | TUnit -> "unit"
-  in
-  print_type t
-
 let _ =
   let error f =
     Printf.kprintf (fun s -> print_endline (bash_color colors.red "%s\n" s)) f
   in
   let good = ref 0 in
   let bad = ref 0 in
-  let compare ?(alpha_conversion=false) o o' =
+  let compare o o' =
     try 
       let t = parse_output o in
       let t' = parse_output o' in
@@ -131,17 +97,12 @@ let _ =
       let compare_and_print i r1 r2 =
         let name1, type1 = r1 in
         let name2, type2 = r2 in
-        let type1, type2 =
-          if alpha_conversion then
-            alpha_convert type1, alpha_convert type2
-          else
-            type1, type2
-        in
+        let type1, type2 = string_of_term type1, string_of_term type2 in
         let i = i + 1 in
         let sp = if i >= 10 then "" else " " in
         (*Printf.printf "%s = %s\n" (print_type type1) (print_type type2);*)
         let test_name =
-          Printf.sprintf "[Binding %d/%d]:%s val %s: ..." i l sp name1
+          Printf.sprintf "[Binding %d/%d]:%s val %s: %s" i l sp name1 type1
         in
         if (String.compare name1 name2) != 0 then
           error "Top-level bindings do not match: %s != %s" name1 name2
@@ -200,8 +161,9 @@ let _ =
     let o' = Ocamlbuild_plugin.run_and_read
       "ocamlc -i -w a tests/test_constraint.ml"
     in
-    compare ~alpha_conversion:true o' o;
+    compare o' o;
   in
+  Opts.add_opt "caml-types" true;
   test1 ();
   print_newline ();
   test2 ();

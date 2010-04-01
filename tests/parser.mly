@@ -18,7 +18,8 @@
 /*****************************************************************************/
 
 %{
-  open Typetree
+  open Constraint
+  open Algebra
 %}
 
 %token <string> IDENT
@@ -32,7 +33,7 @@
 %right ARROW
 
 /* Don't know why it is necessary to specify the full path here */
-%start <Typetree.type_decl list> main
+%start <(string * Constraint.type_term) list> main
 
 %%
 
@@ -48,31 +49,31 @@ type_decl:
 
 type_expr:
 | e1 = type_expr ARROW e2 = type_expr
-  { TArrow (e1, e2) }
+  { type_cons_arrow e1 e2 }
 | v = type_var
   { v }
 | LPAREN e = type_expr RPAREN
   { e }
 | e = type_product
-  { TTuple e }
+  { type_cons "*" e }
 
 type_var:
 | QUOTE UNDERSCORE v = IDENT
-  { TVar v }
+  { `Var v }
 | QUOTE v = IDENT
-  { TVar v }
+  { `Var v }
 | v = IDENT
-  { TVar v }
+  { `Var v }
 | INT
-  { TInt }
+  { type_cons_int }
 | CHAR
-  { TChar }
+  { type_cons_char }
 | STRING
-  { TString }
+  { type_cons_string }
 | FLOAT
-  { TFloat }
+  { type_cons_float }
 | UNIT
-  { TUnit }
+  { type_cons_unit }
 
 type_product:
 | e = type_product_elt TIMES es = type_product

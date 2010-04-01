@@ -32,4 +32,5 @@ graph:
 	ocamldoc -dot -I _build/chaml/ -I _build/parsing/ -I _build/stdlib/ \
 	  -I _build/tests/ -I _build/utils/ chaml/*.ml -o graph.dot
 	dot -Tpng graph.dot > graph.png
+	convert graph.png -rotate 90 graph.png
 	eog graph.png

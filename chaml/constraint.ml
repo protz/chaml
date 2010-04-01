@@ -20,6 +20,7 @@
 open Parsetree
 open Algebra
 open Error
+open TypePrinter
 
 (* Instanciate the types we need. Here, our type terms are only parameterized by
  * strings, that is, 'x1, 'x2... = the fresh variable names we generate as we
@@ -40,8 +41,18 @@ let tvl_ttl x = (x: type_var list :> type_term list)
 let ident x pos = `Var (Longident.Lident x), pos
 
 (* Generate fresh type variables on demand *)
-let fresh_type_var ?letter () =
-  `Var (Utils.fresh_var ?letter ())
+let fresh_type_var =
+  let c = ref (-1) in
+  fun ?letter () ->
+    c := !c + 1; 
+    let letter = if !c >= 26 && letter = None then Some 'v' else letter in
+    let v = match letter with
+      | Some l ->
+        (String.make 1 l) ^ (string_of_int !c)
+      | _ ->
+        String.make 1 (char_of_int (int_of_char 'a' + !c))
+    in
+    `Var v
 
 (* Returns c_1 and (c_2 and ( ... and c_n)) *)
 let constr_conj = function

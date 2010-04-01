@@ -57,7 +57,7 @@ let string_of_ident = function
   | `Var (Longident.Lident x), _ -> x
   | _ -> failwith "This kind of ident is not supported\n"
 
-let string_of_constraint, string_of_type =
+let string_of_constraint =
   let inc i = " " ^ i in
   let space_before_type_var = fun x -> " " ^ (string_of_type_var x) in
   let rec string_of_constraint pp_env = fun i -> function
@@ -153,5 +153,5 @@ let string_of_constraint, string_of_type =
            String.concat "" [op; types]
   in
   (* Because of the value restrictiooooooooooon *)
-  (fun pp_env konstraint -> string_of_constraint pp_env "" konstraint), string_of_type
+  fun pp_env konstraint -> string_of_constraint pp_env "" konstraint
 
