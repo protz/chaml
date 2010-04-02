@@ -98,3 +98,4 @@ type_product:
 type_product_elt:
   | LPAREN e = type_expr RPAREN { e }
   | v = type_var { (v :> ParserTypes.pvar) }
+  | v = type_constr { (v :> ParserTypes.pvar) }

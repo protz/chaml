@@ -100,7 +100,7 @@ let inspect_uvar: unifier_var -> descriptor inspected_var =
       begin match Jhashtbl.find_opt seen repr with
         | Some None ->
             let key = repr in
-            Hashtbl.add seen repr (Some key);
+            Hashtbl.replace seen repr (Some key);
             `Var key
         | Some (Some key) ->
             `Var key
@@ -113,7 +113,7 @@ let inspect_uvar: unifier_var -> descriptor inspected_var =
                 | None ->
                     `Var repr
             in
-            begin match Jhashtbl.find_opt seen repr with
+            let r = begin match Jhashtbl.find_opt seen repr with
               | Some (Some key) ->
                   `Alias (type_term, `Var key)
               | Some None ->
@@ -121,6 +121,9 @@ let inspect_uvar: unifier_var -> descriptor inspected_var =
               | None ->
                   assert false
             end
+            in
+            Hashtbl.remove seen repr;
+            r
       end
     in
     inspect_uvar uvar
