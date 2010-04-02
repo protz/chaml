@@ -89,23 +89,59 @@ let step_env env =
   let new_pool = { Pool.base_pool with Pool.rank = new_rank } in
   { env with current_pool = new_pool }
 
+(* Transforms the unification graph into a non-cyclic structure where cycles
+ * have been replaced by `Alias *)
+let inspect_uvar: unifier_var -> descriptor inspected_var =
+  fun uvar ->
+    let seen = Hashtbl.create 16 in
+    let rec inspect_uvar: unifier_var -> descriptor inspected_var =
+    fun uvar ->
+      let repr = UnionFind.find uvar in
+      begin match Jhashtbl.find_opt seen repr with
+        | Some None ->
+            let key = repr in
+            Hashtbl.add seen repr (Some key);
+            `Var key
+        | Some (Some key) ->
+            `Var key
+        | None ->
+            Hashtbl.add seen repr None;
+            let type_term = 
+              match repr.term with
+                | Some (`Cons (type_cons, cons_args)) ->
+                    `Cons (type_cons, List.map inspect_uvar cons_args)
+                | None ->
+                    `Var repr
+            in
+            begin match Jhashtbl.find_opt seen repr with
+              | Some (Some key) ->
+                  `Alias (type_term, `Var key)
+              | Some None ->
+                  type_term
+              | None ->
+                  assert false
+            end
+      end
+    in
+    inspect_uvar uvar
+
 (* This is mainly for debugging *)
 let rec uvar_name: unifier_var -> string =
-  let inspect_var: unifier_var -> (descriptor, unifier_var) inspected_var =
-    fun uvar ->
-    let repr = UnionFind.find uvar in
-    match repr.term with
-      | Some (`Cons (type_cons, cons_args)) ->
-          `Cons (type_cons, cons_args)
-      | None ->
-          `Key repr
-  in
   fun uvar -> match UnionFind.find uvar with
     | { name = s; term = None; _ } ->
         s
     | { name = s; term = Some cons; _ } ->
         let string_of_key: descriptor -> string = fun { name; _ } -> name in
-        Printf.sprintf "(%s = %s)" s (string_of_type ~string_of_key uvar inspect_var)
+        Printf.sprintf
+          "(%s = %s)"
+          s
+          (string_of_type ~string_of_key (inspect_uvar uvar))
+
+(* For printing type schemes *)
+let string_of_scheme ident scheme =
+  let _, uvar = scheme in
+  Printf.sprintf "val %s: %s" ident (string_of_type (inspect_uvar uvar))
+
 
 (* Create a fresh variable and add it to the current pool *)
 let fresh_unifier_var ?term ?prefix ?name unifier_env =
@@ -240,17 +276,3 @@ let rec unify: unifier_env -> unifier_var -> unifier_var -> unit =
       | { term = None; _ }, { term = None; _ } ->
           debug_unify v2 v1;
           merge v1 v2
-
-(* For printing type schemes *)
-let string_of_scheme ident scheme =
-  let _, uvar = scheme in
-  let inspect_var: unifier_var -> (descriptor, unifier_var) inspected_var =
-    fun uvar ->
-    let repr = UnionFind.find uvar in
-    match repr.term with
-      | Some (`Cons (type_cons, cons_args)) ->
-          `Cons (type_cons, cons_args)
-      | None ->
-          `Key repr
-  in
-  Printf.sprintf "val %s: %s" ident (string_of_type uvar inspect_var)
