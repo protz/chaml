@@ -90,9 +90,9 @@ let step_env env =
   { env with current_pool = new_pool }
 
 (* Transforms the unification graph into a non-cyclic structure where cycles
- * have been replaced by `Alias *)
-let inspect_uvar: unifier_var -> descriptor inspected_var =
-  fun uvar ->
+ * have been replaced by `Alias, suitable for printing. *)
+let inspect_uvar: ?debug:unit -> unifier_var -> descriptor inspected_var =
+  fun ?debug uvar ->
     let seen = Hashtbl.create 16 in
     let rec inspect_uvar: unifier_var -> descriptor inspected_var =
     fun uvar ->
@@ -118,7 +118,10 @@ let inspect_uvar: unifier_var -> descriptor inspected_var =
                   `Alias (type_term, `Var key)
               | Some None ->
                   Hashtbl.remove seen repr;
-                  type_term
+                  if Option.unit_bool debug && repr.term <> None then
+                    `Alias (type_term, `Var repr)
+                  else
+                    type_term
               | None ->
                   assert false
             end
@@ -138,7 +141,7 @@ let rec uvar_name: unifier_var -> string =
         Printf.sprintf
           "(%s = %s)"
           s
-          (string_of_type ~string_of_key (inspect_uvar uvar))
+          (string_of_type ~string_of_key (inspect_uvar ~debug:() uvar))
 
 (* For printing type schemes *)
 let string_of_scheme ident scheme =

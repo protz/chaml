@@ -24,3 +24,7 @@ let map f = function
 let map_none v = function
   | None -> v
   | Some v -> v
+
+let unit_bool = function
+  | None -> false
+  | Some () -> true
