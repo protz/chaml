@@ -22,7 +22,7 @@ open Algebra
 type ('key, 'var) inspected_var = [
   | `Key of 'key
   | `Cons of type_cons * 'var list
-  | `Alias of ('key, 'var) inspected_var * 'var
+  (* | `Alias of ('key, 'var) inspected_var * 'var *)
 ]
 
 let prec =
@@ -72,6 +72,10 @@ let string_of_type:
     in
     let rec print_type paren uvar =
       match inspect_var uvar with
+          (*
+        | `Alias (uvar, key) ->
+            Printf.sprintf "(%s as %s)" (print_type false uvar) (string_of_key key)
+           *)
         | `Key key ->
             string_of_key key
         | `Cons (cons_name, cons_args) as cons ->
