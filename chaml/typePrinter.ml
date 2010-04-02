@@ -22,6 +22,7 @@ open Algebra
 type ('key, 'var) inspected_var = [
   | `Key of 'key
   | `Cons of type_cons * 'var list
+  | `Alias of ('key, 'var) inspected_var * 'var
 ]
 
 let prec =
@@ -34,8 +35,9 @@ let prec =
   fun op -> Hashtbl.find tbl op
 
 let string_of_type:
-  'var -> ('var -> ('key, 'var) inspected_var) -> string =
-  fun uvar inspect_var ->
+  ?string_of_key: ('key -> string) -> 'var -> ('var -> ('key, 'var) inspected_var) -> string =
+  fun ?string_of_key uvar inspect_var ->
+    let seen = Hashtbl.create 16 in
     let c = ref 0 in
     let fresh_greek_var =
       if Opts.get_opt "caml-types" then
@@ -54,9 +56,9 @@ let string_of_type:
           ]
     in
     let greek_of_repr = Hashtbl.create 24 in
-    let rec print_type paren uvar =
-      match inspect_var uvar with
-        | `Key key ->
+    let string_of_key = match string_of_key with
+      | None ->
+          (fun key ->
             begin match Jhashtbl.find_opt greek_of_repr key with
               | None -> 
                   let letter = fresh_greek_var () in
@@ -64,40 +66,65 @@ let string_of_type:
                   letter
               | Some letter ->
                   letter
-            end
-        | `Cons (cons_name, cons_args) ->
-            begin match cons_name with
-              | { cons_name = "->"; _ } ->
-                  let op =
-                    if Opts.get_opt "caml-types" then "->" else "→"
-                  in
-                  let arg1 = List.nth cons_args 0 in
-                  let arg2 = List.nth cons_args 1 in
-                  let p1 = match inspect_var arg1 with
-                    | `Cons ({ cons_name; _ }, _) ->
-                        prec cons_name <= prec "->"
-                    | _ -> true
-                  in
-                  let t1 = print_type p1 arg1 in
-                  let t2 = print_type false arg2 in
-                  if paren then
-                    Printf.sprintf "(%s %s %s)" t1 op t2
-                  else
-                    Printf.sprintf "%s %s %s" t1 op t2
-              | { cons_name = "*"; _ } ->
-                  let types = List.map (print_type true) cons_args in
-                  let types = (String.concat " * " types) in
-                  if paren then
-                    Printf.sprintf "(%s)" types
-                  else
-                    types
-              | { cons_name; _ } ->
-                  let types = List.map (print_type true) cons_args in
-                  let args = String.concat ", " types in
-                  if List.length types > 0 then
-                    Printf.sprintf "(%s (%s))" cons_name args
-                  else
-                    Printf.sprintf "%s" cons_name
+            end)
+      | Some f ->
+          f
+    in
+    let rec print_type paren uvar =
+      match inspect_var uvar with
+        | `Key key ->
+            string_of_key key
+        | `Cons (cons_name, cons_args) as cons ->
+            begin match Jhashtbl.find_opt seen cons with
+              | Some None ->
+                  let l = fresh_greek_var () in
+                  Hashtbl.add seen cons (Some l);
+                  l
+              | Some (Some l) ->
+                  l
+              | None ->
+                  Hashtbl.add seen cons None; 
+                  let type_string = begin match cons_name with
+                    | { cons_name = "->"; _ } ->
+                        let op =
+                          if Opts.get_opt "caml-types" then "->" else "→"
+                        in
+                        let arg1 = List.nth cons_args 0 in
+                        let arg2 = List.nth cons_args 1 in
+                        let p1 = match inspect_var arg1 with
+                          | `Cons ({ cons_name; _ }, _) ->
+                              prec cons_name <= prec "->"
+                          | _ -> true
+                        in
+                        let t1 = print_type p1 arg1 in
+                        let t2 = print_type false arg2 in
+                        if paren then
+                          Printf.sprintf "(%s %s %s)" t1 op t2
+                        else
+                          Printf.sprintf "%s %s %s" t1 op t2
+                    | { cons_name = "*"; _ } ->
+                        let types = List.map (print_type true) cons_args in
+                        let types = (String.concat " * " types) in
+                        if paren then
+                          Printf.sprintf "(%s)" types
+                        else
+                          types
+                    | { cons_name; _ } ->
+                        let types = List.map (print_type true) cons_args in
+                        let args = String.concat ", " types in
+                        if List.length types > 0 then
+                          Printf.sprintf "(%s (%s))" cons_name args
+                        else
+                          Printf.sprintf "%s" cons_name
+                  end in
+                  begin match Jhashtbl.find_opt seen cons with
+                    | Some (Some l) ->
+                        Printf.sprintf "(%s as %s)" type_string l
+                    | Some None ->
+                        type_string
+                    | None ->
+                        assert false
+                  end
             end
     in
     print_type false uvar

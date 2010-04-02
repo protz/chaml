@@ -52,7 +52,7 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
             unify unifier_env instance t_uvar;
             unifier_env
           end else begin
-            Error.debug "[S-Young] Unifying %s\n" ident_s;
+            Error.debug "[S-Young] Unifying %s directly\n" ident_s;
             unify unifier_env scheme_uvar t_uvar;
             unifier_env
           end

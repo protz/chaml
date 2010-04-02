@@ -90,45 +90,38 @@ let step_env env =
   { env with current_pool = new_pool }
 
 (* This is mainly for debugging *)
-let rec uvar_name =
-  let ucons_name = function `Cons (cons_name, cons_args) ->
-    let types = List.map uvar_name cons_args in
-    begin match cons_name with
-      | { cons_name = "->"; _ } ->
-          let t1 = List.nth types 0 in
-          let t2 = List.nth types 1 in
-          Printf.sprintf "(%s -> %s)" t1 t2
-      | { cons_name = "*"; _ } ->
-          Printf.sprintf "(%s)" (String.concat " * " types)
-      | { cons_name; _ } ->
-          let args = String.concat ", " types in
-          if List.length types > 0 then
-            Printf.sprintf "%s (%s)" cons_name args
-          else
-            Printf.sprintf "%s" cons_name
-    end
+let rec uvar_name: unifier_var -> string =
+  let inspect_var: unifier_var -> (descriptor, unifier_var) inspected_var =
+    fun uvar ->
+    let repr = UnionFind.find uvar in
+    match repr.term with
+      | Some (`Cons (type_cons, cons_args)) ->
+          `Cons (type_cons, cons_args)
+      | None ->
+          `Key repr
   in
   fun uvar -> match UnionFind.find uvar with
-    | { name = s; term = None; _ } -> s
-    | { name = s; term = Some cons; _ } -> Printf.sprintf "(%s = %s)" s (ucons_name cons)
+    | { name = s; term = None; _ } ->
+        s
+    | { name = s; term = Some cons; _ } ->
+        let string_of_key: descriptor -> string = fun { name; _ } -> name in
+        Printf.sprintf "(%s = %s)" s (string_of_type ~string_of_key uvar inspect_var)
 
 (* Create a fresh variable and add it to the current pool *)
-let fresh_unifier_var =
-  let c = ref (-1) in
-    fun ?term ?prefix ?name unifier_env ->
-    let current_pool = current_pool unifier_env in
-    let rank = current_rank unifier_env in
-    let name =
-      match name with
-        | None ->
-            let base = match prefix with None -> "uvar" | Some x -> x in
-            c := !c + 1; Printf.sprintf "%s_%d" base !c
-        | Some name ->
-            name
-    in
-    let uvar = UnionFind.fresh { term; name; rank; } in
-    Pool.add current_pool uvar;
-    uvar
+let fresh_unifier_var ?term ?prefix ?name unifier_env =
+  let current_pool = current_pool unifier_env in
+  let rank = current_rank unifier_env in
+  let name =
+    match name with
+      | None ->
+          let prefix = Option.map_none "uvar" prefix in
+          fresh_var ~prefix ()
+      | Some name ->
+          name
+  in
+  let uvar = UnionFind.fresh { term; name; rank; } in
+  Pool.add current_pool uvar;
+  uvar
 
 (* Create a fresh copy of a scheme for instanciation *)
 let fresh_copy unifier_env (young_vars, scheme_uvar) =

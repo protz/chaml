@@ -28,6 +28,8 @@
 %token ARROW
 %token TIMES
 %token RPAREN LPAREN
+%token AS
+%nonassoc AS
 %token EOL EOF
 
 %right ARROW
@@ -48,12 +50,14 @@ type_decl:
   { (i, e) }
 
 type_expr:
-| e1 = type_expr ARROW e2 = type_expr
-  { type_cons_arrow e1 e2 }
 | v = type_var
   { v }
 | LPAREN e = type_expr RPAREN
   { e }
+| e = type_expr AS v = type_var
+  { make_recursive e v }
+| e1 = type_expr ARROW e2 = type_expr
+  { type_cons_arrow e1 e2 }
 | e = type_product
   { type_cons "*" e }
 

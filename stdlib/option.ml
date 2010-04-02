@@ -17,80 +17,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-{
-  open Parser
-  exception LexingError of string
+let map f = function
+  | None -> None
+  | Some v -> Some (f v)
 
-  let keywords = 
-    let t = Hashtbl.create 8 in
-      List.iter
-        (fun (keyword, token) -> Hashtbl.add t keyword token)
-        [
-          "val", VAL;
-          "int", INT;
-          "unit", UNIT;
-          "float", FLOAT;
-          "string", STRING;
-          "char", CHAR;
-          "forall", FORALL;
-          "as", AS;
-        ];
-      t
-        
-  let filter lexbuf =
-    let ident = Lexing.lexeme lexbuf in
-    match Jhashtbl.find_opt keywords ident with
-    | Some kw -> kw
-    | None ->
-        IDENT (ident)
-
-}
-
-let lowercase = [ 'a'-'z' ]
-let whitespace = [ ' ' '\t' ]
-let number = [ '0'-'9' ]
-
-rule token = parse
-| '\n'
-  { EOL }
-
-| '\''
-  { QUOTE }
-
-| '_'
-  { UNDERSCORE }
-
-| '*'
-  { TIMES }
-
-| '('
-  { LPAREN }
-
-| ')'
-  { RPAREN }
-
-| '-' '>'
-  { ARROW }
-
-| ':'
-  { COLON }
-
-| '.'
-  { DOT }
-
-| lowercase (lowercase|number|'\''|'_')*
-  { filter lexbuf }
-
-| whitespace
-  { token lexbuf }
-
-| eof
-  { EOF }
-
-| _
-  {
-    raise (LexingError (Printf.sprintf
-                          "At offset %d: unexpected character %s\n"
-                          (Lexing.lexeme_start lexbuf)
-                          (Lexing.lexeme lexbuf)))
-  }
+let map_none v = function
+  | None -> v
+  | Some v -> v

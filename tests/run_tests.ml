@@ -120,7 +120,7 @@ let _ =
       Printf.printf "The output was:\n%s\n" o;
   in
   let test1 () =
-    print_endline (box "Constraint Solving - first series of tests");
+    print_endline (box "Constraint Solving - standard tests");
     let o = Ocamlbuild_plugin.run_and_read
       "./chaml.native --enable caml-types --disable generalize-match tests/test_solving.ml"
     in
@@ -132,7 +132,7 @@ let _ =
     compare o o';
   in
   let test2 () =
-    print_endline (box "Constraint Solving - second series of tests"); 
+    print_endline (box "Constraint Solving - ChaML extra features"); 
     let o = Ocamlbuild_plugin.run_and_read
       "./chaml.native --enable caml-types tests/test_solving_chaml_only.ml"
     in
@@ -143,6 +143,16 @@ let _ =
       "val i: 'a -> 'a";
       "val e: 'a -> 'a\n";
     ]
+    in
+    compare o o';
+  in
+  let test2' () =
+    print_endline (box "Constraint Solving - recursive types");
+    let o = Ocamlbuild_plugin.run_and_read
+      "./chaml.native --enable caml-types --disable generalize-match tests/tests_recursive_types.ml"
+    in
+    let o' = Ocamlbuild_plugin.run_and_read
+      "ocamlc -rectypes -i -w a tests/tests_recursive_types.ml"
     in
     compare o o';
   in
@@ -167,6 +177,8 @@ let _ =
   test1 ();
   print_newline ();
   test2 ();
+  print_newline ();
+  test2' ();
   print_newline ();
   test3 ();
   Printf.printf

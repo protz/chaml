@@ -41,18 +41,22 @@ let tvl_ttl x = (x: type_var list :> type_term list)
 let ident x pos = `Var (Longident.Lident x), pos
 
 (* Generate fresh type variables on demand *)
-let fresh_type_var =
+let fresh_var =
   let c = ref (-1) in
-  fun ?letter () ->
+  fun ?prefix () ->
     c := !c + 1; 
-    let letter = if !c >= 26 && letter = None then Some 'v' else letter in
-    let v = match letter with
+    let prefix = if !c >= 26 && prefix = None then Some "v" else prefix in
+    let v = match prefix with
       | Some l ->
-        (String.make 1 l) ^ (string_of_int !c)
+        l ^ (string_of_int !c)
       | _ ->
         String.make 1 (char_of_int (int_of_char 'a' + !c))
     in
-    `Var v
+    v
+
+let fresh_type_var ?letter () =
+  let prefix = Option.map (String.make 1) letter in
+  `Var (fresh_var ?prefix ())
 
 (* Returns c_1 and (c_2 and ( ... and c_n)) *)
 let constr_conj = function
