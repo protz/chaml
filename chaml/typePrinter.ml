@@ -24,6 +24,15 @@ type ('key, 'var) inspected_var = [
   | `Cons of type_cons * 'var list
 ]
 
+let prec =
+  let tbl = Hashtbl.create 4 in
+  Hashtbl.add tbl "->" 1;
+  Hashtbl.add tbl "*" 2;
+  List.iter
+    (fun x -> Hashtbl.add tbl x 3)
+    ["int"; "char"; "float"; "string"; "unit"];
+  fun op -> Hashtbl.find tbl op
+
 let string_of_type:
   'var -> ('var -> ('key, 'var) inspected_var) -> string =
   fun uvar inspect_var ->
@@ -62,15 +71,26 @@ let string_of_type:
                   let op =
                     if Opts.get_opt "caml-types" then "->" else "→"
                   in
-                  let t1 = print_type true (List.nth cons_args 0) in
-                  let t2 = print_type false (List.nth cons_args 1) in
+                  let arg1 = List.nth cons_args 0 in
+                  let arg2 = List.nth cons_args 1 in
+                  let p1 = match inspect_var arg1 with
+                    | `Cons ({ cons_name; _ }, _) ->
+                        prec cons_name <= prec "->"
+                    | _ -> true
+                  in
+                  let t1 = print_type p1 arg1 in
+                  let t2 = print_type false arg2 in
                   if paren then
                     Printf.sprintf "(%s %s %s)" t1 op t2
                   else
                     Printf.sprintf "%s %s %s" t1 op t2
               | { cons_name = "*"; _ } ->
                   let types = List.map (print_type true) cons_args in
-                  Printf.sprintf "(%s)" (String.concat " * " types)
+                  let types = (String.concat " * " types) in
+                  if paren then
+                    Printf.sprintf "(%s)" types
+                  else
+                    types
               | { cons_name; _ } ->
                   let types = List.map (print_type true) cons_args in
                   let args = String.concat ", " types in
