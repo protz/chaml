@@ -117,12 +117,12 @@ let inspect_uvar: unifier_var -> descriptor inspected_var =
               | Some (Some key) ->
                   `Alias (type_term, `Var key)
               | Some None ->
+                  Hashtbl.remove seen repr;
                   type_term
               | None ->
                   assert false
             end
             in
-            Hashtbl.remove seen repr;
             r
       end
     in

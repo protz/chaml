@@ -54,7 +54,9 @@ let twidth, theight =
 let test_pass, test_fail =
   let fill s =
     let l = String.length s in
-    let spaces = String.make (twidth - 3 - l) ' ' in
+    let l = twidth - 3 - l in
+    let l = if l < 0 then l + twidth else l in
+    let spaces = String.make l ' ' in
     s ^ spaces
   in
   let pass = bash_color colors.green "✓" in
