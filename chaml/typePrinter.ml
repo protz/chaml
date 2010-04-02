@@ -72,8 +72,10 @@ let string_of_type:
     in
     let rec print_type paren uvar =
       match uvar with
-        | `Alias (uvar, `Var key) ->
-            Printf.sprintf "(%s as %s)" (print_type false uvar) (string_of_key key)
+        | `Alias (uvar, key) ->
+            Printf.sprintf "(%s as %s)"
+              (print_type false uvar)
+              (print_type false (key :> 'key inspected_var))
         | `Var key ->
             string_of_key key
         | `Cons (cons_name, cons_args) ->

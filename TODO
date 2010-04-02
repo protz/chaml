@@ -1,4 +1,6 @@
-- At least do the application
-- See _constraint for the right way to dump constraints
-- Write a constraint dumper
-- Confirm that the given constraints are correct by feeding mini with them
+Issues
+------
+
+- Equirecursive types are unfolded one level too deep. Figure out why the type
+  parser doesn't complain. This is triggered by --enable generalized-match
+- Found a bug with equirecursive types! Triggered by the same option.
