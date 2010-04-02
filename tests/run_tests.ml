@@ -97,7 +97,7 @@ let _ =
       let compare_and_print i r1 r2 =
         let name1, type1 = r1 in
         let name2, type2 = r2 in
-        let type1, type2 = string_of_term type1, string_of_term type2 in
+        let type1, type2 = string_of_type (type1: string TypePrinter.inspected_var), string_of_type type2 in
         let i = i + 1 in
         let sp = if i >= 10 then "" else " " in
         (*Printf.printf "%s = %s\n" (print_type type1) (print_type type2);*)

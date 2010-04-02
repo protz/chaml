@@ -18,8 +18,8 @@
 /*****************************************************************************/
 
 %{
-  open Constraint
   open Algebra
+  open ParserTypes
 %}
 
 %token <string> IDENT
@@ -35,7 +35,13 @@
 %right ARROW
 
 /* Don't know why it is necessary to specify the full path here */
-%start <(string * Constraint.type_term) list> main
+%start <(string * ParserTypes.pvar) list> main
+%type <string * ParserTypes.pvar> type_decl
+%type <ParserTypes.pvar> type_expr
+%type <[`Var of string]> type_var
+%type <ParserTypes.pvar> type_constr
+%type <ParserTypes.pvar list> type_product
+%type <ParserTypes.pvar> type_product_elt
 
 %%
 
@@ -51,11 +57,13 @@ type_decl:
 
 type_expr:
 | v = type_var
+  { (v :> ParserTypes.pvar) }
+| v = type_constr
   { v }
 | LPAREN e = type_expr RPAREN
   { e }
-/* | e = type_expr AS v = type_var
-  { make_recursive e v } */
+| e = type_expr AS v = type_var
+  { `Alias (e, v) }
 | e1 = type_expr ARROW e2 = type_expr
   { type_cons_arrow e1 e2 }
 | e = type_product
@@ -68,6 +76,8 @@ type_var:
   { `Var v }
 | v = IDENT
   { `Var v }
+
+type_constr:
 | INT
   { type_cons_int }
 | CHAR
@@ -87,4 +97,4 @@ type_product:
 
 type_product_elt:
   | LPAREN e = type_expr RPAREN { e }
-  | v = type_var { v }
+  | v = type_var { (v :> ParserTypes.pvar) }

@@ -98,7 +98,7 @@ let global_constructor_table =
 (* Instanciate a type constructor with its type variables, thus creating a type
  * term. If the type constructor does not exist, raise an error, unless it's a
  * tuple (all tuples exist, so we create them on demand). *)
-let type_cons: string -> 'var_type generic_term list -> 'var_type generic_term =
+let type_cons =
   fun cons_name args ->
     begin match Jhashtbl.find_opt global_constructor_table cons_name with
     | Some cons ->

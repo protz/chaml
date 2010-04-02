@@ -19,10 +19,10 @@
 
 open Algebra
 
-type ('key, 'var) inspected_var = [
-  | `Key of 'key
-  | `Cons of type_cons * 'var list
-  (* | `Alias of ('key, 'var) inspected_var * 'var *)
+type 'var inspected_var = [
+  | `Var of 'var
+  | `Cons of type_cons * 'var inspected_var list
+  | `Alias of 'var inspected_var * [`Var of 'var]
 ]
 
 let prec =
@@ -32,12 +32,13 @@ let prec =
   List.iter
     (fun x -> Hashtbl.add tbl x 3)
     ["int"; "char"; "float"; "string"; "unit"];
-  fun op -> Hashtbl.find tbl op
+  fun op ->
+    Hashtbl.find tbl op
 
 let string_of_type:
-  ?string_of_key: ('key -> string) -> 'var -> ('var -> ('key, 'var) inspected_var) -> string =
-  fun ?string_of_key uvar inspect_var ->
-    let seen = Hashtbl.create 16 in
+  ?string_of_key:('key -> string) -> 'key inspected_var -> string =
+  fun ?string_of_key uvar ->
+    let _seen = Hashtbl.create 16 in
     let c = ref 0 in
     let fresh_greek_var =
       if Opts.get_opt "caml-types" then
@@ -71,15 +72,13 @@ let string_of_type:
           f
     in
     let rec print_type paren uvar =
-      match inspect_var uvar with
-          (*
-        | `Alias (uvar, key) ->
+      match uvar with
+        | `Alias (uvar, `Var key) ->
             Printf.sprintf "(%s as %s)" (print_type false uvar) (string_of_key key)
-           *)
-        | `Key key ->
+        | `Var key ->
             string_of_key key
-        | `Cons (cons_name, cons_args) as cons ->
-            begin match Jhashtbl.find_opt seen cons with
+        | `Cons (cons_name, cons_args) as _cons ->
+            (* begin match Jhashtbl.find_opt seen cons with
               | Some None ->
                   let l = fresh_greek_var () in
                   Hashtbl.add seen cons (Some l);
@@ -87,15 +86,15 @@ let string_of_type:
               | Some (Some l) ->
                   l
               | None ->
-                  Hashtbl.add seen cons None; 
-                  let type_string = begin match cons_name with
+                  Hashtbl.add seen cons None;
+                  let type_string =  *)begin match cons_name with
                     | { cons_name = "->"; _ } ->
                         let op =
                           if Opts.get_opt "caml-types" then "->" else "→"
                         in
                         let arg1 = List.nth cons_args 0 in
                         let arg2 = List.nth cons_args 1 in
-                        let p1 = match inspect_var arg1 with
+                        let p1 = match arg1 with
                           | `Cons ({ cons_name; _ }, _) ->
                               prec cons_name <= prec "->"
                           | _ -> true
@@ -120,7 +119,7 @@ let string_of_type:
                           Printf.sprintf "(%s (%s))" cons_name args
                         else
                           Printf.sprintf "%s" cons_name
-                  end in
+                  end (* in
                   begin match Jhashtbl.find_opt seen cons with
                     | Some (Some l) ->
                         Printf.sprintf "(%s as %s)" type_string l
@@ -129,14 +128,10 @@ let string_of_type:
                     | None ->
                         assert false
                   end
-            end
+            end *)
     in
     print_type false uvar
 
 let string_of_term: 'var generic_term -> string =
-  let inspect_var: 'var generic_term -> ('var, 'var generic_term) inspected_var =
-    function
-      | `Var v -> `Key v
-      | `Cons (cons_name, cons_args) -> `Cons (cons_name, cons_args)
-  in
-  fun type_term -> string_of_type type_term inspect_var
+  fun type_term ->
+    string_of_type (type_term: 'var generic_term :> 'var inspected_var)
