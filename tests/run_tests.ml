@@ -104,7 +104,7 @@ let _ =
         let sp = if i >= 10 then "" else " " in
         (*Printf.printf "%s = %s\n" (print_type type1) (print_type type2);*)
         let test_name =
-          Printf.sprintf "[Binding %d/%d]:%s val %s: %s but also %s" i l sp name1 type1 type2
+          Printf.sprintf "[Binding %d/%d]:%s val %s: %s" i l sp name1 type1
         in
         if (String.compare name1 name2) != 0 then
           error "Top-level bindings do not match: %s != %s" name1 name2

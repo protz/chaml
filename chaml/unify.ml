@@ -68,10 +68,11 @@ module Pool = struct
 end
 
 (* This is used by the solver to pass information down the recursive calls.
-* - We can use a Hashtbl because all type variables are distinct (although
+ * - We can use a Hashtbl because all type variables are distinct (although
  * strictly speaking we should use a map for scopes).
-* - The map is required because we need different ident maps for each branch of
-* multiple simultaneous let bindings. *)
+ * - The map is required because we need different ident maps for each branch of
+ * multiple simultaneous let bindings. Moreover, it is important in a `Conj
+ * constraint not pollute one branch's scope with the other one's.*)
 type unifier_env = {
   current_pool: Pool.t;
   uvar_of_tterm: (type_term, unifier_var) Hashtbl.t;
@@ -176,23 +177,26 @@ let fresh_copy unifier_env (young_vars, scheme_uvar) =
           (* We don't create fresh variables. The young variables have already
            * been created for us, so if we can't find it, it's and old variable
            * that we musn't duplicate. *)
-          let uvar = match Jhashtbl.find_opt mapping repr with
-            | Some uvar -> uvar
+          begin match Jhashtbl.find_opt mapping repr with
+            | Some uvar' -> uvar'
             | None -> uvar
-          in
-          uvar
+          end
       | Some (`Cons (cons_name, cons_args)) ->
           let uvar, deep = match Jhashtbl.find_opt mapping repr with
             | Some uvar ->
-                if repr.rank < base_rank then
-                  uvar, false
-                else
+                (* The then code path is never used. There's only two possible
+                 * reasons why [uvar] is in [mapping].
+                 * - It's a young variable added initially. Then repr.rank =
+                 * base_rank, which implies deep = true
+                 * - It's been added from below. deep was already set to true
+                 * and remains so. *)
+                if repr.rank < base_rank then begin
+                  let _previous_return_value = uvar, false in
+                  assert false
+                end else begin
                   uvar, true
+                end
             | None -> 
-                (* Add the variable first to avoid infinite loops. This should
-                 * allow some sharing of variables (XXX check this actually
-                 * helps). *)
-                (* XXX explain *)
                 if repr.rank < base_rank then
                   uvar, false
                 else
@@ -212,12 +216,15 @@ let fresh_copy unifier_env (young_vars, scheme_uvar) =
   List.iter
     (fun v ->
        let v' = fresh_unifier_var ~prefix:"dup" unifier_env in
-         Error.debug "[Copy] %s is a copy of %s\n" (UnionFind.find v').name
-           (UnionFind.find v).name;
-         Hashtbl.add mapping (UnionFind.find v) v')
+       Error.debug
+         "[Copy] %s is a copy of %s\n" (UnionFind.find v').name (UnionFind.find v).name;
+       Hashtbl.add mapping (UnionFind.find v) v'
+    )
     young_vars;
-  let pairs = Jhashtbl.map_list mapping (fun k v -> let n = k.name in
-                                   Printf.sprintf "%s: %s" n (uvar_name v))
+  let pairs =
+    Jhashtbl.map_list
+      mapping
+      (fun k v -> let n = k.name in Printf.sprintf "%s: %s" n (uvar_name v))
   in
   Error.debug "[UCopy] Mapping: %s\n" (String.concat ", " pairs);
   fresh_copy scheme_uvar
