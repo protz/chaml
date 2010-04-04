@@ -83,6 +83,10 @@ let _ =
   if !arg_filename = "" then begin
     print_string usage
   end else begin
+    (* Do this right now as all the module are likely to use it. *)
+    if !arg_debug then begin
+      Error.enable_debug ();
+    end;
     (* Get the AST from OCaml lexer/parser *)
     let ast = file Format.err_formatter !arg_filename Parse.implementation Config.ast_impl_magic_number in
     if !arg_print_ast then
@@ -93,9 +97,6 @@ let _ =
       let pp_env = ConstraintPrinter.fresh_pp_env ~pretty_printing:!arg_pretty_printing () in
       print_string (ConstraintPrinter.string_of_constraint pp_env konstraint);
       flush stdout;
-    end;
-    if !arg_debug then begin
-      Error.enable_debug ();
     end;
     (* Constraint solving *)
     if Opts.get_opt "solver" then

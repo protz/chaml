@@ -229,25 +229,29 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
           let c2 = generate_constraint_expression t e2 in
           `Let (List.map generate_constraint_pat_expr pat_expr_list, c2)
       | Pexp_match (e1, pat_expr_list) ->
-          let x1 = fresh_type_var ~letter:'x' () in
-          let constr_e1 = generate_constraint_expression x1 e1 in
           if Opts.get_opt "generalize-match" then
             (* We generalize here. See the draft version of ATTAPL p.98 for the
              * exact rule. The important part is that we generate a `Let
              * constraint for each branch and we copy the e1 constraint into each
              * branch. TODO use a let-constraint instead of copying constr_e1 *)
+            let `Var var_name = t in
+            Error.debug "[CG] Generalizing match constraint on %s\n" var_name;
             let generate_branch (pat, expr) =
+              let x1 = fresh_type_var ~letter:'x' () in
+              let constr_e1 = generate_constraint_expression x1 e1 in
               let c1, var_map, generated_vars = generate_constraint_pattern x1 pat in
               let c2 = generate_constraint_expression t expr in
               let c = `Conj (constr_e1, c1) in
               let let_constr: type_constraint =
                 `Let ([x1 :: generated_vars, c, var_map], c2)
               in
-              let_constr
+              x1, let_constr
             in
-            let constraints = List.map generate_branch pat_expr_list in
-            `Exists ([x1], constr_conj constraints)
+            let xis, constraints = List.split (List.map generate_branch pat_expr_list) in
+            `Exists (xis, constr_conj constraints)
           else
+            let x1 = fresh_type_var ~letter:'x' () in
+            let constr_e1 = generate_constraint_expression x1 e1 in
             let generate_branch (pat, expr) =
               let c1, var_map, generated_vars = generate_constraint_pattern x1 pat in
               let c2 = generate_constraint_expression t expr in

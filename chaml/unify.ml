@@ -184,15 +184,8 @@ let fresh_copy unifier_env (young_vars, scheme_uvar) =
       | Some (`Cons (cons_name, cons_args)) ->
           let uvar, deep = match Jhashtbl.find_opt mapping repr with
             | Some uvar ->
-                (* The then code path is never used. There's only two possible
-                 * reasons why [uvar] is in [mapping].
-                 * - It's a young variable added initially. Then repr.rank =
-                 * base_rank, which implies deep = true
-                 * - It's been added from below. deep was already set to true
-                 * and remains so. *)
-                if repr.rank < base_rank then begin
-                  let _previous_return_value = uvar, false in
-                  assert false
+                if repr.rank <= base_rank then begin
+                  uvar, false
                 end else begin
                   uvar, true
                 end
