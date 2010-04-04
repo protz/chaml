@@ -30,7 +30,7 @@ open TypePrinter
 type type_var = string generic_var
 type type_term = string generic_term
 type type_constraint = string generic_constraint
-type type_scheme = string generic_scheme    
+type type_scheme = string generic_scheme
 
 (* The polymorphic variants allow us to make a difference between simply a
  * variable and a more general term. But we need to do the casts ourselves. *)
@@ -44,7 +44,7 @@ let ident x pos = `Var (Longident.Lident x), pos
 let fresh_var =
   let c = ref (-1) in
   fun ?prefix () ->
-    c := !c + 1; 
+    c := !c + 1;
     let prefix = if !c >= 26 && prefix = None then Some "v" else prefix in
     let v = match prefix with
       | Some l ->
@@ -65,7 +65,7 @@ let constr_conj = function
   | _ ->
       assert false
 
-(* Parsetree.pattern 
+(* Parsetree.pattern
  *
  * We are given a type var that's supposed to match the given pattern. What we
  * return is a type constraint and a map from identifiers to the corresponding
@@ -113,7 +113,7 @@ let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * t
                * this pattern *)
               let new_vars = xi :: sub_vars @ known_vars in
               combine new_vars new_map new_constraint_list (remaining_patterns, xis)
-          | ([], []) -> 
+          | ([], []) ->
               let konstraint = constr_conj current_constraint_list in
               List.rev known_vars, known_map, konstraint
           | _ ->
@@ -150,7 +150,7 @@ let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * t
       | _ -> fatal_error "This pattern is not implemented\n"
 
 (* Parsetree.expression
- * 
+ *
  * - TODO figure out what label and the expression option are for in
  * Pexp_function then do things accordingly. label is probably when the argument
  * is labeled. What is the expression option for?
@@ -265,7 +265,7 @@ and generate_constraint_expression: type_var -> expression -> type_constraint =
           fatal_error "This expression is not supported\n"
 
 (* Parsetree.structure
- * 
+ *
  * structure_items are only for top-level definitions inside modules
  * - Pstr_value is for let x = ...
  * - Pstr_eval is for let _ = ...

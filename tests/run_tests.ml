@@ -47,7 +47,7 @@ let twidth, theight =
   let height, width = ref 0, ref 0 in
   Scanf.sscanf
     (Ocamlbuild_plugin.run_and_read "stty size")
-    "%d %d" 
+    "%d %d"
     (fun h w -> width := w; height := h);
   !width, !height
 
@@ -91,24 +91,25 @@ let _ =
   in
   let good = ref 0 in
   let bad = ref 0 in
-  let compare o o' =
-    try 
-      let t = parse_output o in
-      let t' = parse_output o' in
-      let l = List.length t in
-      let compare_and_print i r1 r2 =
-        let name1, type1 = r1 in
-        let name2, type2 = r2 in
-        let type1, type2 = string_of_type type1, string_of_type type2 in
+  let compare outputs =
+    try
+      let ts = List.map parse_output outputs in
+      let l = List.length (List.hd ts) in
+      let compare_and_print: int -> (string * ParserTypes.pvar) list -> unit = fun i rs ->
+        let names, types = List.split rs in
+        let types = List.map string_of_type types in
         let i = i + 1 in
         let sp = if i >= 10 then "" else " " in
         (*Printf.printf "%s = %s\n" (print_type type1) (print_type type2);*)
         let test_name =
-          Printf.sprintf "[Binding %d/%d]:%s val %s: %s" i l sp name1 type1
+          Printf.sprintf
+            "[Binding %d/%d]:%s val %s: %s" i l sp (List.hd names) (List.hd types)
         in
-        if (String.compare name1 name2) != 0 then
-          error "Top-level bindings do not match: %s != %s" name1 name2
-        else if type1 = type2 then begin
+        let compare_name n = String.compare (List.hd names) n = 0 in
+        let compare_type = (=) (List.hd types) in
+        if not (List.for_all compare_name names) then
+          error "Top-level bindings do not match: %s" (String.concat ", " names)
+        else if (List.for_all compare_type types) then begin
           test_pass test_name;
           good := !good + 1;
         end else begin
@@ -116,10 +117,36 @@ let _ =
           bad := !bad + 1;
         end
       in
-      Jlist.iter2i compare_and_print t t';
+      let heads: 'a list list -> ('a list * 'a list list) option = fun lists ->
+        let tails = ref [] in
+        let heads = ref [] in
+        let module T = struct exception Stop end in
+        try
+          List.iter
+            (function
+               | [] -> raise T.Stop
+               | hd :: tl -> heads := hd :: !heads; tails := tl :: !tails
+            )
+            lists;
+          Some (!heads, !tails)
+        with T.Stop ->
+          None
+      in
+      let ts = ref ts in
+      let i = ref 0 in
+      while begin
+        match heads !ts with
+          | Some (heads, tails) ->
+              compare_and_print !i heads;
+              ts := tails;
+              i := !i + 1;
+              true
+          | None ->
+              false
+      end do () done;
     with Lexer.LexingError e ->
       error "Lexing Error: %s" e;
-      Printf.printf "The output was:\n%s\n" o;
+      Printf.printf "The output was:\n%s\n" (List.hd outputs);
   in
   let test1 () =
     print_endline (box "Constraint Solving - standard tests");
@@ -131,10 +158,13 @@ let _ =
     let o' = Ocamlbuild_plugin.run_and_read
       "ocamlc -i -w a tests/test_solving.ml"
     in
-    compare o o';
+    let o'' = Ocamlbuild_plugin.run_and_read
+      "./chaml.native --enable caml-types tests/test_solving.ml"
+    in
+    compare [o; o'; o''];
   in
   let test2 () =
-    print_endline (box "Constraint Solving - ChaML extra features"); 
+    print_endline (box "Constraint Solving - ChaML extra features");
     let o = Ocamlbuild_plugin.run_and_read
       "./chaml.native --enable caml-types tests/test_solving_chaml_only.ml"
     in
@@ -146,7 +176,7 @@ let _ =
       "val e: 'a -> 'a\n";
     ]
     in
-    compare o o';
+    compare [o; o'];
   in
   let test2' () =
     print_endline (box "Constraint Solving - recursive types");
@@ -156,10 +186,13 @@ let _ =
     let o' = Ocamlbuild_plugin.run_and_read
       "ocamlc -rectypes -i -w a tests/tests_recursive_types.ml"
     in
-    compare o o';
+    let o'' = Ocamlbuild_plugin.run_and_read
+      "./chaml.native --enable caml-types tests/tests_recursive_types.ml"
+    in
+    compare [o; o'; o''];
   in
   let test3 () =
-    print_endline (box "Constraint Generation - first series of tests"); 
+    print_endline (box "Constraint Generation - first series of tests");
     let o = Ocamlbuild_plugin.run_and_read
       ("./chaml.native --disable solver --disable generalize-match " ^
       "--disable default-bindings --print-constraint tests/test_constraint.ml")
@@ -167,13 +200,23 @@ let _ =
     let fd = open_out "_constraint" in
     output_string fd o;
     close_out fd;
-    let o = Ocamlbuild_plugin.run_and_read 
+    let o = Ocamlbuild_plugin.run_and_read
+      ("./chaml.native --disable solver " ^
+      "--disable default-bindings --print-constraint tests/test_constraint.ml")
+    in
+    let fd = open_out "_constraint2" in
+    output_string fd o;
+    close_out fd;
+    let o = Ocamlbuild_plugin.run_and_read
       "mini --start parse-constraint _constraint"
     in
     let o' = Ocamlbuild_plugin.run_and_read
       "ocamlc -i -w a tests/test_constraint.ml"
     in
-    compare o' o;
+    let o'' = Ocamlbuild_plugin.run_and_read
+      "mini --start parse-constraint _constraint2"
+    in
+    compare [o'; o; o''];
   in
   Opts.add_opt "caml-types" true;
   test1 ();

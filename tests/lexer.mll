@@ -21,7 +21,7 @@
   open Parser
   exception LexingError of string
 
-  let keywords = 
+  let keywords =
     let t = Hashtbl.create 8 in
       List.iter
         (fun (keyword, token) -> Hashtbl.add t keyword token)
@@ -36,7 +36,7 @@
           "as", AS;
         ];
       t
-        
+
   let filter lexbuf =
     let ident = Lexing.lexeme lexbuf in
     match Jhashtbl.find_opt keywords ident with

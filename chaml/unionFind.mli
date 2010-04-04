@@ -53,4 +53,4 @@ val equivalent: 'a point -> 'a point -> bool
 val redundant: 'a point -> bool
 
 (** [change p d] updates the descriptor of [p] to [d]. *)
-val change: 'a point -> 'a -> 'a  
+val change: 'a point -> 'a -> 'a

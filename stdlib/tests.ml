@@ -38,6 +38,6 @@ let _ =
   let l = List.map string_of_int l in
   let l' = List.map string_of_int l' in
   Printf.printf
-    "remove_duplicates: [%s] -> [%s]\n" 
+    "remove_duplicates: [%s] -> [%s]\n"
     (String.concat "; " l)
     (String.concat "; " l')

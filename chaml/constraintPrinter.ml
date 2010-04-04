@@ -76,7 +76,7 @@ let string_of_constraint =
     | `Exists (xs, c) ->
         let i' = inc i in
         let c = string_of_constraint pp_env i' c in
-        if List.length xs > 0 then 
+        if List.length xs > 0 then
           let xs = String.concat "" (List.map space_before_type_var xs) in
           String.concat "" ["\xE2\x88\x83"; xs; ".\n"; i'; c]
         else

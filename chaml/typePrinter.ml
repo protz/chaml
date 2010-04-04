@@ -60,7 +60,7 @@ let string_of_type:
       | None ->
           (fun key ->
             begin match Jhashtbl.find_opt greek_of_repr key with
-              | None -> 
+              | None ->
                   let letter = fresh_greek_var () in
                   Hashtbl.add greek_of_repr key letter;
                   letter
@@ -111,7 +111,7 @@ let string_of_type:
                     Printf.sprintf "(%s (%s))" cons_name args
                   else
                     Printf.sprintf "%s" cons_name
-            end 
+            end
     in
     print_type false uvar
 

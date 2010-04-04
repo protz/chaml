@@ -91,7 +91,10 @@ let step_env env =
   { env with current_pool = new_pool }
 
 (* Transforms the unification graph into a non-cyclic structure where cycles
- * have been replaced by `Alias, suitable for printing. *)
+ * have been replaced by `Alias, suitable for printing. The ?debug optional
+ * parameter is used when printing a unification variable whose internal name we
+ * want to display (to track unification progress). Do not use it if you want to
+ * see a "real" type. *)
 let inspect_uvar: ?debug:unit -> unifier_var -> descriptor inspected_var =
   fun ?debug uvar ->
     let seen = Hashtbl.create 16 in
@@ -107,7 +110,7 @@ let inspect_uvar: ?debug:unit -> unifier_var -> descriptor inspected_var =
             `Var key
         | None ->
             Hashtbl.add seen repr None;
-            let type_term = 
+            let type_term =
               match repr.term with
                 | Some (`Cons (type_cons, cons_args)) ->
                     `Cons (type_cons, List.map inspect_uvar cons_args)
@@ -144,10 +147,13 @@ let rec uvar_name: unifier_var -> string =
           s
           (string_of_type ~string_of_key (inspect_uvar ~debug:() uvar))
 
+(* For error messages *)
+let string_of_uvar uvar = string_of_type (inspect_uvar uvar)
+
 (* For printing type schemes *)
 let string_of_scheme ident scheme =
   let _, uvar = scheme in
-  Printf.sprintf "val %s: %s" ident (string_of_type (inspect_uvar uvar))
+  Printf.sprintf "val %s: %s" ident (string_of_uvar uvar)
 
 
 (* Create a fresh variable and add it to the current pool *)
@@ -184,12 +190,19 @@ let fresh_copy unifier_env (young_vars, scheme_uvar) =
       | Some (`Cons (cons_name, cons_args)) ->
           let uvar, deep = match Jhashtbl.find_opt mapping repr with
             | Some uvar ->
+                (* Tentative explanation for the weird <= equal. What happens
+                 * basically is that if we take an instance of a type scheme
+                 * that has repr.rank = base_rank, then we want to duplicate the
+                 * constructor once (the None -> branch of the match). However,
+                 * if this is a recursive type, the next time we bump into the
+                 * constructor, we don't want to traverse it again. Hence the =.
+                 * *)
                 if repr.rank <= base_rank then begin
                   uvar, false
                 end else begin
                   uvar, true
                 end
-            | None -> 
+            | None ->
                 if repr.rank < base_rank then
                   uvar, false
                 else
@@ -198,7 +211,8 @@ let fresh_copy unifier_env (young_vars, scheme_uvar) =
                   uvar, true
           in
           if deep then
-            (* Generate recursively *)
+            (* Generate recursively after we have added the term to avoid
+             * infinite recursion. *)
             let cons_args' = List.map fresh_copy cons_args in
             let term = `Cons (cons_name, cons_args') in
             (UnionFind.find uvar).term <- Some term;
@@ -268,7 +282,7 @@ let rec unify: unifier_env -> unifier_var -> unifier_var -> unit =
       | { term = Some t1; _ }, { term = Some t2; _ } ->
           let `Cons (c1, args1) = t1 and `Cons (c2, args2) = t2 in
           if not (c1 == c2) then
-            Error.fatal_error "%s cannot be unified with %s\n" c1.cons_name c2.cons_name;
+            Error.fatal_error "%s cannot be unified with %s\n" (string_of_uvar v1) (string_of_uvar v2);
           if not (List.length args1 == List.length args2) then
             Error.fatal_error "wrong number of arguments for this tuple\n";
           List.iter2 (fun arg1 arg2 -> unify unifier_env arg1 arg2) args1 args2;

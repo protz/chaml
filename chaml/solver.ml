@@ -78,7 +78,7 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
    * definitions. This roughly corresponds to S-SOLVE-LET. *)
   and schedule_schemes: unifier_env -> type_scheme list -> type_constraint -> unifier_env =
     fun unifier_env schemes c ->
-      (* This auxiliary function 
+      (* This auxiliary function
        * - solves the constraint
        * - generalizes variables as needed
        * - associates schemes to identifiers in the environment
@@ -150,7 +150,7 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
     uvar_of_tterm = Hashtbl.create 64;
     scheme_of_ident = IdentMap.empty;
   } in
-  let knowledge = analyze initial_env konstraint in 
+  let knowledge = analyze initial_env konstraint in
   let module JIM = Jmap.Make(IdentMap) in
   let kv = JIM.to_list knowledge.scheme_of_ident in
   let kv = List.filter (fun ((_, pos), _) -> not pos.Location.loc_ghost) kv in
@@ -160,4 +160,4 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
     let s = string_of_scheme ident scheme in
     print_endline s
   in
-  List.iter print_kv kv 
+  List.iter print_kv kv
