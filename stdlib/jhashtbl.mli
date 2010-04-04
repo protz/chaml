@@ -17,26 +17,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A bunch of useful functions for lists. *)
+(** This module adds some useful functions that are compatible with [Hashtbl].
+  *)
 
-(** Same as [List.split] but for triples instead of couples. *)
-val split3 : ('a * 'b * 'c) list -> 'a list * 'b list * 'c list
+(** Same as [Hashtbl.find] instead that it returns an option type instead of
+    raising an exception. *)
+val find_opt : ('a, 'b) Hashtbl.t -> 'a -> 'b option
 
-(** Map a function and then discard the result. *)
-val ignore_map : ('a -> 'b) -> 'a list -> unit
-
-(** Iterate a function that also takes the index as an argument. *)
-val iteri : (int -> 'a -> unit) -> 'a list -> unit
-
-(** Same as [Jlist.iteri] but with two lists. *)
-val iter2i : (int -> 'a -> 'b -> unit) -> 'a list -> 'b list -> unit
-
-(** [append_rev_front l1 l2] is tail-rec and returns [(List.rev l1) :: l2]. *)
-val append_rev_front : 'a list -> 'a list -> 'a list
-
-(** Remove duplicates from a list. You can provide a hash functino as well as a
-    custom equality function. The constraint is that two equal elements must
-    have the same hash. Use [Hashtbl.hash_func] if needed. *)
-val remove_duplicates :
-  ?hash_func:('a -> int) ->
-  ?equal_func:('a -> 'a -> bool) -> 'a list -> 'a list
+(** map_list [tbl] [f] returns a list of [f key val] for each value [key]
+    associated to a value [val] in [tbl]. *)
+val map_list : ('a, 'b) Hashtbl.t -> ('a -> 'b -> 'c) -> 'c list

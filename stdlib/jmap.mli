@@ -17,26 +17,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A bunch of useful functions for lists. *)
+(** Various missing functions from the [Map] module. *)
 
-(** Same as [List.split] but for triples instead of couples. *)
-val split3 : ('a * 'b * 'c) list -> 'a list * 'b list * 'c list
+module Make: functor (M : Map.S) -> sig
+  (** Get a list of all keys in a map. *)
+  val keys : 'a M.t -> M.key list
 
-(** Map a function and then discard the result. *)
-val ignore_map : ('a -> 'b) -> 'a list -> unit
+  (** [union m1 m2] keeps the values from [m1] *)
+  val union : 'a M.t -> 'a M.t -> 'a M.t
 
-(** Iterate a function that also takes the index as an argument. *)
-val iteri : (int -> 'a -> unit) -> 'a list -> unit
+  (** [inter m1 m2] keeps the values from [m1] *)
+  val inter : 'a M.t -> 'a M.t -> 'a M.t
 
-(** Same as [Jlist.iteri] but with two lists. *)
-val iter2i : (int -> 'a -> 'b -> unit) -> 'a list -> 'b list -> unit
+  (** [minus m1 m2] returns [m1] minus all the elements that are also in [m2],
+      that is, m1 \ (m1 ∩ m2) *)
+  val minus : 'a M.t -> 'a M.t -> 'a M.t
 
-(** [append_rev_front l1 l2] is tail-rec and returns [(List.rev l1) :: l2]. *)
-val append_rev_front : 'a list -> 'a list -> 'a list
+  (** [xor m1 m2] is ([m1] ∪ [m2]) \ ([m1] ∩ [m2]) *)
+  val xor : 'a M.t -> 'a M.t -> 'a M.t
 
-(** Remove duplicates from a list. You can provide a hash functino as well as a
-    custom equality function. The constraint is that two equal elements must
-    have the same hash. Use [Hashtbl.hash_func] if needed. *)
-val remove_duplicates :
-  ?hash_func:('a -> int) ->
-  ?equal_func:('a -> 'a -> bool) -> 'a list -> 'a list
+  (** [to_list] translates the map to a list. *)
+  val to_list : 'a M.t -> (M.key * 'a) list
+end

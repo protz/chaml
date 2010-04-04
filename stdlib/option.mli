@@ -17,26 +17,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A bunch of useful functions for lists. *)
+(** No "J" prefix for this module since OCaml's standard library does not have
+  * an [Option] module. *)
 
-(** Same as [List.split] but for triples instead of couples. *)
-val split3 : ('a * 'b * 'c) list -> 'a list * 'b list * 'c list
+(** [map] [f] [opt] maps [None] to [None] and [Some a] to [Some (f a)] *)
+val map : ('a -> 'b) -> 'a option -> 'b option
 
-(** Map a function and then discard the result. *)
-val ignore_map : ('a -> 'b) -> 'a list -> unit
+(** [map_none] [n] [opt] maps [None] to [n] and [Some m] to [m]. *)
+val map_none : 'a -> 'a option -> 'a
 
-(** Iterate a function that also takes the index as an argument. *)
-val iteri : (int -> 'a -> unit) -> 'a list -> unit
-
-(** Same as [Jlist.iteri] but with two lists. *)
-val iter2i : (int -> 'a -> 'b -> unit) -> 'a list -> 'b list -> unit
-
-(** [append_rev_front l1 l2] is tail-rec and returns [(List.rev l1) :: l2]. *)
-val append_rev_front : 'a list -> 'a list -> 'a list
-
-(** Remove duplicates from a list. You can provide a hash functino as well as a
-    custom equality function. The constraint is that two equal elements must
-    have the same hash. Use [Hashtbl.hash_func] if needed. *)
-val remove_duplicates :
-  ?hash_func:('a -> int) ->
-  ?equal_func:('a -> 'a -> bool) -> 'a list -> 'a list
+(** Since [unit option] and [bool] are isomorphic, this function implements the
+  * morphism from [unit option] to [bool]. [None] maps to [false] and [Some ()]
+  * to true. *)
+val unit_bool : unit option -> bool

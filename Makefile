@@ -1,7 +1,7 @@
 PATH := /home/yquem/cristal/protzenk/Code/mini-trunk/trunk/src/:$(PATH)
 BUILDFLAGS=-I stdlib -I utils -I parsing
 
-.PHONY: tests
+.PHONY: tests doc
 
 all:
 	ocamlbuild $(BUILDFLAGS) chaml/chaml.native
@@ -34,3 +34,9 @@ graph:
 	dot -Tpng graph.dot > graph.png
 	convert graph.png -rotate 90 graph.png
 	eog graph.png
+
+doc:
+	ocamldoc -html -I _build/chaml/ -I _build/parsing/ -I _build/stdlib/ \
+	  -I _build/tests/ -I _build/utils/ -d doc \
+	  `find chaml stdlib -iname '*.mli' -or -iname '*.ml'`
+	cp -f ocamlstyle.css doc/style.css
