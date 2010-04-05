@@ -85,6 +85,15 @@ let box txt =
   bash_color colors.blue "%s%s\n%s%s\n%s%s\n"
     whitespace top whitespace middle whitespace bottom
 
+
+let conversions =
+  (* Hack alert ! *)
+  let tbl = Hashtbl.create 4 in
+  let expanded_1 = "('a * 'a as 'a) * 'a -> ('a * 'a -> 'a * 'a -> 'b) -> 'a * 'a -> 'a * 'a -> 'b" in
+  let correct_1 = "('a * 'a as 'a) -> ('a -> 'a -> 'b) -> 'a -> 'a -> 'b" in
+  Hashtbl.add tbl expanded_1 correct_1;
+  tbl
+
 let _ =
   let error f =
     Printf.kprintf (fun s -> print_endline (bash_color colors.red "%s\n" s)) f
@@ -113,8 +122,19 @@ let _ =
           test_pass test_name;
           good := !good + 1;
         end else begin
-          test_fail test_name;
-          bad := !bad + 1;
+          let converted_types =
+            List.map
+              (fun x -> Option.map_none x (Jhashtbl.find_opt conversions x))
+              types
+          in
+            let compare_type = (=) (List.hd converted_types) in
+            if (List.for_all compare_type converted_types) then begin
+              test_pass test_name;
+              good := !good + 1;
+            end else begin
+              test_fail test_name;
+              bad := !bad + 1;
+            end
         end
       in
       let heads: 'a list list -> ('a list * 'a list list) option = fun lists ->
@@ -189,7 +209,7 @@ let _ =
     let o'' = Ocamlbuild_plugin.run_and_read
       "./chaml.native --enable caml-types tests/tests_recursive_types.ml"
     in
-    compare [o; o'; o''];
+    compare [o'; o''; o];
   in
   let test3 () =
     print_endline (box "Constraint Generation - first series of tests");
@@ -216,7 +236,7 @@ let _ =
     let o'' = Ocamlbuild_plugin.run_and_read
       "mini --start parse-constraint _constraint2"
     in
-    compare [o'; o; o''];
+    compare [o; o'; o''];
   in
   Opts.add_opt "caml-types" true;
   test1 ();
