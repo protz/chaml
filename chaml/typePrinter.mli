@@ -17,13 +17,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Print types from the Algebra module. [Unify] provides wrappers over these
+    functions to properly convert from a unification var to a ['a, 'b, ...] var.
+  *)
+
 open Algebra
 
+(** This type represents a disambiguated type, that is, where all cycles have
+    been converted to [`Alias]es. [Unify] has a function called [inspect_var]
+    that converts a unification variable to such a variable. The tests output
+    directly a [inspected_var]. *)
 type 'var inspected_var = [
-  | `Var of 'var
+    'var generic_var
   | `Cons of type_cons * 'var inspected_var list
-  | `Alias of 'var inspected_var * [`Var of 'var]
+  | `Alias of 'var inspected_var * 'var generic_var
 ]
 
-val string_of_type : ?string_of_key:('a -> string) -> 'a inspected_var -> string
-val string_of_term : 'a Algebra.generic_term -> string
+(** The [string_of_key] optional argument tells how to convert from a ['var] to
+    a string. If it's a unification var, one might want to use the internal name
+    for debugging. *)
+val string_of_type: ?string_of_key:('var -> string) -> 'var inspected_var -> string
+
+(** Just a type-converted function for printing Algebra's generic terms. Useful
+    for error messages. *)
+val string_of_term: 'a Algebra.generic_term -> string

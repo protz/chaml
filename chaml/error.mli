@@ -17,16 +17,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** No "J" prefix for this module since OCaml's standard library does not have
-    an [Option] module. *)
+(** This module provides error reporting functions for ChaML. Any module can use
+    it. *)
 
-(** [map] [f] [opt] maps [None] to [None] and [Some a] to [Some (f a)] *)
-val map : ('a -> 'b) -> 'a option -> 'b option
+(** Report a fatal error. For now, this raises an exception, but it might do
+    better in the future. Use it like [Printf.printf]. *)
+val fatal_error : ('a, unit, string, 'b) format4 -> 'a
 
-(** [map_none] [n] [opt] maps [None] to [n] and [Some m] to [m]. *)
-val map_none : 'a -> 'a option -> 'a
+(** Enable debugging information. *)
+val enable_debug : unit -> unit
 
-(** Since [unit option] and [bool] are isomorphic, this function implements the
-    morphism from [unit option] to [bool]. [None] maps to [false] and [Some ()]
-    to true. *)
-val unit_bool : unit option -> bool
+(** Report some debugging information. Use it like [Printf.printf] *)
+val debug : ('a, out_channel, unit) format -> 'a
+
+(** Report some debugging information. Use it like [print_string] *)
+val debug_simple : string -> unit

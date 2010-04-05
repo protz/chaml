@@ -18,7 +18,7 @@
 (*****************************************************************************)
 
 (** This module adds some useful functions that are compatible with [Hashtbl].
-  *)
+    *)
 
 (** Same as [Hashtbl.find] instead that it returns an option type instead of
     raising an exception. *)

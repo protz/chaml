@@ -37,6 +37,6 @@ graph:
 
 doc:
 	ocamldoc -html -I _build/chaml/ -I _build/parsing/ -I _build/stdlib/ \
-	  -I _build/tests/ -I _build/utils/ -d doc \
+	  -I _build/tests/ -I _build/utils/ -I `ocamlc -where` -d doc \
 	  `find chaml stdlib -iname '*.mli' -or -iname '*.ml'`
 	cp -f ocamlstyle.css doc/style.css

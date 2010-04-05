@@ -17,16 +17,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** No "J" prefix for this module since OCaml's standard library does not have
-    an [Option] module. *)
+(** This module abstracts command-line options. Use [add_opt] to add a value and
+    later in the program, use [get_opt] to test the value of the option. Default
+    values are hardcoded in [opts.ml], see there for a list of valid options. *)
 
-(** [map] [f] [opt] maps [None] to [None] and [Some a] to [Some (f a)] *)
-val map : ('a -> 'b) -> 'a option -> 'b option
+(** [add_opt key val] is called when used has enabled or disabled option [key].
+    *)
+val add_opt : string -> bool -> unit
 
-(** [map_none] [n] [opt] maps [None] to [n] and [Some m] to [m]. *)
-val map_none : 'a -> 'a option -> 'a
-
-(** Since [unit option] and [bool] are isomorphic, this function implements the
-    morphism from [unit option] to [bool]. [None] maps to [false] and [Some ()]
-    to true. *)
-val unit_bool : unit option -> bool
+(** [get_opt key] returns the value of the option [key]. *)
+val get_opt : string -> bool

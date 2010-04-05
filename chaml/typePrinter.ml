@@ -20,9 +20,9 @@
 open Algebra
 
 type 'var inspected_var = [
-  | `Var of 'var
+    'var generic_var
   | `Cons of type_cons * 'var inspected_var list
-  | `Alias of 'var inspected_var * [`Var of 'var]
+  | `Alias of 'var inspected_var * 'var generic_var
 ]
 
 let prec =
