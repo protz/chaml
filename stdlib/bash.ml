@@ -17,37 +17,37 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Print a constraint (possibly with pretty-printing) in a form suitable for
-    parsing by mini. Also provides wrappers for bash colors. *)
+type colors = { green: int; red: int; blue: int; }
+let colors = { green = 82; red = 196; blue = 81; }
 
-(** A pretty-printing environment *)
-type pp_env
+let color c =
+  Printf.kprintf (Printf.sprintf "\x1b[38;5;%dm%s\x1b[38;5;15m" c)
 
-(** Use this to create a fresh pretty printing environment. *)
-val fresh_pp_env : pretty_printing:bool -> unit -> pp_env
+let twidth, theight =
+  let height, width = ref 0, ref 0 in
+  Scanf.sscanf
+    (Ocamlbuild_plugin.run_and_read "stty size")
+    "%d %d"
+    (fun h w -> width := w; height := h);
+  !width, !height
 
-(** Color some text using Bash escape sequences. Use like Printf.sprintf. *)
-val bash_color : int -> ('a, unit, string, string) format4 -> 'a
-
-(** Convert an identifier into a string. *)
-val string_of_ident : [> `Var of Longident.t ] * 'a -> string
-
-(** Convert a constraint into a string. Cannot write
-    {Constraint.type_constraint} here because that would create a circular
-    dependency. *)
-val string_of_constraint :
-  pp_env ->
-  ([< `Conj of 'a * 'a
-    | `Dump
-    | `Equals of
-        [< `Var of string ] *
-        ([< `Cons of Algebra.type_cons * 'b list | `Var of string ] as 'b)
-    | `Exists of [< `Var of string ] list * 'a
-    | `Instance of ([> `Var of Longident.t ] * 'c) * [< `Var of string ]
-    | `Let of
-        ([< `Var of string ] list * 'a * [< `Var of string ] Algebra.IdentMap.t) list *
-        'a
-    | `True
-    > `Conj `True ]
-   as 'a) ->
-  string
+let box txt =
+  let boxw = String.length txt + 4 in
+  let whitespace = String.make ((twidth - boxw) / 2) ' ' in
+  let charw = String.length "║" in
+  let line = "═" in
+  let top = String.make (charw * boxw) ' ' in
+  for i = 1 to boxw - 2 do
+    String.blit line 0 top (i * charw) charw;
+  done;
+  String.blit "╔" 0 top 0 charw;
+  String.blit "╗" 0 top (charw * (boxw - 1)) charw;
+  let middle = Printf.sprintf "║ %s ║" txt in
+  let bottom = String.make (charw * boxw) ' ' in
+  for i = 1 to boxw - 2 do
+    String.blit line 0 bottom (i * charw) charw;
+  done;
+  String.blit "╚" 0 bottom 0 charw;
+  String.blit "╝" 0 bottom (charw * (boxw - 1)) charw;
+  color colors.blue "%s%s\n%s%s\n%s%s\n"
+    whitespace top whitespace middle whitespace bottom

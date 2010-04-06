@@ -45,7 +45,7 @@ let solve: caml_types:bool -> print_types:bool -> type_constraint -> TypedAst.t 
           let scheme = IdentMap.find ident unifier_env.scheme_of_ident in
           let young_vars, scheme_uvar = scheme in
           let scheme_desc = UnionFind.find scheme_uvar in
-          let ident_s = ConstraintPrinter.string_of_ident ident in
+          let ident_s = string_of_ident ident in
           if scheme_desc.rank < current_rank unifier_env then begin
             let instance = fresh_copy unifier_env scheme in
             let instance_s = uvar_name instance in
@@ -90,12 +90,11 @@ let solve: caml_types:bool -> print_types:bool -> type_constraint -> TypedAst.t 
         let vars, konstraint, var_map = scheme in
         (* --- Debug --- *)
         let module JIM = Jmap.Make(IdentMap) in
-        let open ConstraintPrinter in
         let idents = JIM.keys var_map in
-        let idents = List.map ConstraintPrinter.string_of_ident idents in
+        let idents = List.map string_of_ident idents in
         let idents = String.concat ", " idents in
         Error.debug_simple
-          (bash_color 219 "[SLeft] Solving scheme for %s\n" idents);
+          (Bash.color 219 "[SLeft] Solving scheme for %s\n" idents);
         (* --- End Debug --- *)
 
         let sub_env = step_env unifier_env in
@@ -158,7 +157,7 @@ let solve: caml_types:bool -> print_types:bool -> type_constraint -> TypedAst.t 
   let kv = List.filter (fun ((_, pos), _) -> not pos.Location.loc_ghost) kv in
   let kv = List.sort (fun ((_, pos), _) ((_, pos'), _) -> compare pos pos') kv in
   let print_kv (ident, scheme) =
-    let ident = ConstraintPrinter.string_of_ident ident in
+    let ident = string_of_ident ident in
     let s = string_of_scheme ~caml_types:opt_caml_types ident scheme in
     print_endline s
   in

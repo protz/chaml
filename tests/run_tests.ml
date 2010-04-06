@@ -33,57 +33,25 @@
  * *)
 
 open TypePrinter
-open ConstraintPrinter
+open Constraint
 
 let parse_output output =
   let lexbuf = Lexing.from_string output in
   let result = Parser.main Lexer.token lexbuf in
   result
 
-type colors = { green: int; red: int; blue: int; }
-let colors = { green = 82; red = 196; blue = 81; }
-
-let twidth, theight =
-  let height, width = ref 0, ref 0 in
-  Scanf.sscanf
-    (Ocamlbuild_plugin.run_and_read "stty size")
-    "%d %d"
-    (fun h w -> width := w; height := h);
-  !width, !height
-
 let test_pass, test_fail =
   let fill s =
     let l = String.length s in
-    let l = twidth - 3 - l in
-    let l = if l < 0 then l + twidth else l in
+    let l = Bash.twidth - 3 - l in
+    let l = if l < 0 then l + Bash.twidth else l in
     let spaces = String.make l ' ' in
     s ^ spaces
   in
-  let pass = bash_color colors.green "✓" in
-  let fail = bash_color colors.red "✗" in
+  let pass = Bash.color Bash.colors.Bash.green "✓" in
+  let fail = Bash.color Bash.colors.Bash.red "✗" in
   (fun x -> Printf.printf "%s%s  \n" (fill x) pass),
   (fun x -> Printf.printf "%s%s  \n" (fill x) fail)
-
-let box txt =
-  let boxw = String.length txt + 4 in
-  let whitespace = String.make ((twidth - boxw) / 2) ' ' in
-  let charw = String.length "║" in
-  let line = "═" in
-  let top = String.make (charw * boxw) ' ' in
-  for i = 1 to boxw - 2 do
-    String.blit line 0 top (i * charw) charw;
-  done;
-  String.blit "╔" 0 top 0 charw;
-  String.blit "╗" 0 top (charw * (boxw - 1)) charw;
-  let middle = Printf.sprintf "║ %s ║" txt in
-  let bottom = String.make (charw * boxw) ' ' in
-  for i = 1 to boxw - 2 do
-    String.blit line 0 bottom (i * charw) charw;
-  done;
-  String.blit "╚" 0 bottom 0 charw;
-  String.blit "╝" 0 bottom (charw * (boxw - 1)) charw;
-  bash_color colors.blue "%s%s\n%s%s\n%s%s\n"
-    whitespace top whitespace middle whitespace bottom
 
 
 let conversions =
@@ -96,7 +64,7 @@ let conversions =
 
 let _ =
   let error f =
-    Printf.kprintf (fun s -> print_endline (bash_color colors.red "%s\n" s)) f
+    Printf.kprintf (fun s -> print_endline (Bash.color Bash.colors.Bash.red "%s\n" s)) f
   in
   let good = ref 0 in
   let bad = ref 0 in
@@ -169,7 +137,7 @@ let _ =
       Printf.printf "The output was:\n%s\n" (List.hd outputs);
   in
   let test1 () =
-    print_endline (box "Constraint Solving - standard tests");
+    print_endline (Bash.box "Constraint Solving - standard tests");
     let o = Ocamlbuild_plugin.run_and_read
       "./chaml.native --enable caml-types --disable generalize-match tests/test_solving.ml"
     in
@@ -184,7 +152,7 @@ let _ =
     compare [o; o'; o''];
   in
   let test2 () =
-    print_endline (box "Constraint Solving - ChaML extra features");
+    print_endline (Bash.box "Constraint Solving - ChaML extra features");
     let o = Ocamlbuild_plugin.run_and_read
       "./chaml.native --enable caml-types tests/test_solving_chaml_only.ml"
     in
@@ -199,7 +167,7 @@ let _ =
     compare [o; o'];
   in
   let test2' () =
-    print_endline (box "Constraint Solving - recursive types");
+    print_endline (Bash.box "Constraint Solving - recursive types");
     let o = Ocamlbuild_plugin.run_and_read
       "./chaml.native --enable caml-types --disable generalize-match tests/tests_recursive_types.ml"
     in
@@ -212,7 +180,7 @@ let _ =
     compare [o'; o''; o];
   in
   let test3 () =
-    print_endline (box "Constraint Generation - first series of tests");
+    print_endline (Bash.box "Constraint Generation - first series of tests");
     let o = Ocamlbuild_plugin.run_and_read
       ("./chaml.native --no-print-types --disable generalize-match " ^
       "--disable default-bindings --print-constraint tests/test_constraint.ml")
@@ -247,5 +215,5 @@ let _ =
   test3 ();
   Printf.printf
     "--- %s --- %s ---\n"
-    (bash_color colors.green "%d%% good" (100 * !good / (!bad + !good)))
-    (bash_color colors.red "%d%% bad" (100 * !bad / (!bad + !good)));
+    (Bash.color Bash.colors.Bash.green "%d%% good" (100 * !good / (!bad + !good)))
+    (Bash.color Bash.colors.Bash.red "%d%% bad" (100 * !bad / (!bad + !good)));

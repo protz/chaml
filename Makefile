@@ -35,9 +35,10 @@ graph:
 	convert graph.png -rotate 90 graph.png
 	eog graph.png
 
-DOCFILES = chaml/constraint.mli chaml/unify.mli chaml/solver.mli\
+DOCFILES = chaml/oCamlConstraintGenerator.mli chaml/constraint.mli chaml/unify.mli\
+	   chaml/solver.mli\
 	   chaml/algebra.mli chaml/unionFind.mli\
-	   chaml/error.mli chaml/typePrinter.mli chaml/constraintPrinter.mli\
+	   chaml/error.mli chaml/typePrinter.mli\
 	   stdlib/*.mli
 
 doc:

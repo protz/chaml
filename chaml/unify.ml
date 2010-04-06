@@ -165,7 +165,7 @@ let fresh_unifier_var ?term ?prefix ?name unifier_env =
     match name with
       | None ->
           let prefix = Option.map_none "uvar" prefix in
-          fresh_var ~prefix ()
+          fresh_name ~prefix ()
       | Some name ->
           name
   in

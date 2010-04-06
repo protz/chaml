@@ -6,11 +6,11 @@ and is guaranteed to be correctly typed.
 
 
 {2 Core Modules}
-{!modules: Constraint Unify Solver Algebra UnionFind
+{!modules: OCamlConstraintGenerator Constraint Unify Solver Algebra UnionFind
 }
 
 {2 Helper modules}
-{!modules: Error TypePrinter ConstraintPrinter
+{!modules: Error TypePrinter Bash
 }
 
 {2 Standard library}

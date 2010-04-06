@@ -138,12 +138,12 @@ let _ =
     let generalize_match = Options.get_opt "generalize-match" in
     let default_bindings = Options.get_opt "default-bindings" in
     let konstraint =
-      Constraint.generate_constraint ~generalize_match ~default_bindings ast
+      OCamlConstraintGenerator.generate_constraint ~generalize_match ~default_bindings ast
     in
     if !arg_print_constraint then begin
       let pretty_printing = Options.get_opt "pretty-printing" in
-      let pp_env = ConstraintPrinter.fresh_pp_env ~pretty_printing () in
-      print_string (ConstraintPrinter.string_of_constraint pp_env konstraint);
+      print_string
+        (Constraint.PrettyPrinter.string_of_constraint ~pretty_printing konstraint);
       flush stdout;
     end;
     (* Constraint solving *)

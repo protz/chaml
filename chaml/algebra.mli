@@ -28,12 +28,22 @@
     inspected_var] which has type aliases desambiguated and is suitable for
     printing. This is used by the type parser in [tests/]. *)
 
-(** An identifier, as encountered in the OCaml parse tree. *)
-type ident = [ `Var of Longident.t ] * Location.t
+(** An identifier *)
+type long_ident
+type ident = long_ident * Location.t
+
+(** A wrapper to create an ident *)
+val ident: string -> Location.t -> ident
+
+(** Print it *)
+val string_of_ident: ident -> string
 
 (** This module will be useful many times from now on. It allows one to map
     identifiers to type variables, unification variables, etc. *)
 module IdentMap: Map.S with type key = ident
+
+(** Generate globally unique names. *)
+val fresh_name: ?prefix:string -> unit -> string
 
 (** This describes a type constructor. The trick is to use one instance per
     constructor so that we can use referential equality == to quickly test
@@ -48,7 +58,8 @@ type 'var_type generic_var = [
   `Var of 'var_type
 ]
 
-(** This is what is called T ::= X | F (X1, ..., Xn) in ATTAPL *)
+(** This is what is called T ::= X | F (X1, ..., Xn) in ATTAPL. Will be
+    instanciated later on with [string] as a {!Constraint.type_var}. *)
 type 'var_type generic_term = [
     'var_type generic_var
   | `Cons of type_cons * 'var_type generic_term list
@@ -74,8 +85,8 @@ type 'var_type generic_scheme =
     We might have more than one type scheme if we use [let p1 = e1 and p2 = e2
     ...]  which is why we use a [type_scheme list] in the [`Let] branch.
 
-    We have intentionnaly used [type_var] and not [type_term] in some parts.
-    This enforces some invariants.
+    We have intentionnaly used [generic_var] and not [generic_term] in some
+    parts. This enforces some invariants.
   *)
 and 'var_type generic_constraint = [
     `True

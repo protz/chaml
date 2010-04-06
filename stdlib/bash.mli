@@ -17,40 +17,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The representation of constraints is defined in this module. *)
+(** Provides wrappers for some bash fancy printing, mainly boxes and colors. *)
 
-(** This module also features, among other things, subtypers {!tv_tt} and
-    {!tvl_ttl}, as well as some pretty printers. *)
+(** A set of nice colors. *)
+type colors = { green : int; red : int; blue : int; }
 
-open Algebra
+(** They have been chosen arbitrarily out of the 256-color set available. *)
+val colors : colors
 
-(** This is a type variable, also known as X in ATTAPL. *)
-type type_var = string Algebra.generic_var
+(** Output some colored text. Use it like [Printf.sprintf]. *)
+val color : int -> ('a, unit, string, string) format4 -> 'a
 
-(** This is a type, also known as T::= X | F (X1, ... Xn). It can be printed
-    using {TypePrinter.string_of_term}.. *)
-type type_term = string Algebra.generic_term
+(** The terminal's width. *)
+val twidth : int
 
-(** This main type of constraints. At the moment it is not instanciated anywhere
-    else. It should probably be moved here from [Algebra]. *)
-type type_constraint = string Algebra.generic_constraint
+(** The terminal's height. *)
+val theight : int
 
-(** This is a full type scheme. This definition is simplified later on in
-    [unify.ml]. Same remark, it is not really general. *)
-type type_scheme = string Algebra.generic_scheme
-
-(** We enforce some invariants by requiring that in some places we deal with a
-    variable and not a term. However, we often need to subtype. This function
-    provides a quick and convenient way to do that. *)
-val tv_tt: type_var -> type_term
-
-(** Same wrapper for convenience. *)
-val tvl_ttl: type_var list -> type_term list
-
-
-(** A pretty-printer for constraints. Pretty-prints in a format suitable for
-    reading by mini. *)
-module PrettyPrinter: sig
-  val string_of_type_var: type_var -> string
-  val string_of_constraint: pretty_printing:bool -> type_constraint -> string
-end
+(** Make a title. *)
+val box : string -> string

@@ -20,9 +20,16 @@
 open Error
 
 (* x, y ::= variable | constant | memory location *)
-type ident = [
-  `Var of Longident.t
-] * Location.t
+type long_ident = [ `Var of Longident.t ]
+type ident = long_ident * Location.t
+
+(* Create an ident out of a string *)
+let ident x pos = `Var (Longident.Lident x), pos
+
+(* Get the name *)
+let string_of_ident = function
+  | `Var (Longident.Lident x), _ -> x
+  | _ -> failwith "This kind of ident is not supported\n"
 
 (* The mapping from all the bound identifiers in a pattern to the corresponding
  * type variables in the scheme. *)
@@ -34,6 +41,22 @@ module IdentMap = Map.Make (struct
           String.compare a b
       | _ -> fatal_error "Only simple identifiers are implemented\n"
 end)
+
+
+(* Generate globally unique names on demand *)
+let fresh_name =
+  let c = ref (-1) in
+  fun ?prefix () ->
+    c := !c + 1;
+    let prefix = if !c >= 26 && prefix = None then Some "v" else prefix in
+    let v = match prefix with
+      | Some l ->
+        l ^ (string_of_int !c)
+      | _ ->
+        String.make 1 (char_of_int (int_of_char 'a' + !c))
+    in
+    v
+
 
 (* The trick is to use one instance per constructor so that we can use
  * referential equality == to quickly test whether two types are equal. *)
