@@ -26,9 +26,10 @@ let debug f =
   if !debug_enabled then
     Printf.fprintf stderr f
   else
-    Printf.fprintf dev_null f
+    Printf.ifprintf stderr f
+
 let debug_simple f =
   if !debug_enabled then
     Printf.fprintf stderr "%s" f
   else
-    Printf.fprintf dev_null "%s" f
+    Printf.ifprintf stderr "%s" f

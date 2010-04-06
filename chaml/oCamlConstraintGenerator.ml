@@ -210,7 +210,7 @@ let generate_constraint: generalize_match:bool -> default_bindings:bool -> struc
                * exact rule. The important part is that we generate a `Let
                * constraint for each branch and we copy the e1 constraint into each
                * branch. TODO use a let-constraint instead of copying constr_e1 *)
-              let `Var var_name = t in
+              let var_name = PrettyPrinter.string_of_type_var t in
               Error.debug "[CG] Generalizing match constraint on %s\n" var_name;
               let generate_branch (pat, expr) =
                 let x1 = fresh_type_var ~letter:'x' () in

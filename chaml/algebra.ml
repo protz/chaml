@@ -20,25 +20,29 @@
 open Error
 
 (* x, y ::= variable | constant | memory location *)
-type long_ident = [ `Var of Longident.t ]
+type long_ident =
+    Ident of string
+  | Dot of long_ident * string
 type ident = long_ident * Location.t
 
 (* Create an ident out of a string *)
-let ident x pos = `Var (Longident.Lident x), pos
+let ident x pos = Ident x, pos
 
 (* Get the name *)
-let string_of_ident = function
-  | `Var (Longident.Lident x), _ -> x
-  | _ -> failwith "This kind of ident is not supported\n"
+let rec string_of_ident (ident, _loc) =
+  let rec string_of_ident = function
+  | Ident x -> x
+  | Dot (i, x) -> Printf.sprintf "%s.%s" (string_of_ident i) x
+  in
+  string_of_ident ident
 
 (* The mapping from all the bound identifiers in a pattern to the corresponding
  * type variables in the scheme. *)
 module IdentMap = Map.Make (struct
   type t = ident
-  let compare (`Var x, pos1) (`Var y, pos2) =
+  let compare (x, pos1) (y, pos2) =
     match x, y with
-      | Longident.Lident a, Longident.Lident b ->
-          String.compare a b
+      | Ident a, Ident b -> String.compare a b
       | _ -> fatal_error "Only simple identifiers are implemented\n"
 end)
 
