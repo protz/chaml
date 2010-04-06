@@ -20,7 +20,6 @@
 open Parsetree
 open Algebra
 open Error
-open TypePrinter
 
 (* Instanciate the types we need. Here, our type terms are only parameterized by
  * strings, that is, 'x1, 'x2... = the fresh variable names we generate as we

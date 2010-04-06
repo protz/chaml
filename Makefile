@@ -37,7 +37,7 @@ graph:
 
 DOCFILES = chaml/constraint.mli chaml/unify.mli chaml/solver.mli\
 	   chaml/algebra.mli chaml/unionFind.mli\
-	   chaml/error.mli chaml/typePrinter.mli\
+	   chaml/error.mli chaml/typePrinter.mli chaml/constraintPrinter.mli\
 	   stdlib/*.mli
 
 doc:
