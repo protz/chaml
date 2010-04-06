@@ -83,11 +83,11 @@ val step_env: unifier_env -> unifier_env
 val uvar_name: unifier_var -> string
 
 (** Print a unification variable as a type, useful for error messages. *)
-val string_of_uvar: unifier_var -> string
+val string_of_uvar: ?caml_types:bool -> unifier_var -> string
 
 (** Print a scheme. Use it to get the type of top-level bindings as a string
     "val f: 'a -> ...". *)
-val string_of_scheme: string -> 'a * unifier_var -> string
+val string_of_scheme: ?caml_types:bool -> string -> 'a * unifier_var -> string
 
 (** When instanciating a type scheme, if the rank of the scheme is equal to the
   * current rank, we must create a instance. This function takes care of

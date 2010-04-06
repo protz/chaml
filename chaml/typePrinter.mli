@@ -36,7 +36,7 @@ type 'var inspected_var = [
 (** The [string_of_key] optional argument tells how to convert from a ['var] to
     a string. If it's a unification var, one might want to use the internal name
     for debugging. *)
-val string_of_type: ?string_of_key:('var -> string) -> 'var inspected_var -> string
+val string_of_type: ?string_of_key:('var -> string) -> ?caml_types:bool -> 'var inspected_var -> string
 
 (** Just a type-converted function for printing Algebra's generic terms. Useful
     for error messages. *)

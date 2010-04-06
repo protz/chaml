@@ -43,4 +43,4 @@ val tv_tt : type_var -> type_term
 val fresh_var : ?prefix:string -> unit -> string
 
 (** This is the main function, use it to generate the constraint. *)
-val generate_constraint : Parsetree.structure -> type_constraint
+val generate_constraint: generalize_match:bool -> default_bindings:bool -> Parsetree.structure -> type_constraint

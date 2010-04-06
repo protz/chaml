@@ -148,12 +148,13 @@ let rec uvar_name: unifier_var -> string =
           (string_of_type ~string_of_key (inspect_uvar ~debug:() uvar))
 
 (* For error messages *)
-let string_of_uvar uvar = string_of_type (inspect_uvar uvar)
+let string_of_uvar ?caml_types uvar =
+  string_of_type ?caml_types (inspect_uvar uvar)
 
 (* For printing type schemes *)
-let string_of_scheme ident scheme =
+let string_of_scheme ?caml_types ident scheme =
   let _, uvar = scheme in
-  Printf.sprintf "val %s: %s" ident (string_of_uvar uvar)
+  Printf.sprintf "val %s: %s" ident (string_of_uvar ?caml_types uvar)
 
 
 (* Create a fresh variable and add it to the current pool *)

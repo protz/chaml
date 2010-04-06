@@ -1,5 +1,5 @@
 PATH := /home/yquem/cristal/protzenk/Code/mini-trunk/trunk/src/:$(PATH)
-BUILDFLAGS=-I stdlib -I utils -I parsing
+BUILDFLAGS=-I stdlib -I utils -I parsing -cflag -strict-sequence
 
 .PHONY: tests doc
 
@@ -37,7 +37,7 @@ graph:
 
 DOCFILES = chaml/constraint.mli chaml/unify.mli chaml/solver.mli\
 	   chaml/algebra.mli chaml/unionFind.mli\
-	   chaml/error.mli chaml/opts.mli chaml/typePrinter.mli\
+	   chaml/error.mli chaml/typePrinter.mli\
 	   stdlib/*.mli
 
 doc:

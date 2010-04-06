@@ -106,7 +106,7 @@ let _ =
       let l = List.length (List.hd ts) in
       let compare_and_print: int -> (string * ParserTypes.pvar) list -> unit = fun i rs ->
         let names, types = List.split rs in
-        let types = List.map string_of_type types in
+        let types = List.map (string_of_type ~caml_types:true) types in
         let i = i + 1 in
         let sp = if i >= 10 then "" else " " in
         (*Printf.printf "%s = %s\n" (print_type type1) (print_type type2);*)
@@ -214,14 +214,14 @@ let _ =
   let test3 () =
     print_endline (box "Constraint Generation - first series of tests");
     let o = Ocamlbuild_plugin.run_and_read
-      ("./chaml.native --disable solver --disable generalize-match " ^
+      ("./chaml.native --no-print-types --disable generalize-match " ^
       "--disable default-bindings --print-constraint tests/test_constraint.ml")
     in
     let fd = open_out "_constraint" in
     output_string fd o;
     close_out fd;
     let o = Ocamlbuild_plugin.run_and_read
-      ("./chaml.native --disable solver " ^
+      ("./chaml.native --no-print-types " ^
       "--disable default-bindings --print-constraint tests/test_constraint.ml")
     in
     let fd = open_out "_constraint2" in
@@ -238,7 +238,6 @@ let _ =
     in
     compare [o; o'; o''];
   in
-  Opts.add_opt "caml-types" true;
   test1 ();
   print_newline ();
   test2 ();

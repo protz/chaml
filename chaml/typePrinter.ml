@@ -36,11 +36,11 @@ let prec =
     Hashtbl.find tbl op
 
 let string_of_type:
-  ?string_of_key:('key -> string) -> 'key inspected_var -> string =
-  fun ?string_of_key uvar ->
+  ?string_of_key:('key -> string) -> ?caml_types:bool -> 'key inspected_var -> string =
+  fun ?string_of_key ?caml_types:(opt_caml_types=false) uvar ->
     let c = ref 0 in
     let fresh_greek_var =
-      if Opts.get_opt "caml-types" then
+      if opt_caml_types then
         let a = (int_of_char 'a') - 1 in
         fun () ->
           c := !c + 1;
@@ -82,7 +82,7 @@ let string_of_type:
             begin match cons_name with
               | { cons_name = "->"; _ } ->
                   let op =
-                    if Opts.get_opt "caml-types" then "->" else "→"
+                    if opt_caml_types then "->" else "→"
                   in
                   let arg1 = List.nth cons_args 0 in
                   let arg2 = List.nth cons_args 1 in

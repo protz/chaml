@@ -21,7 +21,9 @@ open Algebra
 open Unify
 open Constraint
 
-let solve: type_constraint -> TypedAst.t = fun konstraint ->
+let solve: caml_types:bool -> print_types:bool -> type_constraint -> TypedAst.t =
+  fun ~caml_types:opt_caml_types ~print_types:opt_print_types konstraint ->
+
   let rec analyze: unifier_env -> type_constraint -> unifier_env =
     fun unifier_env type_constraint ->
     match type_constraint with
@@ -157,7 +159,8 @@ let solve: type_constraint -> TypedAst.t = fun konstraint ->
   let kv = List.sort (fun ((_, pos), _) ((_, pos'), _) -> compare pos pos') kv in
   let print_kv (ident, scheme) =
     let ident = ConstraintPrinter.string_of_ident ident in
-    let s = string_of_scheme ident scheme in
+    let s = string_of_scheme ~caml_types:opt_caml_types ident scheme in
     print_endline s
   in
-  List.iter print_kv kv
+  if opt_print_types then
+    List.iter print_kv kv

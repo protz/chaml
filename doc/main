@@ -10,7 +10,7 @@ and is guaranteed to be correctly typed.
 }
 
 {2 Helper modules}
-{!modules: Error Opts TypePrinter
+{!modules: Error TypePrinter ConstraintPrinter
 }
 
 {2 Standard library}

@@ -57,24 +57,67 @@ let file ppf inputfile parse_fun ast_magic =
   close_in ic;
   ast
 
+module Options = struct
+  let options = Hashtbl.create 8
+
+  let _ =
+    List.iter
+      (fun (k, v) -> Hashtbl.add options k v)
+      [
+        ("generalize-match",
+          (true, "Generalize the pattern which is matched under a branch"));
+        ("default-bindings",
+          (true, "Include default bindings for arithmetic operations (+, *...)"));
+        ("caml-types",
+          (false, "Print OCaml-style 'a types instead of unicode greeks"));
+        ("debug",
+          (false, "Output debug information"));
+        ("pretty-printing",
+          (false, "Use colors for matching parentheses when dumping constraints"));
+      ]
+
+  let set_opt: string -> bool -> unit = fun k v ->
+    match Jhashtbl.find_opt options k with
+      | Some (_, desc) ->
+          Hashtbl.replace options k (v, desc)
+      | None ->
+          Error.fatal_error "No such option %s" k
+
+  let get_opt: string -> bool = fun k ->
+    match Jhashtbl.find_opt options k with
+      | None ->
+          Error.fatal_error "No such option %s" k
+      | Some (v, _) ->
+          v
+
+  let descriptions =
+    let descriptions =
+      Jhashtbl.map_list
+        options
+        (fun k (def, desc) -> Printf.sprintf "\t%s (default: %b)\t: %s" k def desc)
+    in
+    String.concat "\n" descriptions
+
+end
+
 let _ =
   let arg_filename = ref "" in
   let arg_print_ast = ref false in
-  let arg_print_typed_ast = ref false in
   let arg_print_constraint = ref false in
-  let arg_pretty_printing = ref false in
-  let arg_debug = ref false in
-  let add_opt v k = Opts.add_opt k v in
+  let arg_print_types = ref true in
+  let arg_print_typed_ast = ref false in
+  let add_opt v k = Options.set_opt k v in
   let usage = String.concat ""
                 ["ChaML: a type-checker for OCaml programs.\n";
-                 "Usage: "; Sys.argv.(0); " [OPTIONS] FILE\n"] in
+                 "Usage: "; Sys.argv.(0); " [OPTIONS] FILE\n";
+                 "Available options:\n";
+                 Options.descriptions] in
   Arg.parse
     [
       "--print-ast", Arg.Set arg_print_ast, "print the AST as parsed by the OCaml frontend";
-      "--print-typed-ast", Arg.Set arg_print_typed_ast, "print the AST annotated with the types found by the solver";
       "--print-constraint", Arg.Set arg_print_constraint, "print the constraint in a format mini can parse";
-      "--pretty-printing", Arg.Set arg_pretty_printing, "print the constraint using advanced terminal features";
-      "--debug", Arg.Set arg_debug, "debug unification and solving";
+      "--no-print-types", Arg.Clear arg_print_types, "print the inferred types, à la ocamlc -i";
+      "--print-typed-ast", Arg.Set arg_print_typed_ast, "print the AST annotated with the types found by the solver";
       "--enable", Arg.String (add_opt true), "enable one of the following options: generalize-match (on by default)";
       "--disable", Arg.String (add_opt false), "disable one of the options above";
     ]
@@ -83,8 +126,8 @@ let _ =
   if !arg_filename = "" then begin
     print_string usage
   end else begin
-    (* Do this right now as all the module are likely to use it. *)
-    if !arg_debug then begin
+    (* Do this right now as all the modules are likely to use it. *)
+    if Options.get_opt "debug" then begin
       Error.enable_debug ();
     end;
     (* Get the AST from OCaml lexer/parser *)
@@ -92,17 +135,23 @@ let _ =
     if !arg_print_ast then
       Format.fprintf Format.std_formatter "%a@." Printast.implementation ast;
     (* Constraint generation *)
-    let konstraint = Constraint.generate_constraint ast in
+    let generalize_match = Options.get_opt "generalize-match" in
+    let default_bindings = Options.get_opt "default-bindings" in
+    let konstraint =
+      Constraint.generate_constraint ~generalize_match ~default_bindings ast
+    in
     if !arg_print_constraint then begin
-      let pp_env = ConstraintPrinter.fresh_pp_env ~pretty_printing:!arg_pretty_printing () in
+      let pretty_printing = Options.get_opt "pretty-printing" in
+      let pp_env = ConstraintPrinter.fresh_pp_env ~pretty_printing () in
       print_string (ConstraintPrinter.string_of_constraint pp_env konstraint);
       flush stdout;
     end;
     (* Constraint solving *)
-    if Opts.get_opt "solver" then
-      let typed_ast = Solver.solve konstraint in
-      if !arg_print_typed_ast then begin
-        print_string (TypedAstPrinter.string_of_typed_ast typed_ast);
-        flush stdout;
+    let print_types = !arg_print_types in
+    let caml_types = Options.get_opt "caml-types" in
+    let typed_ast = Solver.solve ~caml_types ~print_types konstraint in
+    if !arg_print_typed_ast then begin
+      print_string (TypedAstPrinter.string_of_typed_ast typed_ast);
+      flush stdout;
     end;
   end

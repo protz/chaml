@@ -21,4 +21,4 @@
 
 (** This is the only useful function. It takes a set of constraints and returns
     a typed AST *)
-val solve : Constraint.type_constraint -> TypedAst.t
+val solve: caml_types:bool -> print_types:bool -> Constraint.type_constraint -> TypedAst.t
