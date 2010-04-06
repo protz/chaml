@@ -35,8 +35,15 @@ graph:
 	convert graph.png -rotate 90 graph.png
 	eog graph.png
 
+DOCFILES = chaml/constraint.mli chaml/unify.mli chaml/solver.mli\
+	   chaml/algebra.mli chaml/unionFind.mli\
+	   chaml/error.mli chaml/opts.mli chaml/typePrinter.mli\
+	   stdlib/*.mli
+
 doc:
+	mkdir -p doc
 	ocamldoc -html -I _build/chaml/ -I _build/parsing/ -I _build/stdlib/ \
 	  -I _build/tests/ -I _build/utils/ -I `ocamlc -where` -d doc \
-	  `find chaml stdlib -iname '*.mli' -or -iname '*.ml'`
+	  -intro doc/main $(DOCFILES)
+	sed -i 's/iso-8859-1/utf-8/g' doc/*.html
 	cp -f ocamlstyle.css doc/style.css

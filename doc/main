@@ -1,0 +1,21 @@
+{1 ChaML}
+
+ChaML is a type-checker that uses constraints and a kernel language. It takes
+in input an OCaml file and returns a Fω term that represents the original input
+and is guaranteed to be correctly typed.
+
+
+{2 Core Modules}
+{!modules: Constraint Unify Solver Algebra UnionFind
+}
+
+{2 Helper modules}
+{!modules: Error Opts TypePrinter
+}
+
+{2 Standard library}
+
+A set of files is also provided that fills some holes in the standard library of
+OCaml.
+
+{!modules: Jstring Jhashtbl Jmap Jlist Option}

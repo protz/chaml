@@ -17,26 +17,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A bunch of useful functions for lists. *)
+(** The solver works on top of the unifier and the constraint generator. *)
 
-(** Same as [List.split] but for triples instead of pairs. *)
-val split3 : ('a * 'b * 'c) list -> 'a list * 'b list * 'c list
-
-(** Map a function and then discard the result. *)
-val ignore_map : ('a -> 'b) -> 'a list -> unit
-
-(** Iterate a function that also takes the index as an argument. *)
-val iteri : (int -> 'a -> unit) -> 'a list -> unit
-
-(** Same as [Jlist.iteri] but with two lists. *)
-val iter2i : (int -> 'a -> 'b -> unit) -> 'a list -> 'b list -> unit
-
-(** [append_rev_front l1 l2] is tail-rec and returns [(List.rev l1) :: l2]. *)
-val append_rev_front : 'a list -> 'a list -> 'a list
-
-(** Remove duplicates from a list. You can provide a hash function as well as a
-    custom equality function. The constraint is that two equal elements must
-    have the same hash. Use [Hashtbl.hash_func] if needed. *)
-val remove_duplicates :
-  ?hash_func:('a -> int) ->
-  ?equal_func:('a -> 'a -> bool) -> 'a list -> 'a list
+(** This is the only useful function. It takes a set of constraints and returns
+    a typed AST *)
+val solve : Constraint.type_constraint -> TypedAst.t

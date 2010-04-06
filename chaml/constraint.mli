@@ -17,26 +17,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A bunch of useful functions for lists. *)
+(** Transform a [ParseTree] from the OCaml frontend into a set of constraints.
+    *)
 
-(** Same as [List.split] but for triples instead of pairs. *)
-val split3 : ('a * 'b * 'c) list -> 'a list * 'b list * 'c list
+(** These types are all used for constraint generation. *)
 
-(** Map a function and then discard the result. *)
-val ignore_map : ('a -> 'b) -> 'a list -> unit
+(** This is the main type: the type of constraints. *)
+type type_constraint = string Algebra.generic_constraint
 
-(** Iterate a function that also takes the index as an argument. *)
-val iteri : (int -> 'a -> unit) -> 'a list -> unit
+(** This is the type of type variables used inside constraints. *)
+type type_var = string Algebra.generic_var
 
-(** Same as [Jlist.iteri] but with two lists. *)
-val iter2i : (int -> 'a -> 'b -> unit) -> 'a list -> 'b list -> unit
+(** A term is made of either a type variable or a constructor. *)
+type type_term = string Algebra.generic_term
 
-(** [append_rev_front l1 l2] is tail-rec and returns [(List.rev l1) :: l2]. *)
-val append_rev_front : 'a list -> 'a list -> 'a list
+(** The type scheme used for [`Let] constraints. *)
+type type_scheme = string Algebra.generic_scheme
 
-(** Remove duplicates from a list. You can provide a hash function as well as a
-    custom equality function. The constraint is that two equal elements must
-    have the same hash. Use [Hashtbl.hash_func] if needed. *)
-val remove_duplicates :
-  ?hash_func:('a -> int) ->
-  ?equal_func:('a -> 'a -> bool) -> 'a list -> 'a list
+(** As we use polymorphic variants, this quick wrapper allows you to subtype a
+    [type_var] into a [type_term]. *)
+val tv_tt : type_var -> type_term
+
+(** A utility function that generates fresh names on demand. Used both inside
+    [Constraint] and [Unify]. *)
+val fresh_var : ?prefix:string -> unit -> string
+
+(** This is the main function, use it to generate the constraint. *)
+val generate_constraint : Parsetree.structure -> type_constraint
