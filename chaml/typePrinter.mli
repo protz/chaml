@@ -40,7 +40,8 @@ val string_of_type: ?string_of_key:('var -> string) -> ?caml_types:bool -> 'var 
 
 (** This function is useful for generating error messages. It does not create
     fresh variables for each term; instead, all unification variables are
-    assigned a unique name accross the inspected_vars. *)
+    assigned a unique name accross the inspected_vars. Instead of ["cannot unify
+    'a with 'a * 'b"], you get ["cannot unify 'a with 'b * 'c"]. *)
 val string_of_types: ?string_of_key:('var -> string) -> ?caml_types:bool -> 'var inspected_var list -> string list
 
 (** Just a type-converted function for printing Algebra's generic terms. Useful

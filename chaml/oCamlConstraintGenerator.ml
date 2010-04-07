@@ -33,6 +33,8 @@ let fresh_type_var ?letter () =
   let prefix = Option.map (String.make 1) letter in
   `Var (fresh_name ?prefix ())
 
+let random_ident_name () = Filename.basename (Filename.temp_file "" "")
+
 (* Returns c_1 and (c_2 and ( ... and c_n)) *)
 let constr_conj = function
   | hd :: tl ->
@@ -216,26 +218,41 @@ let generate_constraint: generalize_match:bool -> default_bindings:bool -> struc
             if opt_generalize_match then
               (* We generalize here. See the draft version of ATTAPL p.98 for the
                * exact rule. The important part is that we generate a `Let
-               * constraint for each branch and we copy the e1 constraint into each
-               * branch. TODO use a let-constraint instead of copying constr_e1 *)
+               * constraint for each branch. Instead of copying the base
+               * constraint into each branch, we use a `Let-binding and add an
+               * instanciation constraint into each branch. This allows us to
+               * simplify the constraint beforehand and perform better. *)
               let print_var_name buf () =
                 Buffer.add_string buf (PrettyPrinter.string_of_type_var t)
               in
               Error.debug
                 "[CG] Generalizing match constraint on %a\n" print_var_name ();
+              (* This is going to be simplified first *)
+              let x1 = fresh_type_var ~letter:'x' () in
+              let ident1 = ident (random_ident_name ()) Location.none in
+              let constr_e1 = generate_constraint_expression x1 e1 in
+              (* Each branch has its instance of the type scheme. *)
               let generate_branch (pat, expr) =
-                let x1 = fresh_type_var ~letter:'x' () in
-                let constr_e1 = generate_constraint_expression x1 e1 in
-                let c1, var_map, generated_vars = generate_constraint_pattern x1 pat in
-                let c2 = generate_constraint_expression t expr in
-                let c = `Conj (constr_e1, c1) in
-                let let_constr: type_constraint =
-                  `Let ([x1 :: generated_vars, c, var_map], c2)
+                (* Create a fresh variable *)
+                let y = fresh_type_var ~letter:'y' () in
+                (* It's an instance of the scheme *)
+                let instance_constr = `Instance (ident1, y) in
+                (* It also satisfies the constraints of the pattern *)
+                let c1, var_map, generated_vars =
+                  generate_constraint_pattern y pat
                 in
-                x1, let_constr
+                let c = constr_conj [instance_constr; c1] in
+                (* Generate constraints for the expression *)
+                let c2 = generate_constraint_expression t expr in
+                let let_constr: type_constraint =
+                  `Let ([y :: generated_vars, c, var_map], c2)
+                in
+                let_constr
               in
-              let xis, constraints = List.split (List.map generate_branch pat_expr_list) in
-              `Exists (xis, constr_conj constraints)
+              let constraints = List.map generate_branch pat_expr_list in
+              let map = IdentMap.add ident1 x1 IdentMap.empty in
+              let scheme = [x1], constr_e1, map in
+              `Let ([scheme], constr_conj constraints)
             else
               let x1 = fresh_type_var ~letter:'x' () in
               let constr_e1 = generate_constraint_expression x1 e1 in

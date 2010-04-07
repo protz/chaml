@@ -94,9 +94,9 @@ module Options = struct
     let descriptions =
       Jhashtbl.map_list
         options
-        (fun k (def, desc) -> Printf.sprintf "\t%s (default: %b)\t: %s" k def desc)
+        (fun k (def, desc) -> Printf.sprintf "  %s (default: %b): %s" k def desc)
     in
-    String.concat "\n" descriptions
+    String.concat "\n" (descriptions @ ["\n"])
 
 end
 

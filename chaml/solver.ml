@@ -170,5 +170,6 @@ let solve: caml_types:bool -> print_types:bool -> type_constraint -> TypedAst.t 
     let s = string_of_scheme ~caml_types:opt_caml_types ident scheme in
     print_endline s
   in
+  flush stderr;
   if opt_print_types then
     List.iter print_kv kv

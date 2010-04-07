@@ -8,9 +8,9 @@ all:
 
 debug:
 	ocamlbuild -tag warn_A -tag warn_e -tag warn_z -tag debug \
-	  $(BUILDFLAGS) chaml/chaml.byte
+	  $(BUILDFLAGS) -tag use_unix chaml/chaml.byte
 	OCAMLRUNPARAM=b=1 ./chaml.byte \
-		--print-constraint --pretty-printing --debug\
+		--print-constraint --enable pretty-printing --enable debug\
 		--disable default-bindings test.ml
 
 tests:

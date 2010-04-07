@@ -18,7 +18,6 @@
 /*****************************************************************************/
 
 %{
-  open Algebra
   open ParserTypes
 %}
 
@@ -65,9 +64,9 @@ type_expr:
 | e = type_expr AS v = type_var
   { `Alias (e, v) }
 | e1 = type_expr ARROW e2 = type_expr
-  { type_cons_arrow e1 e2 }
+  { Algebra.type_cons_arrow e1 e2 }
 | e = type_product
-  { type_cons "*" e }
+  { Algebra.type_cons "*" e }
 
 type_var:
 | QUOTE UNDERSCORE v = IDENT
@@ -79,15 +78,15 @@ type_var:
 
 type_constr:
 | INT
-  { type_cons_int }
+  { Algebra.type_cons_int }
 | CHAR
-  { type_cons_char }
+  { Algebra.type_cons_char }
 | STRING
-  { type_cons_string }
+  { Algebra.type_cons_string }
 | FLOAT
-  { type_cons_float }
+  { Algebra.type_cons_float }
 | UNIT
-  { type_cons_unit }
+  { Algebra.type_cons_unit }
 
 type_product:
 | e = type_product_elt TIMES es = type_product
