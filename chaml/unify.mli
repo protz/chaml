@@ -79,8 +79,9 @@ val current_rank: unifier_env -> int
 val step_env: unifier_env -> unifier_env
 
 (** Get the internal name of a {!unifier_var}, annotated with all known
-    equations. This is for tracing/debugging. *)
-val uvar_name: unifier_var -> string
+    equations. This is for tracing/debugging. Use like this:
+    [Jstring.bsprintf "%a" uvar_name uvar] *)
+val uvar_name: Buffer.t -> unifier_var -> unit
 
 (** Print a unification variable as a type, useful for error messages. *)
 val string_of_uvar: ?caml_types:bool -> unifier_var -> string
@@ -90,9 +91,9 @@ val string_of_uvar: ?caml_types:bool -> unifier_var -> string
 val string_of_scheme: ?caml_types:bool -> string -> 'a * unifier_var -> string
 
 (** When instanciating a type scheme, if the rank of the scheme is equal to the
-  * current rank, we must create a instance. This function takes care of
-  * avoiding all cycles (fingers crossed!) and returns a fresh copy of a
-  * unification variable. *)
+    current rank, we must create a instance. This function takes care of
+    avoiding all cycles (fingers crossed!) and returns a fresh copy of a
+    unification variable. *)
 val fresh_copy:
   unifier_env -> descriptor UnionFind.point list * unifier_var -> unifier_var
 

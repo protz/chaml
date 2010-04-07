@@ -38,7 +38,7 @@ graph:
 DOCFILES = chaml/oCamlConstraintGenerator.mli chaml/constraint.mli chaml/unify.mli\
 	   chaml/solver.mli\
 	   chaml/algebra.mli chaml/unionFind.mli\
-	   chaml/error.mli chaml/typePrinter.mli\
+	   chaml/typePrinter.mli\
 	   stdlib/*.mli
 
 doc:

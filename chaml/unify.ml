@@ -136,13 +136,14 @@ let inspect_uvar: ?debug:unit -> unifier_var -> descriptor inspected_var =
     inspect_uvar uvar
 
 (* This is mainly for debugging *)
-let rec uvar_name: unifier_var -> string =
-  fun uvar -> match UnionFind.find uvar with
+let rec uvar_name: Buffer.t -> unifier_var -> unit =
+  fun buf uvar -> match UnionFind.find uvar with
     | { name = s; term = None; _ } ->
-        s
+        Printf.bprintf buf "%s" s
     | { name = s; term = Some cons; _ } ->
         let string_of_key: descriptor -> string = fun { name; _ } -> name in
-        Printf.sprintf
+        Printf.bprintf
+          buf
           "(%s = %s)"
           s
           (string_of_type ~string_of_key (inspect_uvar ~debug:() uvar))
@@ -224,17 +225,19 @@ let fresh_copy unifier_env (young_vars, scheme_uvar) =
   List.iter
     (fun v ->
        let v' = fresh_unifier_var ~prefix:"dup" unifier_env in
-       Error.debug
-         "[Copy] %s is a copy of %s\n" (UnionFind.find v').name (UnionFind.find v).name;
+       Error.debug "[Copy] %s is a copy of %s\n"
+         (UnionFind.find v').name (UnionFind.find v).name;
        Hashtbl.add mapping (UnionFind.find v) v'
     )
     young_vars;
-  let pairs =
-    Jhashtbl.map_list
+  let print_pairs buf () =
+    let pairs = Jhashtbl.map_list
       mapping
-      (fun k v -> let n = k.name in Printf.sprintf "%s: %s" n (uvar_name v))
+      (fun k v -> let n = k.name in Jstring.bsprintf "%s: %a" n uvar_name v)
+    in
+    Buffer.add_string buf (String.concat ", " pairs)
   in
-  Error.debug "[UCopy] Mapping: %s\n" (String.concat ", " pairs);
+  Error.debug "[UCopy] Mapping: %a\n" print_pairs ();
   fresh_copy scheme_uvar
 
 (* Recursively change terms that depend on constraint vars into unification
@@ -265,7 +268,7 @@ let rec uvar_of_tterm: unifier_env -> type_term -> unifier_var =
 
 let debug_unify =
   fun v1 v2 ->
-    Error.debug "[UUnify] Unifying %s with %s\n" (uvar_name v1) (uvar_name v2)
+    Error.debug "[UUnify] Unifying %a with %a\n" uvar_name v1 uvar_name v2
 
 (* Update all the mutable data structures to take into account the new equation.
 * The descriptor that is kept by UnionFind is that of the *second* argument. *)

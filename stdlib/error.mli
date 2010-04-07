@@ -28,7 +28,7 @@ val fatal_error : ('a, unit, string, 'b) format4 -> 'a
 val enable_debug : unit -> unit
 
 (** Report some debugging information. Use it like [Printf.printf] *)
-val debug : ('a, out_channel, unit) format -> 'a
+val debug : ('a, Buffer.t, unit, unit) format4 -> 'a
 
 (** Report some debugging information. Use it like [print_string] *)
 val debug_simple : string -> unit

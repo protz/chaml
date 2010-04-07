@@ -19,6 +19,17 @@
 
 (** Various string utilities. *)
 
+(** Make all your pretty-printers work with buffers and use this to get a
+    [Printf.sprintf] *)
+val bsprintf: ('a, Buffer.t, unit, string) format4 -> 'a
+
+(** Make all your pretty-printers work with buffers, use them with [%a] and use
+    this to get a [Printf.fprintf] *)
+val bfprintf : out_channel -> ('a, Buffer.t, unit, unit) format4 -> 'a
+
+(** In case you need to ignore some stuff. *)
+val biprintf : ('a, Buffer.t, unit) format -> 'a
+
 (** An imperative buffer of strings. Use [Buf.flush] when you're done. *)
 module Buf: sig
   type t

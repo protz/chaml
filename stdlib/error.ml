@@ -21,15 +21,15 @@ let fatal_error f = Printf.kprintf failwith f
 
 let debug_enabled = ref false
 let enable_debug () = debug_enabled := true
-let dev_null = open_out "/dev/null"
-let debug f =
-  if !debug_enabled then
-    Printf.fprintf stderr f
-  else
-    Printf.ifprintf stderr f
 
-let debug_simple f =
+let debug fmt =
   if !debug_enabled then
-    Printf.fprintf stderr "%s" f
+    Jstring.bfprintf stderr fmt
   else
-    Printf.ifprintf stderr "%s" f
+    Jstring.biprintf fmt
+
+let debug_simple fmt =
+  if !debug_enabled then
+    Jstring.bfprintf stderr "%s" fmt
+  else
+    Jstring.biprintf "%s" fmt

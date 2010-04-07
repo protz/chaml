@@ -17,6 +17,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let bsprintf fmt =
+  Printf.kbprintf Buffer.contents (Buffer.create 16) fmt
+
+let bfprintf oc fmt =
+  Printf.kbprintf (Buffer.output_buffer oc) (Buffer.create 16) fmt
+
+let buf = Buffer.create 0
+let biprintf fmt = Printf.ifprintf buf fmt
+
 module Buf: sig
   type t
   val create: unit -> t

@@ -33,7 +33,7 @@ let solve: caml_types:bool -> print_types:bool -> type_constraint -> TypedAst.t 
       | `Equals (t1, t2) ->
           let t1 = uvar_of_tterm unifier_env (tv_tt t1) in
           let t2 = uvar_of_tterm unifier_env t2 in
-          Error.debug "[SEquals] %s = %s\n" (uvar_name t1) (uvar_name t2);
+          Error.debug "[SEquals] %a = %a\n" uvar_name t1 uvar_name t2;
           unify unifier_env t1 t2;
           unifier_env
       | `Instance (ident, t) ->
@@ -48,9 +48,10 @@ let solve: caml_types:bool -> print_types:bool -> type_constraint -> TypedAst.t 
           let ident_s = string_of_ident ident in
           if scheme_desc.rank < current_rank unifier_env then begin
             let instance = fresh_copy unifier_env scheme in
-            let instance_s = uvar_name instance in
-            Error.debug "[SCopy] %s is a copy of %s\n" instance_s (uvar_name scheme_uvar);
-            Error.debug "[S-Old] Taking an instance of %s: %s\n" ident_s instance_s;
+            Error.debug
+              "[SCopy] %a is a copy of %a\n" uvar_name instance uvar_name scheme_uvar;
+            Error.debug
+              "[S-Old] Taking an instance of %s: %a\n" ident_s uvar_name instance;
             unify unifier_env instance t_uvar;
             unifier_env
           end else begin
