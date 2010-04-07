@@ -21,6 +21,8 @@ open Algebra
 open Unify
 open Constraint
 
+exception Error of string
+
 let solve: caml_types:bool -> print_types:bool -> type_constraint -> TypedAst.t =
   fun ~caml_types:opt_caml_types ~print_types:opt_print_types konstraint ->
 
@@ -152,7 +154,13 @@ let solve: caml_types:bool -> print_types:bool -> type_constraint -> TypedAst.t 
     uvar_of_tterm = Hashtbl.create 64;
     scheme_of_ident = IdentMap.empty;
   } in
-  let knowledge = analyze initial_env konstraint in
+  let knowledge =
+    try
+      analyze initial_env konstraint
+    with
+      | Unify.Error e ->
+          raise (Error e)
+  in
   let module JIM = Jmap.Make(IdentMap) in
   let kv = JIM.to_list knowledge.scheme_of_ident in
   let kv = List.filter (fun ((_, pos), _) -> not pos.Location.loc_ghost) kv in

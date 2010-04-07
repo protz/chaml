@@ -19,6 +19,10 @@
 
 (** Unification data structures used by the solver. *)
 
+(** In case two terms cannot be unified, this exception will be thrown with an
+    explanation. [Solver] catches this. *)
+exception Error of string
+
 (** This is the descriptor used by [UnionFind]. This is what you get when you do
     [UnionFind.find uvar] where [uvar] is a [unifier_var]. *)
 type descriptor = {

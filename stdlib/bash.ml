@@ -18,7 +18,7 @@
 (*****************************************************************************)
 
 type colors = { green: int; red: int; blue: int; }
-let colors = { green = 82; red = 196; blue = 81; }
+let colors = { green = 82; red = 203; blue = 81; }
 
 let color c =
   Printf.kprintf (Printf.sprintf "\x1b[38;5;%dm%s\x1b[38;5;15m" c)

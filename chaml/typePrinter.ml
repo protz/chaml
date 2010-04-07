@@ -35,9 +35,9 @@ let prec =
   fun op ->
     Hashtbl.find tbl op
 
-let string_of_type:
-  ?string_of_key:('key -> string) -> ?caml_types:bool -> 'key inspected_var -> string =
-  fun ?string_of_key ?caml_types:(opt_caml_types=false) uvar ->
+let string_of_types:
+  ?string_of_key:('key -> string) -> ?caml_types:bool -> 'key inspected_var list -> string list =
+  fun ?string_of_key ?caml_types:(opt_caml_types=false) uvars ->
     let c = ref 0 in
     let fresh_greek_var =
       if opt_caml_types then
@@ -113,7 +113,10 @@ let string_of_type:
                     Printf.sprintf "%s" cons_name
             end
     in
-    print_type false uvar
+    List.map (print_type false) uvars
+
+let string_of_type ?string_of_key ?caml_types uvar =
+  List.hd (string_of_types ?string_of_key ?caml_types [uvar])
 
 let string_of_term: 'var generic_term -> string =
   fun type_term ->

@@ -24,6 +24,10 @@
     parts of the OCaml source code. One might want to write another custom
     front-end for another language, though. *) 
 
+(** If something goes wrong during constraint generation, an exception will be
+    thrown with an informative error message. *)
+exception Error of string
+
 (** The driver calls this function. *)
 val generate_constraint:
   generalize_match:bool ->

@@ -21,6 +21,8 @@ open Algebra
 open Constraint
 open TypePrinter
 
+exception Error of string
+
 (* - An equivalence class of variables is a [unifier_var].
  * - A multi-equation is a set of variables that are all equal to a given [term].
  *
@@ -152,6 +154,10 @@ let rec uvar_name: Buffer.t -> unifier_var -> unit =
 let string_of_uvar ?caml_types uvar =
   string_of_type ?caml_types (inspect_uvar uvar)
 
+(* For error messages. Same distinction, see typePrinter.mli *)
+let string_of_uvars ?caml_types uvars =
+  string_of_types ?caml_types (List.map inspect_uvar uvars)
+
 (* For printing type schemes *)
 let string_of_scheme ?caml_types ident scheme =
   let _, uvar = scheme in
@@ -270,33 +276,53 @@ let debug_unify =
   fun v1 v2 ->
     Error.debug "[UUnify] Unifying %a with %a\n" uvar_name v1 uvar_name v2
 
+(* The exceptions that might be thrown in the process. *)
+exception CannotUnify of unifier_var * unifier_var
+exception ArityMismatch of unifier_var * int * unifier_var * int
+
 (* Update all the mutable data structures to take into account the new equation.
 * The descriptor that is kept by UnionFind is that of the *second* argument. *)
-let rec unify: unifier_env -> unifier_var -> unifier_var -> unit =
-  fun unifier_env v1 v2 ->
-  if not (UnionFind.equivalent v1 v2) then
-    (* Keeps the second argument's descriptor and updates the rank *)
-    let merge v1 v2 =
-      let repr1, repr2 = UnionFind.find v1, UnionFind.find v2 in
-      let r = min repr1.rank repr2.rank in
-      UnionFind.union v1 v2;
-      repr2.rank <- r
-    in
-    match UnionFind.find v1, UnionFind.find v2 with
-      | { term = Some t1; _ }, { term = Some t2; _ } ->
-          let `Cons (c1, args1) = t1 and `Cons (c2, args2) = t2 in
-          if not (c1 == c2) then
-            Error.fatal_error "%s cannot be unified with %s\n" (string_of_uvar v1) (string_of_uvar v2);
-          if not (List.length args1 == List.length args2) then
-            Error.fatal_error "wrong number of arguments for this tuple\n";
-          List.iter2 (fun arg1 arg2 -> unify unifier_env arg1 arg2) args1 args2;
-          merge v1 v2;
-      | { term = Some _; _ }, { term = None; _ } ->
-          debug_unify v2 v1;
-          merge v2 v1;
-      | { term = None; _ }, { term = Some _; _ } ->
-          debug_unify v2 v1;
-          merge v1 v2;
-      | { term = None; _ }, { term = None; _ } ->
-          debug_unify v2 v1;
-          merge v1 v2
+let unify unifier_env v1 v2 =
+  let rec unify: unifier_env -> unifier_var -> unifier_var -> unit =
+    fun unifier_env v1 v2 ->
+    if not (UnionFind.equivalent v1 v2) then
+      (* Keeps the second argument's descriptor and updates the rank *)
+      let merge v1 v2 =
+        let repr1, repr2 = UnionFind.find v1, UnionFind.find v2 in
+        let r = min repr1.rank repr2.rank in
+        UnionFind.union v1 v2;
+        repr2.rank <- r
+      in
+      match UnionFind.find v1, UnionFind.find v2 with
+        | { term = Some t1; _ }, { term = Some t2; _ } ->
+            let `Cons (c1, args1) = t1 and `Cons (c2, args2) = t2 in
+            if not (c1 == c2) then
+              raise (CannotUnify (v1, v2));
+            let l1, l2 = List.length args1, List.length args2 in
+            if not (l1 = l2) then
+              raise (ArityMismatch (v1, l1, v2, l2));
+            List.iter2 (fun arg1 arg2 -> unify unifier_env arg1 arg2) args1 args2;
+            merge v1 v2;
+        | { term = Some _; _ }, { term = None; _ } ->
+            debug_unify v2 v1;
+            merge v2 v1;
+        | { term = None; _ }, { term = Some _; _ } ->
+            debug_unify v2 v1;
+            merge v1 v2;
+        | { term = None; _ }, { term = None; _ } ->
+            debug_unify v2 v1;
+            merge v1 v2
+  in
+  let raise_error fmt = Printf.kprintf (fun x -> raise (Error x)) fmt in
+  try
+    unify unifier_env v1 v2
+  with
+    | CannotUnify (v1, v2) ->
+        let s1, s2 = match string_of_uvars [v1; v2] with
+            [s1; s2] -> s1, s2
+          | _ -> assert false
+        in
+        raise_error "Cannot unify %s with %s\n" s1 s2
+    | ArityMismatch (v1, l1, v2, l2) ->
+        raise_error "Type constructor %s with %d arguments cannot be unified with %s which has %d arguments\n" 
+          (string_of_uvar v1) l1 (string_of_uvar v2) l2

@@ -24,6 +24,10 @@ open Constraint
 
 module IdentMap = Algebra.IdentMap
 
+exception Error of string
+exception NotImplemented of string * Location.t
+exception VariableBoundSeveralTimes of string * Location.t
+exception VariableMustOccurBothSides of string * Location.t
 
 let fresh_type_var ?letter () =
   let prefix = Option.map (String.make 1) letter in
@@ -81,8 +85,11 @@ let generate_constraint: generalize_match:bool -> default_bindings:bool -> struc
                 (* sub_vars represents the existential variables that have been
                  * generated throughout the pattern *)
                 let sub_constraint, sub_map, sub_vars = generate_constraint_pattern xi new_pattern in
-                if not (IdentMap.is_empty (JIM.inter known_map sub_map)) then
-                  fatal_error "Variable is bound several times in the matching";
+                let inter_map = JIM.inter known_map sub_map in
+                if not (IdentMap.is_empty inter_map) then begin
+                  let bad_ident = string_of_ident (List.hd (JIM.keys inter_map)) in
+                  raise (VariableBoundSeveralTimes (bad_ident, ppat_loc))
+                end;
                 let new_map = JIM.union known_map sub_map in
                 let new_constraint_list = sub_constraint :: current_constraint_list in
                 (* All the variables that have been generated existentially for
@@ -113,8 +120,8 @@ let generate_constraint: generalize_match:bool -> default_bindings:bool -> struc
           let c2, map2, vars2 = generate_constraint_pattern x pat2 in
           let xor_map = JIM.xor map1 map2 in
           if not (IdentMap.is_empty xor_map) then begin
-            let bad_ident = List.hd (JIM.keys xor_map) in
-            fatal_error "Variable %s must occur on both sides of this | pattern" (string_of_ident bad_ident)
+            let bad_ident = string_of_ident (List.hd (JIM.keys xor_map)) in
+            raise (VariableMustOccurBothSides (bad_ident, ppat_loc))
           end;
           let constraints =
             IdentMap.fold
@@ -123,7 +130,8 @@ let generate_constraint: generalize_match:bool -> default_bindings:bool -> struc
               []
           in
           constr_conj (c1 :: c2 :: constraints), map1, vars1 @ vars2
-        | _ -> fatal_error "This pattern is not implemented\n"
+        | _ ->
+            raise (NotImplemented ("some pattern", ppat_loc))
 
   (* Parsetree.expression
    *
@@ -144,7 +152,7 @@ let generate_constraint: generalize_match:bool -> default_bindings:bool -> struc
               | Const_char _ -> `Equals (t, type_cons_char)
               | Const_string _ -> `Equals (t, type_cons_string)
               | Const_float _ -> `Equals (t, type_cons_float)
-              | _ -> fatal_error "This type of constant is not supported."
+              | _ -> raise (NotImplemented ("int32 or int64 or intnative", pexp_loc))
             end
         | Pexp_function (_, _, pat_expr_list) ->
             (* As in the definition. We could generate fresh variables for each
@@ -201,7 +209,7 @@ let generate_constraint: generalize_match:bool -> default_bindings:bool -> struc
             (* Once again, the list of pattern/expressions is here because of
              * let ... and ... in e2 (multiple simultaneous definitions *)
             if rec_flag <> Asttypes.Nonrecursive then
-              fatal_error "Rec flag not supported";
+              raise (NotImplemented ("rec flag", pexp_loc));
             let c2 = generate_constraint_expression t e2 in
             `Let (List.map generate_constraint_pat_expr pat_expr_list, c2)
         | Pexp_match (e1, pat_expr_list) ->
@@ -241,7 +249,7 @@ let generate_constraint: generalize_match:bool -> default_bindings:bool -> struc
               let constraints = List.map generate_branch pat_expr_list in
               `Exists ([x1], constr_conj (constr_e1 :: constraints))
         | _ ->
-            fatal_error "This expression is not supported\n"
+            raise (NotImplemented ("some expression", pexp_loc))
 
   (* Parsetree.structure
    *
@@ -268,14 +276,15 @@ let generate_constraint: generalize_match:bool -> default_bindings:bool -> struc
         match pstr_desc with
           | Pstr_value (rec_flag, pat_expr_list) ->
               if rec_flag <> Asttypes.Nonrecursive then
-                fatal_error "rec flag not implemented\n";
+                raise (NotImplemented ("rec flag", pstr_loc));
               `Let (List.map generate_constraint_pat_expr pat_expr_list, c2)
           | Pstr_eval expr ->
               let t = fresh_type_var ~letter:'t' () in
               let c = generate_constraint_expression t expr in
               let c = `Exists ([t], c) in
               `Let ([[], c, IdentMap.empty], c2)
-          | _ -> fatal_error "structure_item not implemented\n"
+          | _ ->
+              raise (NotImplemented ("some structure item", pstr_loc))
       in
       let default_bindings =
         let plus_scheme =
@@ -316,4 +325,34 @@ let generate_constraint: generalize_match:bool -> default_bindings:bool -> struc
       [x], konstraint, var_map
 
   in
-  generate_constraint structure
+
+  (** The "driver" for OCaml constraint generation. Takes care of catching all
+      errors and returning an understandable error message. *)
+  let raise_error fmt =
+   Printf.kprintf (fun x -> raise (Error x)) fmt
+  in
+  let print_loc () { Location.loc_start; Location.loc_end; Location.loc_ghost } =
+    let open Lexing in
+    assert (not loc_ghost);
+    let { pos_fname; pos_lnum; pos_bol; _ } = loc_start in
+    let { pos_bol = pos_end; _ } = loc_end in
+    Printf.sprintf "File %s, line %d, characters %d-%d"
+      pos_fname pos_lnum pos_bol pos_end
+  in 
+  try
+    generate_constraint structure
+  with
+    | NotImplemented (r, loc) ->
+        raise_error
+          "%a: the following OCaml feature is not implemented: %s\n"
+          print_loc loc r
+    | VariableBoundSeveralTimes (v, loc) ->
+        raise_error
+          "%a: variable %s is bound several times in the matching\n"
+          print_loc loc v
+    | VariableMustOccurBothSides (v, loc) ->
+        raise_error
+          "%a: variable %s must occur on both sides of this pattern\n"
+          print_loc loc v
+    | Algebra.Error e ->
+        raise_error "%s" e

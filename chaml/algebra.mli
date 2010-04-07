@@ -28,6 +28,9 @@
     inspected_var] which has type aliases desambiguated and is suitable for
     printing. This is used by the type parser in [tests/]. *)
 
+(** This can happen when looking up a wrong type constructor for instance. *)
+exception Error of string
+
 (** An identifier *)
 type long_ident
 type ident = long_ident * Location.t

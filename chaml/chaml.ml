@@ -81,12 +81,12 @@ module Options = struct
       | Some (_, desc) ->
           Hashtbl.replace options k (v, desc)
       | None ->
-          Error.fatal_error "No such option %s" k
+          Error.exit_error "No such option %s" k
 
   let get_opt: string -> bool = fun k ->
     match Jhashtbl.find_opt options k with
       | None ->
-          Error.fatal_error "No such option %s" k
+          Error.exit_error "No such option %s" k
       | Some (v, _) ->
           v
 
@@ -138,7 +138,13 @@ let _ =
     let generalize_match = Options.get_opt "generalize-match" in
     let default_bindings = Options.get_opt "default-bindings" in
     let konstraint =
-      OCamlConstraintGenerator.generate_constraint ~generalize_match ~default_bindings ast
+      try
+        OCamlConstraintGenerator.generate_constraint ~generalize_match ~default_bindings ast
+      with
+        OCamlConstraintGenerator.Error e ->
+          output_string stderr
+            (Bash.color Bash.colors.Bash.red "!!! Constraint generation failed\n");
+          Error.exit_error "%s" e
     in
     if !arg_print_constraint then begin
       let pretty_printing = Options.get_opt "pretty-printing" in
@@ -149,7 +155,15 @@ let _ =
     (* Constraint solving *)
     let print_types = !arg_print_types in
     let caml_types = Options.get_opt "caml-types" in
-    let typed_ast = Solver.solve ~caml_types ~print_types konstraint in
+    let typed_ast =
+      try
+        Solver.solve ~caml_types ~print_types konstraint
+      with
+        Solver.Error e ->
+          output_string stderr
+            (Bash.color Bash.colors.Bash.red "!!! Constraint solving failed\n");
+          Error.exit_error "%s" e
+    in
     if !arg_print_typed_ast then begin
       print_string (TypedAstPrinter.string_of_typed_ast typed_ast);
       flush stdout;

@@ -18,6 +18,7 @@
 (*****************************************************************************)
 
 let fatal_error f = Printf.kprintf failwith f
+let exit_error fmt = Printf.kprintf (fun e -> output_string stderr e; exit 255) fmt
 
 let debug_enabled = ref false
 let enable_debug () = debug_enabled := true

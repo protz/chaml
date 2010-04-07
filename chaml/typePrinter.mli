@@ -38,6 +38,11 @@ type 'var inspected_var = [
     for debugging. *)
 val string_of_type: ?string_of_key:('var -> string) -> ?caml_types:bool -> 'var inspected_var -> string
 
+(** This function is useful for generating error messages. It does not create
+    fresh variables for each term; instead, all unification variables are
+    assigned a unique name accross the inspected_vars. *)
+val string_of_types: ?string_of_key:('var -> string) -> ?caml_types:bool -> 'var inspected_var list -> string list
+
 (** Just a type-converted function for printing Algebra's generic terms. Useful
     for error messages. *)
 val string_of_term: 'a Algebra.generic_term -> string

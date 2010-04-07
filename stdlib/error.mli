@@ -24,6 +24,9 @@
     better in the future. Use it like [Printf.printf]. *)
 val fatal_error : ('a, unit, string, 'b) format4 -> 'a
 
+(** Display an error message and exit with an error code. *)
+val exit_error : ('a, unit, string, 'b) format4 -> 'a
+
 (** Enable debugging information. *)
 val enable_debug : unit -> unit
 

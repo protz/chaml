@@ -18,6 +18,8 @@
 (*****************************************************************************)
 
 open Error
+exception Error of string
+let raise_error fmt = Printf.kprintf (fun x -> raise (Error x)) fmt
 
 (* x, y ::= variable | constant | memory location *)
 type long_ident =
@@ -43,7 +45,7 @@ module IdentMap = Map.Make (struct
   let compare (x, pos1) (y, pos2) =
     match x, y with
       | Ident a, Ident b -> String.compare a b
-      | _ -> fatal_error "Only simple identifiers are implemented\n"
+      | _ -> assert false
 end)
 
 
@@ -130,7 +132,7 @@ let type_cons =
     begin match Jhashtbl.find_opt global_constructor_table cons_name with
     | Some cons ->
         if List.length args != cons.cons_arity then
-          fatal_error "Bad number of arguments for type constructor %s" cons_name;
+          raise_error "Bad number of arguments for type constructor %s" cons_name;
         `Cons (cons, args)
     | None ->
         if cons_name = "*" then
@@ -144,7 +146,7 @@ let type_cons =
           | Some cons ->
               `Cons (cons, args)
         else
-          fatal_error "Unbound type constructor %s\n" cons_name
+          raise_error "Unbound type constructor %s\n" cons_name
     end
 
 (* That way these constructors are global and we can test type equality by using
