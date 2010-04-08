@@ -28,23 +28,28 @@ clean:
 count:
 	wc -l `find chaml stdlib tests -iname '*.ml' -or -iname '*.mli' -or -iname '*.mly' -or -iname '*.mll'` | sort -n
 
-graph:
+build_graph:
 	ocamldoc -dot -I _build/chaml/ -I _build/parsing/ -I _build/stdlib/ \
 	  -I _build/tests/ -I _build/utils/ chaml/*.ml -o graph.dot
 	dot -Tpng graph.dot > graph.png
 	convert graph.png -rotate 90 graph.png
+
+graph: build_graph
 	eog graph.png
+
+OCAMLLIBPATH = $(shell ocamlc -where)
 
 DOCFILES = chaml/oCamlConstraintGenerator.mli chaml/constraint.mli chaml/unify.mli\
 	   chaml/solver.mli\
 	   chaml/algebra.mli chaml/unionFind.mli\
 	   chaml/typePrinter.mli\
-	   stdlib/*.mli
+	   stdlib/*.mli #`find $(OCAMLLIBPATH) -maxdepth 1 -iname '*.mli' -and -not -iname 'condition.mli'`
 
-doc:
+doc: build_graph
 	mkdir -p doc
 	ocamldoc -html -I _build/chaml/ -I _build/parsing/ -I _build/stdlib/ \
 	  -I _build/tests/ -I _build/utils/ -I `ocamlc -where` -d doc \
 	  -intro doc/main $(DOCFILES)
 	sed -i 's/iso-8859-1/utf-8/g' doc/*.html
+	sed -i 's/<\/body>/<img src="..\/graph.png" \/><\/body>/' doc/index.html
 	cp -f ocamlstyle.css doc/style.css
