@@ -17,4 +17,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let string_of_typed_ast _ = ""
+let string_of_typed_ast: TypedAst.t -> string = fun _ -> ""

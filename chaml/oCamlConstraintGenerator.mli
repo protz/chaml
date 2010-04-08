@@ -22,13 +22,17 @@
 (** This module makes use of the OCaml parser and lexer, walks the OCaml AST and
     produces constraints suitable for solving later on by ChaML. It depends on
     parts of the OCaml source code. One might want to write another custom
-    front-end for another language, though. *) 
+    front-end for another language, though. *)
 
-(** If something goes wrong during constraint generation, an exception will be
-    thrown with an informative error message. *)
-exception Error of string
+(** This describes an error encountered during constraint generation. *)
+type error
 
-(** The driver calls this function. *)
+(** Creates a human-readable representation of an error *)
+val string_of_error: error -> string
+
+(** The driver calls this function. The client of this module is forced to deal
+    with the [`Error] case. *)
 val generate_constraint:
   generalize_match:bool ->
-  default_bindings:bool -> Parsetree.structure -> Constraint.type_constraint
+  default_bindings:bool -> Parsetree.structure ->
+  [ `Ok of Constraint.type_constraint | `Error of error ]

@@ -26,7 +26,7 @@ clean:
 	ocamlbuild -clean
 
 count:
-	wc -l `find chaml stdlib -iname '*.ml' -or -iname '*.mli'` | sort -n
+	wc -l `find chaml stdlib tests -iname '*.ml' -or -iname '*.mli' -or -iname '*.mly' -or -iname '*.mll'` | sort -n
 
 graph:
 	ocamldoc -dot -I _build/chaml/ -I _build/parsing/ -I _build/stdlib/ \

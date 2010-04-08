@@ -19,9 +19,16 @@
 
 (** Unification data structures used by the solver. *)
 
-(** In case two terms cannot be unified, this exception will be thrown with an
-    explanation. [Solver] catches this. *)
-exception Error of string
+(** {3 Error handling} *)
+
+(** In case two terms cannot be unified, an error will be returned. *)
+type error
+
+(** This forces the client code to deal with it, plus, it can be explained with
+    this function. *)
+val string_of_error: error -> string
+
+(** {3 Core types} *)
 
 (** This is the descriptor used by [UnionFind]. This is what you get when you do
     [UnionFind.find uvar] where [uvar] is a [unifier_var]. *)
@@ -40,13 +47,15 @@ and unifier_var = descriptor UnionFind.point
     is to say that all variables share a common descriptor. That descriptor
     might be associated to a term. If it's not, it's only an equation between
     variables.
-   
+
     When a term is equated with another one, they are unified on-the-fly in
     {!unify}. *)
 and unifier_term = [ `Cons of Algebra.type_cons * unifier_var list ]
 
 (** A scheme is a list of young variables and a constraint. *)
 and unifier_scheme = unifier_var list * unifier_var
+
+(** {3 Pools and environments} *)
 
 (** When diving into the left branch of a let construct, all variables that are
     created in the process end up in a {!Pool.t}. We then examine the [Pool]'s
@@ -82,6 +91,8 @@ val current_rank: unifier_env -> int
 (** Create a new pool, increment the rank. *)
 val step_env: unifier_env -> unifier_env
 
+(** {3 Printing and debugging} *)
+
 (** Get the internal name of a {!unifier_var}, annotated with all known
     equations. This is for tracing/debugging. Use like this:
     [Jstring.bsprintf "%a" uvar_name uvar] *)
@@ -93,6 +104,8 @@ val string_of_uvar: ?caml_types:bool -> unifier_var -> string
 (** Print a scheme. Use it to get the type of top-level bindings as a string
     "val f: 'a -> ...". *)
 val string_of_scheme: ?caml_types:bool -> string -> 'a * unifier_var -> string
+
+(** {3 Core functions} *)
 
 (** When instanciating a type scheme, if the rank of the scheme is equal to the
     current rank, we must create a instance. This function takes care of
@@ -111,4 +124,4 @@ val fresh_copy:
 val uvar_of_tterm: unifier_env -> Constraint.type_term -> unifier_var
 
 (** The main function, called by the solver to unify terms. *)
-val unify: unifier_env -> unifier_var -> unifier_var -> unit
+val unify: unifier_env -> unifier_var -> unifier_var -> [ `Ok | `Error of error ]

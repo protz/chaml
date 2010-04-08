@@ -277,8 +277,11 @@ let debug_unify =
     Error.debug "[UUnify] Unifying %a with %a\n" uvar_name v1 uvar_name v2
 
 (* The exceptions that might be thrown in the process. *)
-exception CannotUnify of unifier_var * unifier_var
-exception ArityMismatch of unifier_var * int * unifier_var * int
+type error =
+  | CannotUnify of unifier_var * unifier_var
+  | ArityMismatch of unifier_var * int * unifier_var * int
+exception Error of error
+let raise_error x = raise (Error x)
 
 (* Update all the mutable data structures to take into account the new equation.
 * The descriptor that is kept by UnionFind is that of the *second* argument. *)
@@ -297,10 +300,10 @@ let unify unifier_env v1 v2 =
         | { term = Some t1; _ }, { term = Some t2; _ } ->
             let `Cons (c1, args1) = t1 and `Cons (c2, args2) = t2 in
             if not (c1 == c2) then
-              raise (CannotUnify (v1, v2));
+              raise_error (CannotUnify (v1, v2));
             let l1, l2 = List.length args1, List.length args2 in
             if not (l1 = l2) then
-              raise (ArityMismatch (v1, l1, v2, l2));
+              raise_error (ArityMismatch (v1, l1, v2, l2));
             List.iter2 (fun arg1 arg2 -> unify unifier_env arg1 arg2) args1 args2;
             merge v1 v2;
         | { term = Some _; _ }, { term = None; _ } ->
@@ -313,16 +316,20 @@ let unify unifier_env v1 v2 =
             debug_unify v2 v1;
             merge v1 v2
   in
-  let raise_error fmt = Printf.kprintf (fun x -> raise (Error x)) fmt in
   try
-    unify unifier_env v1 v2
+    unify unifier_env v1 v2;
+    `Ok
   with
+    | Error e -> `Error e
+
+let string_of_error = function
     | CannotUnify (v1, v2) ->
         let s1, s2 = match string_of_uvars [v1; v2] with
             [s1; s2] -> s1, s2
           | _ -> assert false
         in
-        raise_error "Cannot unify %s with %s\n" s1 s2
+        Printf.sprintf "Cannot unify %s with %s\n" s1 s2
     | ArityMismatch (v1, l1, v2, l2) ->
-        raise_error "Type constructor %s with %d arguments cannot be unified with %s which has %d arguments\n" 
+        Printf.sprintf
+          "Type constructor %s with %d arguments cannot be unified with %s which has %d arguments\n"
           (string_of_uvar v1) l1 (string_of_uvar v2) l2

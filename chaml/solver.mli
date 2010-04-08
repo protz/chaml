@@ -19,10 +19,12 @@
 
 (** The solver works on top of the unifier and the constraint generator. *)
 
-(** If something wrong happens during constraint solving, this will be thrown.
-    *)
-exception Error of string
+(** Describes a unification or solving error.  *)
+type error
+
+(** Create a human-readable representation of an error. *)
+val string_of_error: error -> string
 
 (** This is the only useful function. It takes a set of constraints and returns
     a typed AST *)
-val solve: caml_types:bool -> print_types:bool -> Constraint.type_constraint -> TypedAst.t
+val solve: caml_types:bool -> print_types:bool -> Constraint.type_constraint -> [`Ok of TypedAst.t | `Error of error]

@@ -21,9 +21,21 @@ open Algebra
 open Unify
 open Constraint
 
-exception Error of string
+type error =
+  | UnifyError of Unify.error
 
-let solve: caml_types:bool -> print_types:bool -> type_constraint -> TypedAst.t =
+exception Error of error
+
+let string_of_error = function
+  | UnifyError e ->
+      Unify.string_of_error e
+
+let unify_or_raise unifier_env t1 t2 =
+  match (unify unifier_env t1 t2) with
+  | `Ok -> ();
+  | `Error e -> raise (Error (UnifyError e))
+
+let solve =
   fun ~caml_types:opt_caml_types ~print_types:opt_print_types konstraint ->
 
   let rec analyze: unifier_env -> type_constraint -> unifier_env =
@@ -36,7 +48,7 @@ let solve: caml_types:bool -> print_types:bool -> type_constraint -> TypedAst.t 
           let t1 = uvar_of_tterm unifier_env (tv_tt t1) in
           let t2 = uvar_of_tterm unifier_env t2 in
           Error.debug "[SEquals] %a = %a\n" uvar_name t1 uvar_name t2;
-          unify unifier_env t1 t2;
+          unify_or_raise unifier_env t1 t2;
           unifier_env
       | `Instance (ident, t) ->
           (* For instance: ident = f (with let f x = x), and t = int -> int *)
@@ -54,11 +66,11 @@ let solve: caml_types:bool -> print_types:bool -> type_constraint -> TypedAst.t 
               "[SCopy] %a is a copy of %a\n" uvar_name instance uvar_name scheme_uvar;
             Error.debug
               "[S-Old] Taking an instance of %s: %a\n" ident_s uvar_name instance;
-            unify unifier_env instance t_uvar;
+            unify_or_raise unifier_env instance t_uvar;
             unifier_env
           end else begin
             Error.debug "[S-Young] Unifying %s directly\n" ident_s;
-            unify unifier_env scheme_uvar t_uvar;
+            unify_or_raise unifier_env scheme_uvar t_uvar;
             unifier_env
           end
       | `Conj (c1, c2) ->
@@ -154,22 +166,20 @@ let solve: caml_types:bool -> print_types:bool -> type_constraint -> TypedAst.t 
     uvar_of_tterm = Hashtbl.create 64;
     scheme_of_ident = IdentMap.empty;
   } in
-  let knowledge =
-    try
-      analyze initial_env konstraint
-    with
-      | Unify.Error e ->
-          raise (Error e)
-  in
-  let module JIM = Jmap.Make(IdentMap) in
-  let kv = JIM.to_list knowledge.scheme_of_ident in
-  let kv = List.filter (fun ((_, pos), _) -> not pos.Location.loc_ghost) kv in
-  let kv = List.sort (fun ((_, pos), _) ((_, pos'), _) -> compare pos pos') kv in
-  let print_kv (ident, scheme) =
-    let ident = string_of_ident ident in
-    let s = string_of_scheme ~caml_types:opt_caml_types ident scheme in
-    print_endline s
-  in
-  flush stderr;
-  if opt_print_types then
-    List.iter print_kv kv
+  try
+    let knowledge = analyze initial_env konstraint in
+    let module JIM = Jmap.Make(IdentMap) in
+    let kv = JIM.to_list knowledge.scheme_of_ident in
+    let kv = List.filter (fun ((_, pos), _) -> not pos.Location.loc_ghost) kv in
+    let kv = List.sort (fun ((_, pos), _) ((_, pos'), _) -> compare pos pos') kv in
+    let print_kv (ident, scheme) =
+      let ident = string_of_ident ident in
+      let s = string_of_scheme ~caml_types:opt_caml_types ident scheme in
+      print_endline s
+    in
+    flush stderr;
+    if opt_print_types then
+      List.iter print_kv kv;
+    `Ok ()
+  with
+    Error e -> `Error e

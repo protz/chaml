@@ -18,8 +18,20 @@
 (*****************************************************************************)
 
 open Error
-exception Error of string
-let raise_error fmt = Printf.kprintf (fun x -> raise (Error x)) fmt
+
+type error =
+  | BadNumberOfArguments of string
+  | UnboundTypeConstructor of string
+
+exception Error of error
+
+let string_of_error = function
+  | BadNumberOfArguments s ->
+      Printf.sprintf "This constructor has a wrong number of arguments: %s" s
+  | UnboundTypeConstructor s ->
+      Printf.sprintf "Unbound type constructor %s" s
+
+let raise_error e = raise (Error e)
 
 (* x, y ::= variable | constant | memory location *)
 type long_ident =
@@ -132,7 +144,7 @@ let type_cons =
     begin match Jhashtbl.find_opt global_constructor_table cons_name with
     | Some cons ->
         if List.length args != cons.cons_arity then
-          raise_error "Bad number of arguments for type constructor %s" cons_name;
+          raise_error (BadNumberOfArguments cons_name);
         `Cons (cons, args)
     | None ->
         if cons_name = "*" then
@@ -146,7 +158,7 @@ let type_cons =
           | Some cons ->
               `Cons (cons, args)
         else
-          raise_error "Unbound type constructor %s\n" cons_name
+          raise_error (UnboundTypeConstructor cons_name)
     end
 
 (* That way these constructors are global and we can test type equality by using

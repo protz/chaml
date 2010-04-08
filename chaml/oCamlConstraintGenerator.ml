@@ -24,10 +24,14 @@ open Constraint
 
 module IdentMap = Algebra.IdentMap
 
-exception Error of string
-exception NotImplemented of string * Location.t
-exception VariableBoundSeveralTimes of string * Location.t
-exception VariableMustOccurBothSides of string * Location.t
+type error =
+  | NotImplemented of string * Location.t
+  | VariableBoundSeveralTimes of string * Location.t
+  | VariableMustOccurBothSides of string * Location.t
+  | AlgebraError of Algebra.error
+
+exception Error of error
+let raise_error e = raise (Error e)
 
 let fresh_type_var ?letter () =
   let prefix = Option.map (String.make 1) letter in
@@ -42,7 +46,7 @@ let constr_conj = function
   | _ ->
       assert false
 
-let generate_constraint: generalize_match:bool -> default_bindings:bool -> structure -> type_constraint =
+let generate_constraint =
   fun ~generalize_match:opt_generalize_match
       ~default_bindings:opt_default_bindings
       structure ->
@@ -90,7 +94,7 @@ let generate_constraint: generalize_match:bool -> default_bindings:bool -> struc
                 let inter_map = JIM.inter known_map sub_map in
                 if not (IdentMap.is_empty inter_map) then begin
                   let bad_ident = string_of_ident (List.hd (JIM.keys inter_map)) in
-                  raise (VariableBoundSeveralTimes (bad_ident, ppat_loc))
+                  raise_error (VariableBoundSeveralTimes (bad_ident, ppat_loc))
                 end;
                 let new_map = JIM.union known_map sub_map in
                 let new_constraint_list = sub_constraint :: current_constraint_list in
@@ -123,7 +127,7 @@ let generate_constraint: generalize_match:bool -> default_bindings:bool -> struc
           let xor_map = JIM.xor map1 map2 in
           if not (IdentMap.is_empty xor_map) then begin
             let bad_ident = string_of_ident (List.hd (JIM.keys xor_map)) in
-            raise (VariableMustOccurBothSides (bad_ident, ppat_loc))
+            raise_error (VariableMustOccurBothSides (bad_ident, ppat_loc))
           end;
           let constraints =
             IdentMap.fold
@@ -133,7 +137,7 @@ let generate_constraint: generalize_match:bool -> default_bindings:bool -> struc
           in
           constr_conj (c1 :: c2 :: constraints), map1, vars1 @ vars2
         | _ ->
-            raise (NotImplemented ("some pattern", ppat_loc))
+            raise_error (NotImplemented ("some pattern", ppat_loc))
 
   (* Parsetree.expression
    *
@@ -154,7 +158,7 @@ let generate_constraint: generalize_match:bool -> default_bindings:bool -> struc
               | Const_char _ -> `Equals (t, type_cons_char)
               | Const_string _ -> `Equals (t, type_cons_string)
               | Const_float _ -> `Equals (t, type_cons_float)
-              | _ -> raise (NotImplemented ("int32 or int64 or intnative", pexp_loc))
+              | _ -> raise_error (NotImplemented ("int32 or int64 or intnative", pexp_loc))
             end
         | Pexp_function (_, _, pat_expr_list) ->
             (* As in the definition. We could generate fresh variables for each
@@ -211,7 +215,7 @@ let generate_constraint: generalize_match:bool -> default_bindings:bool -> struc
             (* Once again, the list of pattern/expressions is here because of
              * let ... and ... in e2 (multiple simultaneous definitions *)
             if rec_flag <> Asttypes.Nonrecursive then
-              raise (NotImplemented ("rec flag", pexp_loc));
+              raise_error (NotImplemented ("rec flag", pexp_loc));
             let c2 = generate_constraint_expression t e2 in
             `Let (List.map generate_constraint_pat_expr pat_expr_list, c2)
         | Pexp_match (e1, pat_expr_list) ->
@@ -266,7 +270,7 @@ let generate_constraint: generalize_match:bool -> default_bindings:bool -> struc
               let constraints = List.map generate_branch pat_expr_list in
               `Exists ([x1], constr_conj (constr_e1 :: constraints))
         | _ ->
-            raise (NotImplemented ("some expression", pexp_loc))
+            raise_error (NotImplemented ("some expression", pexp_loc))
 
   (* Parsetree.structure
    *
@@ -293,7 +297,7 @@ let generate_constraint: generalize_match:bool -> default_bindings:bool -> struc
         match pstr_desc with
           | Pstr_value (rec_flag, pat_expr_list) ->
               if rec_flag <> Asttypes.Nonrecursive then
-                raise (NotImplemented ("rec flag", pstr_loc));
+                raise_error (NotImplemented ("rec flag", pstr_loc));
               `Let (List.map generate_constraint_pat_expr pat_expr_list, c2)
           | Pstr_eval expr ->
               let t = fresh_type_var ~letter:'t' () in
@@ -301,7 +305,7 @@ let generate_constraint: generalize_match:bool -> default_bindings:bool -> struc
               let c = `Exists ([t], c) in
               `Let ([[], c, IdentMap.empty], c2)
           | _ ->
-              raise (NotImplemented ("some structure item", pstr_loc))
+              raise_error (NotImplemented ("some structure item", pstr_loc))
       in
       let default_bindings =
         let plus_scheme =
@@ -345,9 +349,13 @@ let generate_constraint: generalize_match:bool -> default_bindings:bool -> struc
 
   (** The "driver" for OCaml constraint generation. Takes care of catching all
       errors and returning an understandable error message. *)
-  let raise_error fmt =
-   Printf.kprintf (fun x -> raise (Error x)) fmt
-  in
+  try
+    `Ok (generate_constraint structure)
+  with
+    | Error e -> `Error e
+    | Algebra.Error e -> `Error (AlgebraError e)
+
+let string_of_error =
   let print_loc () { Location.loc_start; Location.loc_end; Location.loc_ghost } =
     let open Lexing in
     assert (not loc_ghost);
@@ -355,21 +363,18 @@ let generate_constraint: generalize_match:bool -> default_bindings:bool -> struc
     let { pos_bol = pos_end; _ } = loc_end in
     Printf.sprintf "File %s, line %d, characters %d-%d"
       pos_fname pos_lnum pos_bol pos_end
-  in 
-  try
-    generate_constraint structure
-  with
-    | NotImplemented (r, loc) ->
-        raise_error
-          "%a: the following OCaml feature is not implemented: %s\n"
-          print_loc loc r
-    | VariableBoundSeveralTimes (v, loc) ->
-        raise_error
-          "%a: variable %s is bound several times in the matching\n"
-          print_loc loc v
-    | VariableMustOccurBothSides (v, loc) ->
-        raise_error
-          "%a: variable %s must occur on both sides of this pattern\n"
-          print_loc loc v
-    | Algebra.Error e ->
-        raise_error "%s" e
+  in function
+  | NotImplemented (r, loc) ->
+      Printf.sprintf
+        "%a: the following OCaml feature is not implemented: %s\n"
+        print_loc loc r
+  | VariableBoundSeveralTimes (v, loc) ->
+      Printf.sprintf
+        "%a: variable %s is bound several times in the matching\n"
+        print_loc loc v
+  | VariableMustOccurBothSides (v, loc) ->
+      Printf.sprintf
+        "%a: variable %s must occur on both sides of this pattern\n"
+        print_loc loc v
+  | AlgebraError e ->
+      Algebra.string_of_error e
