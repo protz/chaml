@@ -56,6 +56,7 @@ let solve =
            * let. young_vars is all the young variables that are possibly
            * quantified inside that scheme *)
           let t_uvar = uvar_of_tterm unifier_env (tv_tt t) in
+          Error.debug "[SInstance] taking an instance of %s\n" (string_of_ident ident);
           let scheme = IdentMap.find ident unifier_env.scheme_of_ident in
           let young_vars, scheme_uvar = scheme in
           let scheme_desc = UnionFind.find scheme_uvar in
