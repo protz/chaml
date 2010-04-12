@@ -151,8 +151,8 @@ let rec uvar_name: Buffer.t -> unifier_var -> unit =
           (string_of_type ~string_of_key (inspect_uvar ~debug:() uvar))
 
 (* For error messages *)
-let string_of_uvar ?caml_types uvar =
-  string_of_type ?caml_types (inspect_uvar uvar)
+let string_of_uvar ?caml_types ?young_vars uvar =
+  string_of_type ?caml_types ?young_vars (inspect_uvar uvar)
 
 (* For error messages. Same distinction, see typePrinter.mli *)
 let string_of_uvars ?caml_types uvars =
@@ -160,8 +160,9 @@ let string_of_uvars ?caml_types uvars =
 
 (* For printing type schemes *)
 let string_of_scheme ?caml_types ident scheme =
-  let _, uvar = scheme in
-  Printf.sprintf "val %s: %s" ident (string_of_uvar ?caml_types uvar)
+  let young_vars, uvar = scheme in
+  let young_vars = List.map UnionFind.find young_vars in
+  Printf.sprintf "val %s: %s" ident (string_of_uvar ~young_vars ?caml_types uvar)
 
 
 (* Create a fresh variable and add it to the current pool *)

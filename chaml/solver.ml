@@ -151,14 +151,20 @@ let solve =
         in
         IdentMap.fold
           (fun ident type_var map ->
-            IdentMap.add ident (assign_scheme ident) map)
+             let r = IdentMap.add ident (assign_scheme ident) map in
+             Error.debug_simple
+               (Bash.color
+                  185
+                  "[SScheme] Got %s\n"
+                  (string_of_scheme (string_of_ident ident) (IdentMap.find ident r)));
+             r
+          )
           (var_map: type_var IdentMap.t :> type_term IdentMap.t)
           new_map
       in
       let new_map =
         List.fold_left solve_branch unifier_env.scheme_of_ident schemes
       in
-      Error.debug "[SRight] Moving to the right branch\n";
       let new_env = { unifier_env with scheme_of_ident = new_map } in
       analyze new_env c
   in

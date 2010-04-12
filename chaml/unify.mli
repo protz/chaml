@@ -99,11 +99,11 @@ val step_env: unifier_env -> unifier_env
 val uvar_name: Buffer.t -> unifier_var -> unit
 
 (** Print a unification variable as a type, useful for error messages. *)
-val string_of_uvar: ?caml_types:bool -> unifier_var -> string
+val string_of_uvar: ?caml_types:bool -> ?young_vars:descriptor list -> unifier_var -> string
 
 (** Print a scheme. Use it to get the type of top-level bindings as a string
     "val f: 'a -> ...". *)
-val string_of_scheme: ?caml_types:bool -> string -> 'a * unifier_var -> string
+val string_of_scheme: ?caml_types:bool -> string -> unifier_var list * unifier_var -> string
 
 (** {3 Core functions} *)
 
