@@ -136,13 +136,6 @@ let solve =
          * allows us to create a fresh pool which will contain all the
          * existentially quantified variables in it. *)
         let sub_env = step_env unifier_env in
-        (* XXX with the "propagate rank" feature we should be able to remove
-         * this *)
-        (* This makes sure all the universally quantified variables appear in
-         * the Pool. *)
-        Jlist.ignore_map
-          (uvar_of_tterm sub_env)
-          (vars: type_var list :> type_term list);
 
         (* Solve the constraint in the scheme. *)
         let _unifier_env' =
@@ -164,7 +157,8 @@ let solve =
         in
 
         (* We want to keep "young" variables that have been introduced while
-         * solving the constraint attached to that branch. *)
+         * solving the constraint attached to that branch. We don't want to
+         * quantify over variables that represent constructors, that's useless. *)
         let is_young uvar =
           let desc = UnionFind.find uvar in
           assert (desc.rank <= current_rank sub_env);
@@ -172,7 +166,8 @@ let solve =
         in
         let young_vars = current_pool.Pool.members in
 
-        (* Filter out duplicates *)
+        (* Filter out duplicates. This isn't necessary but still this should
+         * speed things up. *)
         let young_vars =
           Jlist.remove_duplicates
             ~hash_func:(fun x -> Hashtbl.hash (UnionFind.find x))

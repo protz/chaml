@@ -67,3 +67,11 @@ let f7 = function (x,y) -> x | (_, (a, b)) -> 42
 let v8 f =
   let g x = f x in
   g
+
+let f9 g h =
+  let g x = h x g in
+  let g =
+    let h = fun x -> g x in
+    fun _ -> h
+  in
+  g

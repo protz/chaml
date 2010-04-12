@@ -49,7 +49,7 @@ main:
   { l }
 
 type_decl:
-| VAL i = IDENT COLON e = type_expr EOL
+| VAL i = IDENT COLON list(EOL) e = type_expr EOL
   { (i, e) }
 | VAL i = IDENT COLON FORALL list(IDENT) DOT e = type_expr EOL
   { (i, e) }
