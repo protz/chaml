@@ -56,24 +56,13 @@ let solve =
            * let. young_vars is all the young variables that are possibly
            * quantified inside that scheme *)
           let t_uvar = uvar_of_tterm unifier_env (tv_tt t) in
-          Error.debug "[SInstance] taking an instance of %s\n" (string_of_ident ident);
           let scheme = IdentMap.find ident unifier_env.scheme_of_ident in
-          let young_vars, scheme_uvar = scheme in
-          let scheme_desc = UnionFind.find scheme_uvar in
           let ident_s = string_of_ident ident in
-          if scheme_desc.rank < current_rank unifier_env then begin
-            let instance = fresh_copy unifier_env scheme in
-            Error.debug
-              "[SCopy] %a is a copy of %a\n" uvar_name instance uvar_name scheme_uvar;
-            Error.debug
-              "[S-Old] Taking an instance of %s: %a\n" ident_s uvar_name instance;
-            unify_or_raise unifier_env instance t_uvar;
-            unifier_env
-          end else begin
-            Error.debug "[S-Young] Unifying %s directly\n" ident_s;
-            unify_or_raise unifier_env scheme_uvar t_uvar;
-            unifier_env
-          end
+          let instance = fresh_copy unifier_env scheme in
+          Error.debug
+              "[SInstance] Taking an instance of %s: %a\n" ident_s uvar_name instance;
+          unify_or_raise unifier_env instance t_uvar;
+          unifier_env
       | `Conj (c1, c2) ->
           (* Do *NOT* forward _unifier_env! Identifiers in c1's scope must not
            * go through c2's scope, this would be fatal. *)
@@ -132,6 +121,9 @@ let solve =
           desc.rank = current_rank sub_env
         in
         let current_pool = current_pool sub_env in
+        let rank = current_rank sub_env in
+        let members = List.map (fun x -> (UnionFind.find x).name) current_pool.Pool.members in
+        Error.debug_simple (Bash.color 208 "[InPool] %d: %s\n" rank (String.concat ", " members));
         (* We can just get rid of the old vars: they have been unified with a
          * var that's already in its own pool, with a lower rank. *)
         let young_vars = List.filter is_young current_pool.Pool.members in
@@ -152,11 +144,13 @@ let solve =
         IdentMap.fold
           (fun ident type_var map ->
              let r = IdentMap.add ident (assign_scheme ident) map in
+             let string_of_key = fun x -> x.name in
              Error.debug_simple
                (Bash.color
                   185
                   "[SScheme] Got %s\n"
-                  (string_of_scheme (string_of_ident ident) (IdentMap.find ident r)));
+                  (string_of_scheme ~string_of_key
+                     (string_of_ident ident) (IdentMap.find ident r)));
              r
           )
           (var_map: type_var IdentMap.t :> type_term IdentMap.t)
@@ -175,6 +169,7 @@ let solve =
   } in
   try
     let knowledge = analyze initial_env konstraint in
+    Hashtbl.iter (fun k v -> Error.debug "[Rank] %s: %d\n" (UnionFind.find v).name (UnionFind.find v).rank) knowledge.uvar_of_tterm;
     let module JIM = Jmap.Make(IdentMap) in
     let kv = JIM.to_list knowledge.scheme_of_ident in
     let kv = List.filter (fun ((_, pos), _) -> not pos.Location.loc_ghost) kv in

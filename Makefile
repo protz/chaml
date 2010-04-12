@@ -11,6 +11,7 @@ debug:
 	  $(BUILDFLAGS) -tag use_unix chaml/chaml.byte
 	OCAMLRUNPARAM=b=1 ./chaml.byte \
 		--print-constraint --enable pretty-printing --enable debug\
+		--disable default-bindings\
 		test.ml
 
 tests:

@@ -94,7 +94,7 @@ module Options = struct
     let descriptions =
       Jhashtbl.map_list
         options
-        (fun k (def, desc) -> Printf.sprintf "  %s (default: %b): %s" k def desc)
+        (fun k (def, desc) -> Printf.sprintf "  %s (default: %b): %s" (Bash.underline "%s" k) def desc)
     in
     String.concat "\n" (descriptions @ ["\n"])
 
@@ -118,7 +118,7 @@ let _ =
       "--print-constraint", Arg.Set arg_print_constraint, "print the constraint in a format mini can parse";
       "--no-print-types", Arg.Clear arg_print_types, "print the inferred types, à la ocamlc -i";
       "--print-typed-ast", Arg.Set arg_print_typed_ast, "print the AST annotated with the types found by the solver";
-      "--enable", Arg.String (add_opt true), "enable one of the following options: generalize-match (on by default)";
+      "--enable", Arg.String (add_opt true), "enable one of the options above";
       "--disable", Arg.String (add_opt false), "disable one of the options above";
     ]
     (fun f -> if !arg_filename = "" then arg_filename := f else print_endline "*** More than one file given, keeping the first one.")

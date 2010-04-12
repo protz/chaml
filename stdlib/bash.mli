@@ -36,3 +36,6 @@ val theight : int
 
 (** Make a title. *)
 val box : string -> string
+
+(** Underline some text *)
+val underline: ('a, unit, string, string) format4 -> 'a

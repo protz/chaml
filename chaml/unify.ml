@@ -144,25 +144,23 @@ let rec uvar_name: Buffer.t -> unifier_var -> unit =
         Printf.bprintf buf "%s" s
     | { name = s; term = Some cons; _ } ->
         let string_of_key: descriptor -> string = fun { name; _ } -> name in
-        Printf.bprintf
-          buf
-          "(%s = %s)"
-          s
+        Buffer.add_string buf
           (string_of_type ~string_of_key (inspect_uvar ~debug:() uvar))
 
 (* For error messages *)
-let string_of_uvar ?caml_types ?young_vars uvar =
-  string_of_type ?caml_types ?young_vars (inspect_uvar uvar)
+let string_of_uvar ?string_of_key ?caml_types ?young_vars uvar =
+  string_of_type ?string_of_key ?caml_types ?young_vars (inspect_uvar uvar)
 
 (* For error messages. Same distinction, see typePrinter.mli *)
 let string_of_uvars ?caml_types uvars =
   string_of_types ?caml_types (List.map inspect_uvar uvars)
 
 (* For printing type schemes *)
-let string_of_scheme ?caml_types ident scheme =
+let string_of_scheme ?string_of_key ?caml_types ident scheme =
   let young_vars, uvar = scheme in
   let young_vars = List.map UnionFind.find young_vars in
-  Printf.sprintf "val %s: %s" ident (string_of_uvar ~young_vars ?caml_types uvar)
+  let young_vars = List.filter (fun x -> x.term = None) young_vars in
+  Printf.sprintf "val %s: %s" ident (string_of_uvar ?string_of_key ~young_vars ?caml_types uvar)
 
 
 (* Create a fresh variable and add it to the current pool *)
@@ -189,52 +187,30 @@ let fresh_copy unifier_env (young_vars, scheme_uvar) =
     let repr = UnionFind.find uvar in
     match repr.term with
       | None ->
-          (* We don't create fresh variables. The young variables have already
-           * been created for us, so if we can't find it, it's and old variable
-           * that we musn't duplicate. *)
           begin match Jhashtbl.find_opt mapping repr with
             | Some uvar' -> uvar'
             | None -> uvar
           end
       | Some (`Cons (cons_name, cons_args)) ->
-          let uvar, deep = match Jhashtbl.find_opt mapping repr with
+          begin match Jhashtbl.find_opt mapping repr with
             | Some uvar ->
-                (* Tentative explanation for the weird <= equal. What happens
-                 * basically is that if we take an instance of a type scheme
-                 * that has repr.rank = base_rank, then we want to duplicate the
-                 * constructor once (the None -> branch of the match). However,
-                 * if this is a recursive type, the next time we bump into the
-                 * constructor, we don't want to traverse it again. Hence the =.
-                 * *)
-                if repr.rank <= base_rank then begin
-                  uvar, false
-                end else begin
-                  uvar, true
-                end
+                uvar
             | None ->
-                if repr.rank < base_rank then
-                  uvar, false
-                else
-                  let uvar = fresh_unifier_var unifier_env in
-                  Hashtbl.add mapping repr uvar;
-                  uvar, true
-          in
-          if deep then
-            (* Generate recursively after we have added the term to avoid
-             * infinite recursion. *)
-            let cons_args' = List.map fresh_copy cons_args in
-            let term = `Cons (cons_name, cons_args') in
-            (UnionFind.find uvar).term <- Some term;
-            uvar
-          else
-            uvar
+                let uvar = fresh_unifier_var unifier_env in
+                Hashtbl.add mapping repr uvar;
+                (* if (UnionFind.find uvar).rank >= base_rank then begin *)
+                  let cons_args' = List.map fresh_copy cons_args in
+                  let term = `Cons (cons_name, cons_args') in
+                  (UnionFind.find uvar).term <- Some term;
+                (* end; *)
+                uvar
+          end
   in
   List.iter
     (fun v ->
-       let v' = fresh_unifier_var ~prefix:"dup" unifier_env in
-       Error.debug "[Copy] %s is a copy of %s\n"
-         (UnionFind.find v').name (UnionFind.find v).name;
-       Hashtbl.add mapping (UnionFind.find v) v'
+       if (UnionFind.find v).term = None then 
+         let v' = fresh_unifier_var ~prefix:"dup" unifier_env in
+         Hashtbl.add mapping (UnionFind.find v) v'
     )
     young_vars;
   let print_pairs buf () =

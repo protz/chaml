@@ -23,6 +23,9 @@ let colors = { green = 119; red = 203; blue = 81; }
 let color c =
   Printf.kprintf (Printf.sprintf "\x1b[38;5;%dm%s\x1b[38;5;15m" c)
 
+let underline eta =
+  Printf.kprintf (Printf.sprintf "\x1b[4m%s\x1b[0m") eta
+
 let twidth, theight =
   let height, width = ref 0, ref 0 in
   Scanf.sscanf
