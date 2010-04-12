@@ -118,7 +118,7 @@ let solve =
         let is_young uvar =
           let desc = UnionFind.find uvar in
           assert (desc.rank <= current_rank sub_env);
-          desc.rank = current_rank sub_env
+          desc.rank = current_rank sub_env && desc.term = None
         in
         let current_pool = current_pool sub_env in
         let rank = current_rank sub_env in

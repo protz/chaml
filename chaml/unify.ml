@@ -208,9 +208,8 @@ let fresh_copy unifier_env (young_vars, scheme_uvar) =
   in
   List.iter
     (fun v ->
-       if (UnionFind.find v).term = None then 
-         let v' = fresh_unifier_var ~prefix:"dup" unifier_env in
-         Hashtbl.add mapping (UnionFind.find v) v'
+       let v' = fresh_unifier_var ~prefix:"dup" unifier_env in
+       Hashtbl.add mapping (UnionFind.find v) v'
     )
     young_vars;
   let print_pairs buf () =
