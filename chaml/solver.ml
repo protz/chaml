@@ -76,7 +76,7 @@ let solve =
       | `Equals (t1, t2) ->
           let t1 = uvar_of_tterm unifier_env (tv_tt t1) in
           let t2 = uvar_of_tterm unifier_env t2 in
-          Error.debug "[SEquals] %a = %a\n" uvar_name t1 uvar_name t2;
+          Error.debug "[SEquals] %s = %s\n" (UnionFind.find t1).name (UnionFind.find t2).name;
           unify_or_raise unifier_env t1 t2;
           unifier_env
       | `Instance (ident, t) ->
@@ -220,7 +220,11 @@ let solve =
   } in
   try
     let knowledge = analyze initial_env konstraint in
-    Hashtbl.iter (fun k v -> Error.debug "[Rank] %s: %d\n" (UnionFind.find v).name (UnionFind.find v).rank) knowledge.uvar_of_tterm;
+    Hashtbl.iter
+      (fun k v -> Error.debug "[Rank] %s: %d\n"
+                    (UnionFind.find v).name
+                    (UnionFind.find v).rank)
+      knowledge.uvar_of_tterm;
     let module JIM = Jmap.Make(IdentMap) in
     let kv = JIM.to_list knowledge.scheme_of_ident in
     let kv = List.filter (fun ((_, pos), _) -> not pos.Location.loc_ghost) kv in

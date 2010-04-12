@@ -182,28 +182,41 @@ let fresh_unifier_var ?term ?prefix ?name unifier_env =
 (* Create a fresh copy of a scheme for instanciation *)
 let fresh_copy unifier_env (young_vars, scheme_uvar) =
   let mapping = Hashtbl.create 16 in
-  let _base_rank = (UnionFind.find scheme_uvar).rank in
+  let call_stack = Hashtbl.create 16 in
+  let base_rank = (UnionFind.find scheme_uvar).rank in
+  let module L = struct exception RecType of unifier_var * unifier_var end in
   let rec fresh_copy uvar =
     let repr = UnionFind.find uvar in
-    match repr.term with
+    match Jhashtbl.find_opt mapping repr with
+      | Some uvar' ->
+          (* This clearly tells us that we've hit a recursive type: we have
+           * 'a = T('a). Strictly speaking, this is not necessary. It's just
+           * that if we don't do that, we're unfolding the recursive types way
+           * too deep. *)
+          if repr.term <> None && Hashtbl.mem call_stack uvar' then
+            raise (L.RecType (uvar', uvar))
+          else
+            uvar'
       | None ->
-          begin match Jhashtbl.find_opt mapping repr with
-            | Some uvar' -> uvar'
+          begin match repr.term with
             | None -> uvar
-          end
-      | Some (`Cons (cons_name, cons_args)) ->
-          begin match Jhashtbl.find_opt mapping repr with
-            | Some uvar ->
-                uvar
-            | None ->
-                let uvar = fresh_unifier_var unifier_env in
-                Hashtbl.add mapping repr uvar;
-                (* if (UnionFind.find uvar).rank >= base_rank then begin *)
-                  let cons_args' = List.map fresh_copy cons_args in
-                  let term = `Cons (cons_name, cons_args') in
-                  (UnionFind.find uvar).term <- Some term;
-                (* end; *)
-                uvar
+            | Some (`Cons (cons_name, cons_args)) ->
+                if (UnionFind.find uvar).rank < base_rank then
+                  uvar
+                else
+                  let uvar = fresh_unifier_var unifier_env in
+                  try
+                    Hashtbl.add mapping repr uvar;
+                    Hashtbl.add call_stack uvar ();
+                    let cons_args' = List.map fresh_copy cons_args in
+                    Hashtbl.remove call_stack uvar;
+                    let term = `Cons (cons_name, cons_args') in
+                    (UnionFind.find uvar).term <- Some term;
+                    uvar
+                  with
+                    | L.RecType (me, original) when me = uvar ->
+                        Hashtbl.replace mapping repr original;
+                        original
           end
   in
   List.iter
