@@ -9,11 +9,11 @@
         let b = g "" in
         (fun x -> x) *)
 
-(* let v4 f =
+let v4 f =
   let g x = f x in
-  g *)
+  g
 
-let f' =
+(* let f' =
   let g x = x in
   let a = g 2 and b = g 'c' in
-  g
+  g *)
