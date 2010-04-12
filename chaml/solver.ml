@@ -141,7 +141,7 @@ let solve =
         (* This makes sure all the universally quantified variables appear in
          * the Pool. *)
         Jlist.ignore_map
-          (uvar_of_tterm unifier_env)
+          (uvar_of_tterm sub_env)
           (vars: type_var list :> type_term list);
 
         (* Solve the constraint in the scheme. *)
