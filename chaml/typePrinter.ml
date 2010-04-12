@@ -114,8 +114,11 @@ let string_of_types =
     in
     let print_with_scheme young_vars uvar =
       let vars = List.map string_of_key young_vars in
-      let vars = String.concat " " vars in
-      Printf.sprintf "∀ %s. %s" vars (print_type false uvar)
+      if List.length vars > 0 then
+        let vars = String.concat " " vars in
+        Printf.sprintf "∀ %s. %s" vars (print_type false uvar)
+      else
+        Printf.sprintf "%s" (print_type false uvar)
     in
     match young_vars with
       | Some young_vars when opt_caml_types = false ->

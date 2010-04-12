@@ -182,7 +182,7 @@ let fresh_unifier_var ?term ?prefix ?name unifier_env =
 (* Create a fresh copy of a scheme for instanciation *)
 let fresh_copy unifier_env (young_vars, scheme_uvar) =
   let mapping = Hashtbl.create 16 in
-  let base_rank = (UnionFind.find scheme_uvar).rank in
+  let _base_rank = (UnionFind.find scheme_uvar).rank in
   let rec fresh_copy uvar =
     let repr = UnionFind.find uvar in
     match repr.term with

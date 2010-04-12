@@ -40,3 +40,6 @@ val append_rev_front : 'a list -> 'a list -> 'a list
 val remove_duplicates :
   ?hash_func:('a -> int) ->
   ?equal_func:('a -> 'a -> bool) -> 'a list -> 'a list
+
+(** Find the biggest element in a list *)
+val max: int list -> int

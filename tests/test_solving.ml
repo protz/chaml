@@ -64,3 +64,6 @@ let v6 =
 (* More complex example *)
 let f7 = function (x,y) -> x | (_, (a, b)) -> 42
 
+let v8 f =
+  let g x = f x in
+  g

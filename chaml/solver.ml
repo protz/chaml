@@ -35,6 +35,35 @@ let unify_or_raise unifier_env t1 t2 =
   | `Ok -> ();
   | `Error e -> raise (Error (UnifyError e))
 
+let propagate_ranks uvar =
+  let seen = Hashtbl.create 64 in
+  let rec propagate_ranks: int -> unifier_var -> int = fun parent_rank uvar ->
+    let repr = UnionFind.find uvar in
+    (* Top-down *)
+    if parent_rank < repr.rank then
+      repr.rank <- parent_rank;
+    match repr.term with
+      | None ->
+          repr.rank
+      | Some (`Cons (cons_name, cons_args)) ->
+          (* Bottom-up *)
+          let ranks = List.map (dont_loop repr.rank) cons_args in
+          let max_rank = Jlist.max ranks in
+          if max_rank < repr.rank && List.length cons_args > 0 then
+            repr.rank <- max_rank;
+          repr.rank
+  and dont_loop rank uvar =
+    if Hashtbl.mem seen uvar then
+      (UnionFind.find uvar).rank
+    else begin
+      Hashtbl.add seen uvar ();
+      propagate_ranks rank uvar
+    end
+  in
+  let repr = UnionFind.find uvar in
+  ignore (dont_loop repr.rank uvar)
+
+
 let solve =
   fun ~caml_types:opt_caml_types ~print_types:opt_print_types konstraint ->
 
@@ -93,6 +122,7 @@ let solve =
       let solve_branch: unifier_scheme IdentMap.t -> type_scheme -> unifier_scheme IdentMap.t =
         fun new_map scheme ->
         let vars, konstraint, var_map = scheme in
+
         (* --- Debug --- *)
         let module JIM = Jmap.Make(IdentMap) in
         let idents = JIM.keys var_map in
@@ -102,7 +132,12 @@ let solve =
           (Bash.color 219 "[SLeft] Solving scheme for %s\n" idents);
         (* --- End Debug --- *)
 
+        (* Create a fresh environment to type the left part in it. This also
+         * allows us to create a fresh pool which will contain all the
+         * existentially quantified variables in it. *)
         let sub_env = step_env unifier_env in
+        (* XXX with the "propagate rank" feature we should be able to remove
+         * this *)
         (* This makes sure all the universally quantified variables appear in
          * the Pool. *)
         Jlist.ignore_map
@@ -113,20 +148,30 @@ let solve =
         let _unifier_env' =
           analyze sub_env konstraint
         in
-        (* A young variable is a variable that hasn't been unified with a
-         * variable defined before. *)
+        let current_pool = current_pool sub_env in
+
+        (* Debug *)
+        let debug_inpool l =
+          let rank = current_rank sub_env in
+          let members =
+            List.map
+              (fun x ->
+                 let repr = (UnionFind.find x) in
+                   Printf.sprintf "%s(%d)" repr.name repr.rank)
+              l
+          in
+          Error.debug_simple (Bash.color 208 "[InPool] %d: %s\n" rank (String.concat ", " members));
+        in
+
+        (* We want to keep "young" variables that have been introduced while
+         * solving the constraint attached to that branch. *)
         let is_young uvar =
           let desc = UnionFind.find uvar in
           assert (desc.rank <= current_rank sub_env);
           desc.rank = current_rank sub_env && desc.term = None
         in
-        let current_pool = current_pool sub_env in
-        let rank = current_rank sub_env in
-        let members = List.map (fun x -> (UnionFind.find x).name) current_pool.Pool.members in
-        Error.debug_simple (Bash.color 208 "[InPool] %d: %s\n" rank (String.concat ", " members));
-        (* We can just get rid of the old vars: they have been unified with a
-         * var that's already in its own pool, with a lower rank. *)
-        let young_vars = List.filter is_young current_pool.Pool.members in
+        let young_vars = current_pool.Pool.members in
+
         (* Filter out duplicates *)
         let young_vars =
           Jlist.remove_duplicates
@@ -134,6 +179,17 @@ let solve =
             ~equal_func:UnionFind.equivalent
             young_vars
         in
+
+        (* See lemma 10.6.7 in ATTAPL. This is needed. *)
+        debug_inpool young_vars;
+        List.iter propagate_ranks young_vars;
+
+        (* We can just get rid of the old vars: they have been unified with a
+         * var that's already in its own pool, with a lower rank. *)
+        let young_vars = List.filter is_young young_vars in
+
+        debug_inpool young_vars;
+
         (* Each identifier is assigned a scheme. It's a list of the young vars
          * and a pointer to a variable that contains the constraint associated
          * to the identifier. *)
