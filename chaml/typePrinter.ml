@@ -19,10 +19,13 @@
 
 module Make (S: Algebra.SOLVER) = struct
 
+  module Algebra_ = Algebra.Make(S) open Algebra_
+  open Algebra.TypeCons
+
   type inspected_var = [
-      Algebra.Make(S).type_var
-    | `Cons of Algebra.TypeCons.type_cons * inspected_var list
-    | `Alias of inspected_var * Algebra.Make(S).type_var
+      type_var
+    | `Cons of type_cons * inspected_var list
+    | `Alias of inspected_var * type_var
   ]
 
   let prec =
@@ -78,7 +81,6 @@ module Make (S: Algebra.SOLVER) = struct
           | `Var key ->
               string_of_key key
           | `Cons (cons_name, cons_args) ->
-              let open Algebra.TypeCons in
               begin match cons_name with
                 | { cons_name = "->"; _ } ->
                     let op =

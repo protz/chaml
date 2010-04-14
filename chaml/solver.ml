@@ -18,13 +18,10 @@
 (*****************************************************************************)
 
 open Unify
-
 module BaseSolver = Unify.BaseSolver
 
-module TConstraint = Constraint.Make(BaseSolver)
-open TConstraint
-module TAlgebra = Constraint.Make(BaseSolver)
-open TAlgebra
+module Constraint_ = Constraint.Make(BaseSolver) open Constraint_
+module Algebra_ = Algebra.Make(BaseSolver) open Algebra_
 open Algebra.Identifiers
 
 type error =
@@ -111,7 +108,7 @@ let solve =
            * *)
           Jlist.ignore_map
             (uvar_of_tterm unifier_env)
-            (xis: type_var list :> type_term list);
+            (tvl_ttl xis);
           analyze unifier_env c
       | `Let (schemes, c2) ->
           (* We take all the schemes, and schedule them for execution. *)

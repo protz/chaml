@@ -160,9 +160,7 @@ end
 module Make (S: SOLVER) = struct
 
   open S
-  type error = Errors.error
-  exception Error of error
-  let string_of_error = Errors.string_of_error
+  include Errors
 
   (** This is what is called X in ATTAPL *)
   type type_var = [

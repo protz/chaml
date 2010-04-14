@@ -19,15 +19,13 @@
 
 (** The representation of constraints is defined in this module. *)
 
-(** This module also features, among other things, subtypers {!tv_tt} and
-    {!tvl_ttl}, as well as some pretty printers. *)
+(** This module also features, among other things, subtypers {!Make.tv_tt} and
+    {!Make.tvl_ttl}, as well as some pretty printers. *)
 
 module Make: functor (S: Algebra.SOLVER) -> sig
 
-  (** These are just type aliases. *)
-  type type_var = Algebra.Make(S).type_var
-  type type_term = Algebra.Make(S).type_term
-  type ident = Algebra.Identifiers.ident
+  (* To get the ident type in scope. *)
+  open Algebra.Identifiers
 
   (** Here we differ slightly from the definition in ATTAPL. A scheme is made of a
       list of universally quantified variables, a constraint that has to be
@@ -39,9 +37,9 @@ module Make: functor (S: Algebra.SOLVER) -> sig
       instance.)
     *)
   type type_scheme =
-      type_var list
+      Algebra.Make(S).type_var list
     * type_constraint
-    * type_var Algebra.Identifiers.IdentMap.t
+    * Algebra.Make(S).type_var IdentMap.t
 
   (** The definition of a constraint. [`Dump] is not really useful, we could use
       [`True], but left for the sake of compatibility with mini.
@@ -55,9 +53,9 @@ module Make: functor (S: Algebra.SOLVER) -> sig
   and type_constraint = [
       `True
     | `Conj of type_constraint * type_constraint
-    | `Exists of type_var list * type_constraint
-    | `Equals of type_var * type_term
-    | `Instance of ident * type_var
+    | `Exists of Algebra.Make(S).type_var list * type_constraint
+    | `Equals of Algebra.Make(S).type_var * Algebra.Make(S).type_term
+    | `Instance of ident * Algebra.Make(S).type_var
     | `Let of type_scheme list * type_constraint
     | `Dump
   ]
@@ -65,16 +63,16 @@ module Make: functor (S: Algebra.SOLVER) -> sig
   (** We enforce some invariants by requiring that in some places we deal with a
       variable and not a term. However, we often need to subtype. This function
       provides a quick and convenient way to do that. *)
-  val tv_tt: type_var -> type_term
+  val tv_tt: Algebra.Make(S).type_var -> Algebra.Make(S).type_term
 
   (** Same wrapper for convenience. *)
-  val tvl_ttl: type_var list -> type_term list
+  val tvl_ttl: Algebra.Make(S).type_var list -> Algebra.Make(S).type_term list
 
 
   (** A pretty-printer for constraints. Pretty-prints in a format suitable for
       reading by mini. *)
   module PrettyPrinter: sig
-    val string_of_type_var: type_var -> string
+    val string_of_type_var: Algebra.Make(S).type_var -> string
     val string_of_constraint: pretty_printing:bool -> type_constraint -> string
   end
 

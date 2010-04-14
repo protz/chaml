@@ -31,7 +31,7 @@ count:
 
 build_graph:
 	ocamldoc -dot -I _build/chaml/ -I _build/parsing/ -I _build/stdlib/ \
-	  -I _build/tests/ -I _build/utils/ chaml/*.ml -o graph.dot
+	  -I _build/tests/ -I _build/utils/ chaml/*.ml* -o graph.dot
 	dot -Tpng graph.dot > graph.png
 	convert graph.png -rotate 90 graph.png
 
@@ -40,7 +40,9 @@ graph: build_graph
 
 OCAMLLIBPATH = $(shell ocamlc -where)
 
-DOCFILES = chaml/oCamlConstraintGenerator.mli chaml/constraint.mli chaml/unify.mli\
+#DOCFILES = $(shell find chaml stdlib -iname '*.ml' -or -iname '*.mli') #`find $(OCAMLLIBPATH) -maxdepth 1 -iname '*.mli' -and -not -iname 'condition.mli'`
+DOCFILES = chaml/constraint.mli chaml/oCamlConstraintGenerator.mli\
+	   chaml/unify.mli\
 	   chaml/solver.mli\
 	   chaml/algebra.mli chaml/unionFind.mli\
 	   chaml/typePrinter.mli\

@@ -20,6 +20,7 @@
 exception Error of string
 
 open Algebra.Identifiers
+open Algebra.TypeCons
 
 (* We first need to define those types. We cannot build the Algebra.Make module
  * yet as we first need to be able to defined BaseSolver *)
@@ -32,7 +33,7 @@ type descriptor = {
 
 and unifier_var = descriptor UnionFind.point
 and unifier_term = [
-  `Cons of Algebra.TypeCons.type_cons * unifier_var list
+  `Cons of type_cons * unifier_var list
 ]
 and unifier_scheme = unifier_var list * unifier_var
 
@@ -53,10 +54,8 @@ end
 
 (* We're good to go! *)
 
-module Algebra = Algebra.Make(BaseSolver)
-open Algebra
-module TypePrinter = TypePrinter.Make(BaseSolver)
-open TypePrinter
+module Algebra_ = Algebra.Make(BaseSolver) open Algebra_
+module TypePrinter_ = TypePrinter.Make(BaseSolver) open TypePrinter_
 
 (* A pool contains all the variables with a given rank. *)
 module Pool = struct

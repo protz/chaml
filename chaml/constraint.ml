@@ -19,14 +19,10 @@
 
 module Make (S: Algebra.SOLVER) = struct
 
-  (** These are just type aliases. *)
-  module TAlgebra = Algebra.Make(S)
-  type type_var = TAlgebra.type_var
-  type type_term = TAlgebra.type_term
-  open TAlgebra
-
-  open Algebra.Identifiers
-  type ident = Algebra.Identifiers.ident
+  open Algebra.TypeCons
+  include Algebra.Identifiers
+  module Algebra_ = Algebra.Make(S)
+  open Algebra_
 
   type type_scheme =
       type_var list
@@ -157,7 +153,7 @@ module Make (S: Algebra.SOLVER) = struct
       and string_of_type pp_env =
         function
         | `Var _ as v -> string_of_type_var v
-        | `Cons ({ Algebra.TypeCons.cons_name; _ }, types) ->
+        | `Cons ({ cons_name; _ }, types) ->
            match cons_name with
            | "->" as op ->
                let t1 = string_of_type pp_env (List.nth types 0) in

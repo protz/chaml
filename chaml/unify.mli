@@ -17,6 +17,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module features all the required data structure for unification and
+    solving. More specifically, it also provides the {!BaseSolver} module that
+    is needed for all other modules to function properly. *)
+
+open Algebra.TypeCons
+open Algebra.Identifiers
 
 (** {3 Error handling} *)
 
@@ -49,7 +55,7 @@ and unifier_var = descriptor UnionFind.point
 
     When a term is equated with another one, they are unified on-the-fly in
     {!unify}. *)
-and unifier_term = [ `Cons of Algebra.TypeCons.type_cons * unifier_var list ]
+and unifier_term = [ `Cons of type_cons * unifier_var list ]
 
 (** A scheme is a list of young variables and a constraint. *)
 and unifier_scheme = unifier_var list * unifier_var
@@ -75,14 +81,14 @@ module Pool: sig
 end
 
 (** This is used by the solver to pass down information through the recursive
-    calls. We use a [Hashtbl] to translate {!Constraint.type_var}s into
+    calls. We use a [Hashtbl] to translate {!Algebra.Make.type_var}s into
     {!unifier_var}s because the type variables have globally unique names.
     However, we use a [Map] to translate identifiers into schemes because
     identifiers do have a scope. *)
 type unifier_env = {
   current_pool: Pool.t;
-  uvar_of_tterm: (Constraint.Make(BaseSolver).type_term, unifier_var) Hashtbl.t;
-  scheme_of_ident: unifier_scheme Algebra.Identifiers.IdentMap.t;
+  uvar_of_tterm: (Algebra.Make(BaseSolver).type_term, unifier_var) Hashtbl.t;
+  scheme_of_ident: unifier_scheme IdentMap.t;
 }
 
 (** This is just a wrapper to get the current pool. *)
@@ -119,7 +125,7 @@ val string_of_scheme: ?string_of_key:(unifier_var -> string) -> ?caml_types:bool
 val fresh_copy:
   unifier_env -> descriptor UnionFind.point list * unifier_var -> unifier_var
 
-(** Recursively change terms that depend on {!Constraint.type_var}s into
+(** Recursively change terms that depend on {!Algebra.Make.type_var}s into
     unification vars. This function implements the "explicit sharing" concept by
     making sure we only have pointers to equivalence classes (and not whole
     terms). This is discussed on p.442, see rule S-NAME-1. This implies

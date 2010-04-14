@@ -43,6 +43,9 @@ module type SOLVER = sig
   val string_of_var: var -> string
 end
 
+(** This module contains everything related to type constructors. This is
+    separated from the rest as in {!Unify} we need to define first the types
+    that make up the {!SOLVER} and then instanciate an {!Algebra.Make}. *) 
 module TypeCons: sig
 
   (** {3 Type constructors and helpers} *)
@@ -83,6 +86,10 @@ module TypeCons: sig
 
 end
 
+(** Once again, putting this in a separate module is not necessary strictly
+    speaking, but we want to easily have a IdentMap in the scope that is exactly
+    the same everywhere. With multiple instanciations, this was getty hairy. Now
+    we can do [open Algebra.Identifiers] and this works as well. *)
 module Identifiers: sig
 
   (** {3 Identifiers} *)
