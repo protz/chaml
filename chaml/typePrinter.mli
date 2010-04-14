@@ -21,29 +21,35 @@
     functions to properly convert from a unification var to a ['a, 'b, ...] var.
   *)
 
-open Algebra
+module Make: functor (S: Algebra.SOLVER) -> sig
 
-(** This type represents a disambiguated type, that is, where all cycles have
-    been converted to [`Alias]es. [Unify] has a function called [inspect_var]
-    that converts a unification variable to such a variable. The tests output
-    directly a [inspected_var]. *)
-type 'var inspected_var = [
-    'var generic_var
-  | `Cons of type_cons * 'var inspected_var list
-  | `Alias of 'var inspected_var * 'var generic_var
-]
+  open S
 
-(** The [string_of_key] optional argument tells how to convert from a ['var] to
-    a string. If it's a unification var, one might want to use the internal name
-    for debugging. *)
-val string_of_type: ?string_of_key:('var -> string) -> ?caml_types:bool -> ?young_vars:'var list-> 'var inspected_var -> string
+  (** This type represents a disambiguated type, that is, where all cycles have
+      been converted to [`Alias]es. [Unify] has a function called [inspect_var]
+      that converts a unification variable to such a variable. The tests output
+      directly a [inspected_var]. *)
+  type inspected_var = [
+      Algebra.Make(S).type_var
+    | `Cons of Algebra.TypeCons.type_cons * inspected_var list
+    | `Alias of inspected_var * Algebra.Make(S).type_var
+  ]
 
-(** This function is useful for generating error messages. It does not create
-    fresh variables for each term; instead, all unification variables are
-    assigned a unique name accross the inspected_vars. Instead of ["cannot unify
-    'a with 'a * 'b"], you get ["cannot unify 'a with 'b * 'c"]. *)
-val string_of_types: ?string_of_key:('var -> string) -> ?caml_types:bool -> ?young_vars:'var list list -> 'var inspected_var list -> string list
+  (** The [string_of_key] optional argument tells how to convert from a ['var] to
+      a string. If it's a unification var, one might want to use the internal name
+      for debugging. *)
+  val string_of_type: ?string_of_key:(var -> string) -> ?caml_types:bool ->
+    ?young_vars:var list-> inspected_var -> string
 
-(** Just a type-converted function for printing Algebra's generic terms. Useful
-    for error messages. *)
-val string_of_term: 'a Algebra.generic_term -> string
+  (** This function is useful for generating error messages. It does not create
+      fresh variables for each term; instead, all unification variables are
+      assigned a unique name accross the inspected_vars. Instead of ["cannot unify
+      'a with 'a * 'b"], you get ["cannot unify 'a with 'b * 'c"]. *)
+  val string_of_types: ?string_of_key:(var -> string) -> ?caml_types:bool ->
+    ?young_vars:var list list -> inspected_var list -> string list
+
+  (** Just a type-converted function for printing Algebra's generic terms. Useful
+      for error messages. *)
+  val string_of_term: Algebra.Make(S).type_term -> string
+
+end

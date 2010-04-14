@@ -17,7 +17,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Unification data structures used by the solver. *)
 
 (** {3 Error handling} *)
 
@@ -50,10 +49,14 @@ and unifier_var = descriptor UnionFind.point
 
     When a term is equated with another one, they are unified on-the-fly in
     {!unify}. *)
-and unifier_term = [ `Cons of Algebra.type_cons * unifier_var list ]
+and unifier_term = [ `Cons of Algebra.TypeCons.type_cons * unifier_var list ]
 
 (** A scheme is a list of young variables and a constraint. *)
 and unifier_scheme = unifier_var list * unifier_var
+
+(** The unifier actually provides the base solver with the necessary stubs to
+    create pre-allocated constraints and terms. *)
+module BaseSolver: Algebra.SOLVER
 
 (** {3 Pools and environments} *)
 
@@ -78,8 +81,8 @@ end
     identifiers do have a scope. *)
 type unifier_env = {
   current_pool: Pool.t;
-  uvar_of_tterm: (Constraint.type_term, unifier_var) Hashtbl.t;
-  scheme_of_ident: unifier_scheme Algebra.IdentMap.t;
+  uvar_of_tterm: (Constraint.Make(BaseSolver).type_term, unifier_var) Hashtbl.t;
+  scheme_of_ident: unifier_scheme Algebra.Make(BaseSolver).IdentMap.t;
 }
 
 (** This is just a wrapper to get the current pool. *)
@@ -99,11 +102,13 @@ val step_env: unifier_env -> unifier_env
 val uvar_name: Buffer.t -> unifier_var -> unit
 
 (** Print a unification variable as a type, useful for error messages. *)
-val string_of_uvar: ?string_of_key:(descriptor -> string) -> ?caml_types:bool -> ?young_vars:descriptor list -> unifier_var -> string
+val string_of_uvar: ?string_of_key:(unifier_var -> string) -> ?caml_types:bool ->
+      ?young_vars:unifier_var list -> unifier_var -> string
 
 (** Print a scheme. Use it to get the type of top-level bindings as a string
     "val f: 'a -> ...". *)
-val string_of_scheme: ?string_of_key:(descriptor -> string) -> ?caml_types:bool -> string -> unifier_var list * unifier_var -> string
+val string_of_scheme: ?string_of_key:(unifier_var -> string) -> ?caml_types:bool ->
+      string -> unifier_var list * unifier_var -> string
 
 (** {3 Core functions} *)
 
@@ -121,7 +126,7 @@ val fresh_copy:
     creating variables on-the-fly when dealing with type constructors, so that
     when duplicating the associated var, the pointer to the equivalence class is
     retained. *)
-val uvar_of_tterm: unifier_env -> Constraint.type_term -> unifier_var
+val uvar_of_tterm: unifier_env -> Algebra.Make(BaseSolver).type_term -> unifier_var
 
 (** The main function, called by the solver to unify terms. *)
 val unify: unifier_env -> unifier_var -> unifier_var -> [ `Ok | `Error of error ]

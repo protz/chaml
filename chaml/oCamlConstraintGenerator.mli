@@ -37,6 +37,6 @@ module Make: functor (S: Algebra.SOLVER) -> sig
   val generate_constraint:
     generalize_match:bool ->
     default_bindings:bool -> Parsetree.structure ->
-    [ `Ok of Constraint.type_constraint * LambdaTerms.Make(S).term | `Error of error ]
+    [ `Ok of Constraint.Make(S).type_constraint * LambdaTerms.Make(S).term | `Error of error ]
 
 end

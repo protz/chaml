@@ -17,19 +17,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Algebra
-open Constraint
-open TypePrinter
-
 exception Error of string
 
-(* - An equivalence class of variables is a [unifier_var].
- * - A multi-equation is a set of variables that are all equal to a given [term].
- *
- * - A descriptor represents a class of variables. If they have been equated
- * with a term, then [term] is non-null. Otherwise, it's [None].
- *
- * *)
+(* We first need to define those types. We cannot build the Algebra.Make module
+ * yet as we first need to be able to defined BaseSolver *)
 
 type descriptor = {
   mutable term: unifier_term option;
@@ -39,9 +30,31 @@ type descriptor = {
 
 and unifier_var = descriptor UnionFind.point
 and unifier_term = [
-  `Cons of type_cons * unifier_var list
+  `Cons of Algebra.TypeCons.type_cons * unifier_var list
 ]
 and unifier_scheme = unifier_var list * unifier_var
+
+(* Since TypeCons is not a functor, we were able to bootstrap the types above.
+ * Now we can create a SOLVER module. *)
+
+module BaseSolver = struct
+  type var = unifier_var
+  type scheme = unifier_scheme
+  type instance = unifier_var list
+
+  let new_var () = assert false
+  let new_scheme () = assert false
+  let new_instance () = assert false
+
+  let string_of_var uvar = (UnionFind.find uvar).name
+end
+
+(* We're good to go! *)
+
+module Algebra = Algebra.Make(BaseSolver)
+open Algebra
+module TypePrinter = TypePrinter.Make(BaseSolver)
+open TypePrinter
 
 (* A pool contains all the variables with a given rank. *)
 module Pool = struct
@@ -97,15 +110,15 @@ let step_env env =
  * parameter is used when printing a unification variable whose internal name we
  * want to display (to track unification progress). Do not use it if you want to
  * see a "real" type. *)
-let inspect_uvar: ?debug:unit -> unifier_var -> descriptor inspected_var =
+let inspect_uvar: ?debug:unit -> unifier_var -> inspected_var =
   fun ?debug uvar ->
     let seen = Hashtbl.create 16 in
-    let rec inspect_uvar: unifier_var -> descriptor inspected_var =
+    let rec inspect_uvar: unifier_var -> inspected_var =
     fun uvar ->
       let repr = UnionFind.find uvar in
       begin match Jhashtbl.find_opt seen repr with
         | Some None ->
-            let key = repr in
+            let key = uvar in
             Hashtbl.replace seen repr (Some key);
             `Var key
         | Some (Some key) ->
@@ -117,7 +130,7 @@ let inspect_uvar: ?debug:unit -> unifier_var -> descriptor inspected_var =
                 | Some (`Cons (type_cons, cons_args)) ->
                     `Cons (type_cons, List.map inspect_uvar cons_args)
                 | None ->
-                    `Var repr
+                    `Var uvar
             in
             let r = begin match Jhashtbl.find_opt seen repr with
               | Some (Some key) ->
@@ -125,7 +138,7 @@ let inspect_uvar: ?debug:unit -> unifier_var -> descriptor inspected_var =
               | Some None ->
                   Hashtbl.remove seen repr;
                   if Option.unit_bool debug && repr.term <> None then
-                    `Alias (type_term, `Var repr)
+                    `Alias (type_term, `Var uvar)
                   else
                     type_term
               | None ->
@@ -143,7 +156,7 @@ let rec uvar_name: Buffer.t -> unifier_var -> unit =
     | { name = s; term = None; _ } ->
         Printf.bprintf buf "%s" s
     | { name = s; term = Some cons; _ } ->
-        let string_of_key: descriptor -> string = fun { name; _ } -> name in
+        let string_of_key uvar = (UnionFind.find uvar).name in
         Buffer.add_string buf
           (string_of_type ~string_of_key (inspect_uvar ~debug:() uvar))
 
@@ -158,8 +171,7 @@ let string_of_uvars ?caml_types uvars =
 (* For printing type schemes *)
 let string_of_scheme ?string_of_key ?caml_types ident scheme =
   let young_vars, uvar = scheme in
-  let young_vars = List.map UnionFind.find young_vars in
-  let young_vars = List.filter (fun x -> x.term = None) young_vars in
+  let young_vars = List.filter (fun x -> (UnionFind.find x).term = None) young_vars in
   Printf.sprintf "val %s: %s" ident (string_of_uvar ?string_of_key ~young_vars ?caml_types uvar)
 
 
@@ -241,25 +253,7 @@ let fresh_copy unifier_env (young_vars, scheme_uvar) =
  * discussed on p.442, see rule S-NAME-1. This includes creating variables
  * on-the-fly when dealing with type constructors, so that when duplicating the
  * associated var, the pointer to the equivalence class is retained. *)
-let rec uvar_of_tterm: unifier_env -> type_term -> unifier_var =
-  fun unifier_env type_term ->
-    let rec uvar_of_tterm: type_term -> unifier_var = fun tterm ->
-    match Jhashtbl.find_opt unifier_env.uvar_of_tterm tterm with
-      | Some uvar ->
-          uvar
-      | None ->
-          let term, name = match tterm with
-            | `Var s ->
-                None, Some s
-            | `Cons (cons, args) ->
-                let term: unifier_term = `Cons (cons, List.map uvar_of_tterm args) in
-                Some term, None
-          in
-          let uvar = fresh_unifier_var ?name ?term unifier_env in
-          Hashtbl.add unifier_env.uvar_of_tterm tterm uvar;
-          uvar
-    in
-    uvar_of_tterm type_term
+let rec uvar_of_tterm _ _ = assert false
 
 let debug_unify =
   fun v1 v2 ->

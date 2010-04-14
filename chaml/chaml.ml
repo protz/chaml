@@ -21,6 +21,7 @@ exception Error
 exception Outdated_version
 
 module OCamlConstraintGenerator = OCamlConstraintGenerator.Make(Solver.BaseSolver)
+module Constraint = Constraint.Make(Solver.BaseSolver)
 
 (* Stolen from driver/pparse.ml *)
 (* val file : formatter -> string -> (Lexing.lexbuf -> 'a) -> string -> 'a *)

@@ -28,123 +28,6 @@
     inspected_var] which has type aliases desambiguated and is suitable for
     printing. This is used by the type parser in [tests/]. *)
 
-(** {3 Error handling} *)
-
-(** Some operations can throw exceptions (arity mismatch, etc.) At the moment,
-    only {!type_cons} can have such a behaviour. *)
-type error
-
-(** We use exceptions here because [Algebra] is an internal module, so we want
-    to walk up the stack in case something goes wrong deep in unification or in
-    solving. The modules that are meant to be used by client code do not throw
-    exceptions. *)
-exception Error of error
-
-(** Create a human-readable representation of an error. *)
-val string_of_error: error -> string
-
-(** {3 Identifiers} *)
-
-(** An identifier *)
-type long_ident
-type ident = long_ident * Location.t
-
-(** A wrapper to create an ident *)
-val ident: string -> Location.t -> ident
-
-(** Print it *)
-val string_of_ident: ident -> string
-
-(** This module will be useful many times from now on. It allows one to map
-    identifiers to type variables, unification variables, etc. *)
-module IdentMap: Map.S with type key = ident
-
-(** Generate globally unique names. *)
-val fresh_name: ?prefix:string -> unit -> string
-
-(** {3 Core types} *)
-
-(** This describes a type constructor. The trick is to use one instance per
-    constructor so that we can use referential equality == to quickly test
-    whether two types are equal. *)
-type type_cons = {
-  cons_name: string;
-  cons_arity: int;
-}
-
-(** This is what is called X in ATTAPL *)
-type 'var_type generic_var = [
-  `Var of 'var_type
-]
-
-(** This is what is called T ::= X | F (X1, ..., Xn) in ATTAPL. Will be
-    instanciated later on with [string] as a {!Constraint.type_var}. *)
-type 'var_type generic_term = [
-    'var_type generic_var
-  | `Cons of type_cons * 'var_type generic_term list
-]
-
-(** Here we differ slightly from the definition in ATTAPL. A scheme is made of a
-    list of universally quantified variables, a constraint that has to be
-    satisfied, and a mapping from identifiers to variables.
-
-    If there is a pattern on the left-hand side of a let binding, then
-    generate_constraint_pattern will have to bind several identifiers to type
-    variables. This is why we use a IdentMap. (Think of [let x, y = ...] for
-    instance.)
-  *)
-type 'var_type generic_scheme =
-    'var_type generic_var list
-  * 'var_type generic_constraint
-  * 'var_type generic_var IdentMap.t
-
-(** The definition of a constraint. [`Dump] is not really useful, we could use
-    [`True], but left for the sake of compatibility with mini.
-
-    We might have more than one type scheme if we use [let p1 = e1 and p2 = e2
-    ...]  which is why we use a [type_scheme list] in the [`Let] branch.
-
-    We have intentionnaly used [generic_var] and not [generic_term] in some
-    parts. This enforces some invariants.
-  *)
-and 'var_type generic_constraint = [
-    `True
-  | `Conj of 'var_type generic_constraint * 'var_type generic_constraint
-  | `Exists of 'var_type generic_var list * 'var_type generic_constraint
-  | `Equals of 'var_type generic_var * 'var_type generic_term
-  | `Instance of ident * 'var_type generic_var
-  | `Let of 'var_type generic_scheme list * 'var_type generic_constraint
-  | `Dump
-]
-
-(** {3 Type constructors helpers} *)
-
-(** [type_cons cons_name cons_args] allows you to instanciate a type constructor
-    with its arguments. This function checks that the type constructor already
-    exists and that the arity is correct, so check [algebra.ml] for pre-defined
-    ground types. The only exception is the "*" constructor that can be used
-    with any number of arguments. The different versions will be created as
-    needed. *)
-val type_cons : string -> 'a list -> [> `Cons of type_cons * 'a list ]
-
-(** A convenient wrapper to quickly access the arrow constructor. *)
-val type_cons_arrow : 'a -> 'a -> [> `Cons of type_cons * 'a list ]
-
-(** A convenient wrapper to quickly access the int constructor. *)
-val type_cons_int : [> `Cons of type_cons * 'a list ]
-
-(** A convenient wrapper to quickly access the char constructor. *)
-val type_cons_char : [> `Cons of type_cons * 'a list ]
-
-(** A convenient wrapper to quickly access the string constructor. *)
-val type_cons_string : [> `Cons of type_cons * 'a list ]
-
-(** A convenient wrapper to quickly access the float constructor. *)
-val type_cons_float : [> `Cons of type_cons * 'a list ]
-
-(** A convenient wrapper to quickly access the unit constructor. *)
-val type_cons_unit : [> `Cons of type_cons * 'a list ]
-
 (** This is what a solver is. This allows us to pre-allocate solver structures
     right at the beginning of constraint generation. However, we need some
     abstraction otherwise the dependencies would be really messy. *)
@@ -152,7 +35,105 @@ module type SOLVER = sig
   type var
   type scheme
   type instance
+
   val new_var: unit -> var
   val new_scheme: unit -> scheme
   val new_instance: unit -> instance
+
+  val string_of_var: var -> string
+end
+
+module TypeCons: sig
+
+  (** {3 Type constructors and helpers} *)
+
+  (** This describes a type constructor. The trick is to use one instance per
+      constructor so that we can use referential equality == to quickly test
+      whether two types are equal. *)
+  type type_cons = {
+    cons_name: string;
+    cons_arity: int;
+  }
+
+  (** [type_cons cons_name cons_args] allows you to instanciate a type constructor
+      with its arguments. This function checks that the type constructor already
+      exists and that the arity is correct, so check [algebra.ml] for pre-defined
+      ground types. The only exception is the "*" constructor that can be used
+      with any number of arguments. The different versions will be created as
+      needed. *)
+  val type_cons : string -> 'a list -> [> `Cons of type_cons * 'a list ]
+
+  (** A convenient wrapper to quickly access the arrow constructor. *)
+  val type_cons_arrow : 'a -> 'a -> [> `Cons of type_cons * 'a list ]
+
+  (** A convenient wrapper to quickly access the int constructor. *)
+  val type_cons_int : [> `Cons of type_cons * 'a list ]
+
+  (** A convenient wrapper to quickly access the char constructor. *)
+  val type_cons_char : [> `Cons of type_cons * 'a list ]
+
+  (** A convenient wrapper to quickly access the string constructor. *)
+  val type_cons_string : [> `Cons of type_cons * 'a list ]
+
+  (** A convenient wrapper to quickly access the float constructor. *)
+  val type_cons_float : [> `Cons of type_cons * 'a list ]
+
+  (** A convenient wrapper to quickly access the unit constructor. *)
+  val type_cons_unit : [> `Cons of type_cons * 'a list ]
+
+end
+
+
+module Make: functor (S: SOLVER) -> sig
+
+  open S
+
+  (** {3 Error handling} *)
+
+  (** Some operations can throw exceptions (arity mismatch, etc.) At the moment,
+      only {!type_cons} can have such a behaviour. *)
+  type error
+
+  (** We use exceptions here because [Algebra] is an internal module, so we want
+      to walk up the stack in case something goes wrong deep in unification or in
+      solving. The modules that are meant to be used by client code do not throw
+      exceptions. *)
+  exception Error of error
+
+  (** Create a human-readable representation of an error. *)
+  val string_of_error: error -> string
+
+  (** {3 Identifiers} *)
+
+  (** An identifier *)
+  type long_ident
+  type ident = long_ident * Location.t
+
+  (** A wrapper to create an ident *)
+  val ident: string -> Location.t -> ident
+
+  (** Print it *)
+  val string_of_ident: ident -> string
+
+  (** This module will be useful many times from now on. It allows one to map
+      identifiers to type variables, unification variables, etc. *)
+  module IdentMap: Map.S with type key = ident
+
+  (** Generate globally unique names. *)
+  val fresh_name: ?prefix:string -> unit -> string
+
+  (** {3 Core types} *)
+
+  (** This is what is called X in ATTAPL *)
+  type type_var = [
+    `Var of var
+  ]
+
+  (** This is what is called T ::= X | F (X1, ..., Xn) in ATTAPL. Used in many
+      places. *)
+  type type_term = [
+      type_var
+    | `Cons of TypeCons.type_cons * type_term list
+  ]
+
 end

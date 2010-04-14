@@ -18,15 +18,15 @@
 (*****************************************************************************)
 
 open Parsetree
-open Algebra
 open Error
-open Constraint
 
-module IdentMap = Algebra.IdentMap
-
-module Make(S: SOLVER) = struct
+module Make(S: Algebra.SOLVER) = struct
 
   module Lambda = LambdaTerms.Make(S)
+  module Constraint = Constraint.Make(S)
+  module Algebra = Algebra.Make(S)
+  open Constraint
+  open Algebra
 
   type error =
     | NotImplemented of string * Location.t

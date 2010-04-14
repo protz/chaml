@@ -22,35 +22,62 @@
 (** This module also features, among other things, subtypers {!tv_tt} and
     {!tvl_ttl}, as well as some pretty printers. *)
 
-open Algebra
+module Make: functor (S: Algebra.SOLVER) -> sig
 
-(** This is a type variable, also known as X in ATTAPL. *)
-type type_var = string Algebra.generic_var
+  (** These are just type aliases. *)
 
-(** This is a type, also known as T::= X | F (X1, ... Xn). It can be printed
-    using {TypePrinter.string_of_term}.. *)
-type type_term = string Algebra.generic_term
+  type type_var = Algebra.Make(S).type_var
+  type type_term = Algebra.Make(S).type_term
+  type ident = Algebra.Make(S).ident
+  module IdentMap: Map.S with type key = ident
 
-(** This main type of constraints. At the moment it is not instanciated anywhere
-    else. It should probably be moved here from [Algebra]. *)
-type type_constraint = string Algebra.generic_constraint
+  (** Here we differ slightly from the definition in ATTAPL. A scheme is made of a
+      list of universally quantified variables, a constraint that has to be
+      satisfied, and a mapping from identifiers to variables.
 
-(** This is a full type scheme. This definition is simplified later on in
-    [unify.ml]. Same remark, it is not really general. *)
-type type_scheme = string Algebra.generic_scheme
+      If there is a pattern on the left-hand side of a let binding, then
+      generate_constraint_pattern will have to bind several identifiers to type
+      variables. This is why we use a IdentMap. (Think of [let x, y = ...] for
+      instance.)
+    *)
+  type type_scheme =
+      type_var list
+    * type_constraint
+    * type_var IdentMap.t
 
-(** We enforce some invariants by requiring that in some places we deal with a
-    variable and not a term. However, we often need to subtype. This function
-    provides a quick and convenient way to do that. *)
-val tv_tt: type_var -> type_term
+  (** The definition of a constraint. [`Dump] is not really useful, we could use
+      [`True], but left for the sake of compatibility with mini.
 
-(** Same wrapper for convenience. *)
-val tvl_ttl: type_var list -> type_term list
+      We might have more than one type scheme if we use [let p1 = e1 and p2 = e2
+      ...]  which is why we use a [type_scheme list] in the [`Let] branch.
+
+      We have intentionnaly used [generic_var] and not [generic_term] in some
+      parts. This enforces some invariants.
+    *)
+  and type_constraint = [
+      `True
+    | `Conj of type_constraint * type_constraint
+    | `Exists of type_var list * type_constraint
+    | `Equals of type_var * type_term
+    | `Instance of ident * type_var
+    | `Let of type_scheme list * type_constraint
+    | `Dump
+  ]
+
+  (** We enforce some invariants by requiring that in some places we deal with a
+      variable and not a term. However, we often need to subtype. This function
+      provides a quick and convenient way to do that. *)
+  val tv_tt: type_var -> type_term
+
+  (** Same wrapper for convenience. *)
+  val tvl_ttl: type_var list -> type_term list
 
 
-(** A pretty-printer for constraints. Pretty-prints in a format suitable for
-    reading by mini. *)
-module PrettyPrinter: sig
-  val string_of_type_var: type_var -> string
-  val string_of_constraint: pretty_printing:bool -> type_constraint -> string
+  (** A pretty-printer for constraints. Pretty-prints in a format suitable for
+      reading by mini. *)
+  module PrettyPrinter: sig
+    val string_of_type_var: type_var -> string
+    val string_of_constraint: pretty_printing:bool -> type_constraint -> string
+  end
+
 end

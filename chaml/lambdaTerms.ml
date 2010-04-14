@@ -17,9 +17,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Algebra
+module Make (S: Algebra.SOLVER) = struct
+  module Algebra = Algebra.Make(S)
+  open Algebra
 
-module Make (S: SOLVER) = struct
   type term = [
     | `Let of (pattern * term) list * term 
     | `Instance of S.instance * ident

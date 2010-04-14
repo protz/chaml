@@ -21,15 +21,7 @@ open Algebra
 open Unify
 open Constraint
 
-module BaseSolver = struct
-  type var = Unify.unifier_var
-  type scheme = Unify.unifier_scheme
-  type instance = Unify.unifier_var list
-
-  let new_var () = assert false
-  let new_scheme () = assert false
-  let new_instance () = assert false
-end
+module BaseSolver = Unify.BaseSolver
 
 type error =
   | UnifyError of Unify.error
