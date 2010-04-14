@@ -17,4 +17,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type pvar = string TypePrinter.inspected_var
+module BaseSolver = struct
+  type var = string
+  type scheme = unit
+  type instance = unit
+
+  let new_var _ = assert false
+  let new_scheme _ = assert false
+  let new_instance _ = assert false
+
+  let string_of_var s = s
+end
+
+type pvar = TypePrinter.Make(BaseSolver).inspected_var

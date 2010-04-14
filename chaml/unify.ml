@@ -38,14 +38,16 @@ and unifier_term = [
 and unifier_scheme = unifier_var list * unifier_var
 
 (* Since TypeCons is not a functor, we were able to bootstrap the types above.
- * Now we can create a SOLVER module. *)
+ * Now we can create a SOLVER module (modulo one ugly hack). *)
+
+let new_var_ref = ref (fun _ -> assert false)
 
 module BaseSolver = struct
   type var = unifier_var
   type scheme = unifier_scheme
   type instance = unifier_var list
 
-  let new_var _ = assert false
+  let new_var name = UnionFind.fresh { name; rank = -1; term = None }
   let new_scheme () = assert false
   let new_instance () = assert false
 
@@ -59,7 +61,6 @@ module TypePrinter_ = TypePrinter.Make(BaseSolver) open TypePrinter_
 
 (* A pool contains all the variables with a given rank. *)
 module Pool = struct
-
   type t = {
     rank: int;
     mutable members: unifier_var list;
@@ -80,7 +81,6 @@ module Pool = struct
     rank = t.rank + 1;
     members = [];
   }
-
 end
 
 (* This is used by the solver to pass information down the recursive calls.
@@ -248,13 +248,26 @@ let fresh_copy unifier_env (young_vars, scheme_uvar) =
   Error.debug "[UCopy] Mapping: %a\n" print_pairs ();
   fresh_copy scheme_uvar
 
-(* Recursively change terms that depend on constraint vars into unification
- * vars. This function implements the "explicit sharing" concept by making sure
- * we only have pointers to equivalence classes (and not whole terms). This is
- * discussed on p.442, see rule S-NAME-1. This includes creating variables
- * on-the-fly when dealing with type constructors, so that when duplicating the
- * associated var, the pointer to the equivalence class is retained. *)
-let rec uvar_of_tterm _ _ = assert false
+(* What we have is bare unifier vars that don't have a proper rank, etc. So if
+ * we haven't seen them yet, we set their rank properly, and we add them to the
+ * environment's hash table. *)
+let rec uvar_of_tterm: unifier_env -> type_term -> unifier_var =
+  fun unifier_env type_term ->
+    let rec uvar_of_tterm: type_term -> unifier_var = fun tterm ->
+    match Jhashtbl.find_opt unifier_env.uvar_of_tterm tterm with
+      | Some uvar ->
+          uvar
+      | None ->
+          match tterm with
+            | `Var uvar ->
+                (UnionFind.find uvar).rank <- current_rank unifier_env;
+                Hashtbl.add unifier_env.uvar_of_tterm tterm uvar;
+                uvar
+            | `Cons (cons, args) ->
+                let term = `Cons (cons, List.map uvar_of_tterm args) in
+                fresh_unifier_var ~term unifier_env
+    in
+    uvar_of_tterm type_term
 
 let debug_unify =
   fun v1 v2 ->

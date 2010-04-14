@@ -1,4 +1,4 @@
-let f2 x y =
-  let _ = y x x in
-  let _ = match x with (z, z') -> y z z' in
-  y
+let f =
+  let g x = x in
+  let _ = g 1 in
+  g

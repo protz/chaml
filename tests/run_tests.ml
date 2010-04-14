@@ -32,8 +32,8 @@
  * discard the subtle differences in parenthesing between ChaML and OCaml.
  * *)
 
-open TypePrinter
-open Constraint
+module TypePrinter_ = TypePrinter.Make(ParserTypes.BaseSolver) open TypePrinter_
+module Constraint_ = Constraint.Make(ParserTypes.BaseSolver) open Constraint_
 
 let parse_output output =
   let lexbuf = Lexing.from_string output in

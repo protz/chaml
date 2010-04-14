@@ -19,6 +19,7 @@
 
 %{
   open ParserTypes
+  open Algebra.TypeCons
 %}
 
 %token <string> IDENT
@@ -64,9 +65,9 @@ type_expr:
 | e = type_expr AS v = type_var
   { `Alias (e, v) }
 | e1 = type_expr ARROW e2 = type_expr
-  { Algebra.type_cons_arrow e1 e2 }
+  { type_cons_arrow e1 e2 }
 | e = type_product
-  { Algebra.type_cons "*" e }
+  { type_cons "*" e }
 
 type_var:
 | QUOTE UNDERSCORE v = IDENT
@@ -78,15 +79,15 @@ type_var:
 
 type_constr:
 | INT
-  { Algebra.type_cons_int }
+  { type_cons_int }
 | CHAR
-  { Algebra.type_cons_char }
+  { type_cons_char }
 | STRING
-  { Algebra.type_cons_string }
+  { type_cons_string }
 | FLOAT
-  { Algebra.type_cons_float }
+  { type_cons_float }
 | UNIT
-  { Algebra.type_cons_unit }
+  { type_cons_unit }
 
 type_product:
 | e = type_product_elt TIMES es = type_product
