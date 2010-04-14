@@ -24,15 +24,19 @@
     parts of the OCaml source code. One might want to write another custom
     front-end for another language, though. *)
 
-(** This describes an error encountered during constraint generation. *)
-type error
+module Make: functor (S: Algebra.SOLVER) -> sig
 
-(** Creates a human-readable representation of an error *)
-val string_of_error: error -> string
+  (** This describes an error encountered during constraint generation. *)
+  type error
 
-(** The driver calls this function. The client of this module is forced to deal
-    with the [`Error] case. *)
-val generate_constraint:
-  generalize_match:bool ->
-  default_bindings:bool -> Parsetree.structure ->
-  [ `Ok of Constraint.type_constraint | `Error of error ]
+  (** Creates a human-readable representation of an error *)
+  val string_of_error: error -> string
+
+  (** The driver calls this function. The client of this module is forced to deal
+      with the [`Error] case. *)
+  val generate_constraint:
+    generalize_match:bool ->
+    default_bindings:bool -> Parsetree.structure ->
+    [ `Ok of Constraint.type_constraint * LambdaTerms.Make(S).term | `Error of error ]
+
+end

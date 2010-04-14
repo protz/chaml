@@ -19,6 +19,9 @@
 
 (** The solver works on top of the unifier and the constraint generator. *)
 
+(** This can be forwarded to other modules that depend on a solver. *)
+module BaseSolver: Algebra.SOLVER
+
 (** Describes a unification or solving error.  *)
 type error
 
@@ -27,4 +30,6 @@ val string_of_error: error -> string
 
 (** This is the only useful function. It takes a set of constraints and returns
     a typed AST *)
-val solve: caml_types:bool -> print_types:bool -> Constraint.type_constraint -> [`Ok of TypedAst.t | `Error of error]
+val solve: caml_types:bool -> print_types:bool ->
+  Constraint.type_constraint * LambdaTerms.Make(BaseSolver).term ->
+  [`Ok | `Error of error]

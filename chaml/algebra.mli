@@ -144,3 +144,15 @@ val type_cons_float : [> `Cons of type_cons * 'a list ]
 
 (** A convenient wrapper to quickly access the unit constructor. *)
 val type_cons_unit : [> `Cons of type_cons * 'a list ]
+
+(** This is what a solver is. This allows us to pre-allocate solver structures
+    right at the beginning of constraint generation. However, we need some
+    abstraction otherwise the dependencies would be really messy. *)
+module type SOLVER = sig
+  type var
+  type scheme
+  type instance
+  val new_var: unit -> var
+  val new_scheme: unit -> scheme
+  val new_instance: unit -> instance
+end

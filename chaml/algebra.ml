@@ -169,3 +169,13 @@ let type_cons_char = type_cons "char" []
 let type_cons_string = type_cons "string" []
 let type_cons_float = type_cons "float" []
 let type_cons_unit = type_cons "unit" []
+
+(* Now this is for the parameterization of constraint by some solver types *)
+module type SOLVER = sig
+  type var
+  type scheme
+  type instance
+  val new_var: unit -> var
+  val new_scheme: unit -> scheme
+  val new_instance: unit -> instance
+end

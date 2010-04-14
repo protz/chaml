@@ -21,6 +21,16 @@ open Algebra
 open Unify
 open Constraint
 
+module BaseSolver = struct
+  type var = Unify.unifier_var
+  type scheme = Unify.unifier_scheme
+  type instance = Unify.unifier_var list
+
+  let new_var () = assert false
+  let new_scheme () = assert false
+  let new_instance () = assert false
+end
+
 type error =
   | UnifyError of Unify.error
 
@@ -65,7 +75,9 @@ let propagate_ranks uvar =
 
 
 let solve =
-  fun ~caml_types:opt_caml_types ~print_types:opt_print_types konstraint ->
+  fun ~caml_types:opt_caml_types
+    ~print_types:opt_print_types
+    (konstraint, hterm) ->
 
   let rec analyze: unifier_env -> type_constraint -> unifier_env =
     fun unifier_env type_constraint ->
@@ -237,6 +249,6 @@ let solve =
     flush stderr;
     if opt_print_types then
       List.iter print_kv kv;
-    `Ok ()
+    `Ok
   with
     Error e -> `Error e

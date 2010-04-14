@@ -20,6 +20,8 @@
 exception Error
 exception Outdated_version
 
+module OCamlConstraintGenerator = OCamlConstraintGenerator.Make(Solver.BaseSolver)
+
 (* Stolen from driver/pparse.ml *)
 (* val file : formatter -> string -> (Lexing.lexbuf -> 'a) -> string -> 'a *)
 let file ppf inputfile parse_fun ast_magic =
@@ -138,14 +140,14 @@ let _ =
     let generalize_match = Options.get_opt "generalize-match" in
     let default_bindings = Options.get_opt "default-bindings" in
     let konstraint = OCamlConstraintGenerator.generate_constraint ~generalize_match ~default_bindings ast in
-    let konstraint = match konstraint with
+    let konstraint, hterm = match konstraint with
       | `Error e ->
           let e = OCamlConstraintGenerator.string_of_error e in
           output_string stderr
             (Bash.color Bash.colors.Bash.red "!!! Constraint generation failed\n");
           Error.exit_error "%s" e
-      | `Ok konstraint ->
-          konstraint
+      | `Ok v ->
+          v
     in
     if !arg_print_constraint then begin
       let pretty_printing = Options.get_opt "pretty-printing" in
@@ -156,18 +158,18 @@ let _ =
     (* Constraint solving *)
     let print_types = !arg_print_types in
     let caml_types = Options.get_opt "caml-types" in
-    let typed_ast = Solver.solve ~caml_types ~print_types konstraint in
-    let typed_ast = match typed_ast with
+    let r = Solver.solve ~caml_types ~print_types (konstraint, hterm) in
+    begin match r with
       | `Error e ->
           let e = Solver.string_of_error e in
           output_string stderr
             (Bash.color Bash.colors.Bash.red "!!! Constraint solving failed\n");
           Error.exit_error "%s" e
-      | `Ok ast ->
-          ast
-    in
-    if !arg_print_typed_ast then begin
+      | `Ok ->
+          ()
+    end;
+    (* if !arg_print_typed_ast then begin
       print_string (TypedAstPrinter.string_of_typed_ast typed_ast);
       flush stdout;
-    end;
+    end; *)
   end
