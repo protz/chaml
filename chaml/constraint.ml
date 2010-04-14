@@ -19,9 +19,14 @@
 
 module Make (S: Algebra.SOLVER) = struct
 
-  (* Yeah that's ugly but so much simpler. *)
+  (** These are just type aliases. *)
   module TAlgebra = Algebra.Make(S)
-  include TAlgebra
+  type type_var = TAlgebra.type_var
+  type type_term = TAlgebra.type_term
+  open TAlgebra
+
+  open Algebra.Identifiers
+  type ident = Algebra.Identifiers.ident
 
   type type_scheme =
       type_var list

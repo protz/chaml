@@ -17,11 +17,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Algebra
 open Unify
-open Constraint
 
 module BaseSolver = Unify.BaseSolver
+
+module TConstraint = Constraint.Make(BaseSolver)
+open TConstraint
+module TAlgebra = Constraint.Make(BaseSolver)
+open TAlgebra
+open Algebra.Identifiers
 
 type error =
   | UnifyError of Unify.error
@@ -199,7 +203,7 @@ let solve =
         IdentMap.fold
           (fun ident type_var map ->
              let r = IdentMap.add ident (assign_scheme ident) map in
-             let string_of_key = fun x -> x.name in
+             let string_of_key = fun x -> (UnionFind.find x).name in
              Error.debug_simple
                (Bash.color
                   185

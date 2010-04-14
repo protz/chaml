@@ -19,6 +19,8 @@
 
 exception Error of string
 
+open Algebra.Identifiers
+
 (* We first need to define those types. We cannot build the Algebra.Make module
  * yet as we first need to be able to defined BaseSolver *)
 
@@ -42,7 +44,7 @@ module BaseSolver = struct
   type scheme = unifier_scheme
   type instance = unifier_var list
 
-  let new_var () = assert false
+  let new_var _ = assert false
   let new_scheme () = assert false
   let new_instance () = assert false
 

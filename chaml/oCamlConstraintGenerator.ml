@@ -23,23 +23,25 @@ open Error
 module Make(S: Algebra.SOLVER) = struct
 
   module Lambda = LambdaTerms.Make(S)
-  module Constraint = Constraint.Make(S)
-  module Algebra = Algebra.Make(S)
-  open Constraint
-  open Algebra
+  module TConstraint = Constraint.Make(S)
+  module TAlgebra = Algebra.Make(S)
+  open TConstraint
+  open TAlgebra
+  open Algebra.TypeCons
+  open Algebra.Identifiers
 
   type error =
     | NotImplemented of string * Location.t
     | VariableBoundSeveralTimes of string * Location.t
     | VariableMustOccurBothSides of string * Location.t
-    | AlgebraError of Algebra.error
+    | AlgebraError of TAlgebra.error
 
   exception Error of error
   let raise_error e = raise (Error e)
 
   let fresh_type_var ?letter () =
     let prefix = Option.map (String.make 1) letter in
-    `Var (fresh_name ?prefix ())
+    `Var (S.new_var (fresh_name ?prefix ()))
 
   let random_ident_name () = Filename.basename (Filename.temp_file "" "")
 
@@ -357,7 +359,7 @@ module Make(S: Algebra.SOLVER) = struct
       `Ok (generate_constraint structure, `Const (`Int 255))
     with
       | Error e -> `Error e
-      | Algebra.Error e -> `Error (AlgebraError e)
+      | TAlgebra.Error e -> `Error (AlgebraError e)
 
   let string_of_error =
     let print_loc () { Location.loc_start; Location.loc_end; Location.loc_ghost } =
@@ -381,6 +383,6 @@ module Make(S: Algebra.SOLVER) = struct
           "%a: variable %s must occur on both sides of this pattern\n"
           print_loc loc v
     | AlgebraError e ->
-        Algebra.string_of_error e
+        TAlgebra.string_of_error e
 
 end

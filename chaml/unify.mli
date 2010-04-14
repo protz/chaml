@@ -82,7 +82,7 @@ end
 type unifier_env = {
   current_pool: Pool.t;
   uvar_of_tterm: (Constraint.Make(BaseSolver).type_term, unifier_var) Hashtbl.t;
-  scheme_of_ident: unifier_scheme Algebra.Make(BaseSolver).IdentMap.t;
+  scheme_of_ident: unifier_scheme Algebra.Identifiers.IdentMap.t;
 }
 
 (** This is just a wrapper to get the current pool. *)

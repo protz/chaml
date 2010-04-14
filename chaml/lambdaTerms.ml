@@ -18,8 +18,9 @@
 (*****************************************************************************)
 
 module Make (S: Algebra.SOLVER) = struct
-  module Algebra = Algebra.Make(S)
-  open Algebra
+  module TAlgebra = Algebra.Make(S)
+  open TAlgebra
+  open Algebra.Identifiers
 
   type term = [
     | `Let of (pattern * term) list * term 

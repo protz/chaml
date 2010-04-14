@@ -23,7 +23,7 @@ module type SOLVER = sig
   type scheme
   type instance
 
-  val new_var: unit -> var
+  val new_var: string -> var
   val new_scheme: unit -> scheme
   val new_instance: unit -> instance
 
@@ -111,10 +111,7 @@ module TypeCons = struct
 
 end
 
-module Make (S: SOLVER) = struct
-
-  open S
-  include Errors
+module Identifiers = struct
 
   (* x, y ::= variable | constant | memory location *)
   type long_ident =
@@ -158,6 +155,14 @@ module Make (S: SOLVER) = struct
       in
       v
 
+end
+
+module Make (S: SOLVER) = struct
+
+  open S
+  type error = Errors.error
+  exception Error of error
+  let string_of_error = Errors.string_of_error
 
   (** This is what is called X in ATTAPL *)
   type type_var = [

@@ -25,11 +25,9 @@
 module Make: functor (S: Algebra.SOLVER) -> sig
 
   (** These are just type aliases. *)
-
   type type_var = Algebra.Make(S).type_var
   type type_term = Algebra.Make(S).type_term
-  type ident = Algebra.Make(S).ident
-  module IdentMap: Map.S with type key = ident
+  type ident = Algebra.Identifiers.ident
 
   (** Here we differ slightly from the definition in ATTAPL. A scheme is made of a
       list of universally quantified variables, a constraint that has to be
@@ -43,7 +41,7 @@ module Make: functor (S: Algebra.SOLVER) -> sig
   type type_scheme =
       type_var list
     * type_constraint
-    * type_var IdentMap.t
+    * type_var Algebra.Identifiers.IdentMap.t
 
   (** The definition of a constraint. [`Dump] is not really useful, we could use
       [`True], but left for the sake of compatibility with mini.

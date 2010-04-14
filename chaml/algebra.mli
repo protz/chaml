@@ -36,7 +36,7 @@ module type SOLVER = sig
   type scheme
   type instance
 
-  val new_var: unit -> var
+  val new_var: string -> var
   val new_scheme: unit -> scheme
   val new_instance: unit -> instance
 
@@ -83,25 +83,7 @@ module TypeCons: sig
 
 end
 
-
-module Make: functor (S: SOLVER) -> sig
-
-  open S
-
-  (** {3 Error handling} *)
-
-  (** Some operations can throw exceptions (arity mismatch, etc.) At the moment,
-      only {!type_cons} can have such a behaviour. *)
-  type error
-
-  (** We use exceptions here because [Algebra] is an internal module, so we want
-      to walk up the stack in case something goes wrong deep in unification or in
-      solving. The modules that are meant to be used by client code do not throw
-      exceptions. *)
-  exception Error of error
-
-  (** Create a human-readable representation of an error. *)
-  val string_of_error: error -> string
+module Identifiers: sig
 
   (** {3 Identifiers} *)
 
@@ -121,6 +103,27 @@ module Make: functor (S: SOLVER) -> sig
 
   (** Generate globally unique names. *)
   val fresh_name: ?prefix:string -> unit -> string
+
+end
+
+module Make: functor (S: SOLVER) -> sig
+
+  open S
+
+  (** {3 Error handling} *)
+
+  (** Some operations can throw exceptions (arity mismatch, etc.) At the moment,
+      only {!type_cons} can have such a behaviour. *)
+  type error
+
+  (** We use exceptions here because [Algebra] is an internal module, so we want
+      to walk up the stack in case something goes wrong deep in unification or in
+      solving. The modules that are meant to be used by client code do not throw
+      exceptions. *)
+  exception Error of error
+
+  (** Create a human-readable representation of an error. *)
+  val string_of_error: error -> string
 
   (** {3 Core types} *)
 
