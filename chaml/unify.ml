@@ -272,6 +272,7 @@ let fresh_copy unifier_env (young_vars, scheme_uvar) =
  * (have a look at fresh_name in Algebra to convince yourself the names are
  * globally unique). *)
 let rec uvar_of_tterm: unifier_env -> type_term -> unifier_var =
+  let known_terms = Hashtbl.create 64 in
   fun unifier_env type_term ->
     let ensure_ready uvar =
       let repr = UnionFind.find uvar in
@@ -288,8 +289,14 @@ let rec uvar_of_tterm: unifier_env -> type_term -> unifier_var =
             ensure_ready uvar;
             uvar
         | `Cons (cons, args) ->
-            let term = `Cons (cons, List.map uvar_of_tterm args) in
-            fresh_unifier_var ~term unifier_env
+            match Jhashtbl.find_opt known_terms tterm with
+              | Some uvar ->
+                  uvar
+              | None ->
+                  let term = `Cons (cons, List.map uvar_of_tterm args) in
+                  let uvar = fresh_unifier_var ~term unifier_env in
+                  Hashtbl.add known_terms tterm uvar;
+                  uvar
     in
     uvar_of_tterm type_term
 

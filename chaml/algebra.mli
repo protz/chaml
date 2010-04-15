@@ -40,6 +40,10 @@ module type SOLVER = sig
   val new_scheme: unit -> scheme
   val new_instance: unit -> instance
 
+  (** Names are guaranteed to be unique. So you can consider this as a key for
+      each variable. If you need to do hashconsing, do it on the name of the
+      variable, not the variable itself. (Variables with different hashes might
+      have identical names). *)
   val string_of_var: var -> string
 end
 
