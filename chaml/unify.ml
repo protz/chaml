@@ -57,7 +57,7 @@ module BaseSolver = struct
   let new_scheme () = {
     young_vars = [];
     scheme = UnionFind.fresh
-               { name = fresh_name (); rank = -1; term = None; ready = false }
+               { name = fresh_name ~prefix:"scheme" (); rank = -1; term = None; ready = false }
   }
 
   let new_instance () = ref []

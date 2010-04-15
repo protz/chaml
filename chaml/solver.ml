@@ -196,8 +196,9 @@ let solve =
         let assign_scheme: ident -> unifier_scheme = fun ident ->
           let tterm, scheme = IdentMap.find ident var_map in
           let uvar = uvar_of_tterm unifier_env (tv_tt tterm) in
+          let _ = uvar_of_tterm unifier_env (tv_tt (`Var scheme.scheme)) in
           scheme.young_vars <- young_vars;
-          unify_or_raise unifier_env uvar scheme.scheme;
+          unify_or_raise unifier_env scheme.scheme uvar;
           scheme
         in
         IdentMap.fold
