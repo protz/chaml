@@ -193,9 +193,9 @@ let solve =
         (* Each identifier is assigned a scheme. It's a list of the young vars
          * and a pointer to a variable that contains the constraint associated
          * to the identifier. *)
-        let assign_scheme ident =
+        let assign_scheme: ident -> unifier_scheme = fun ident ->
           let uvar = uvar_of_tterm unifier_env (tv_tt (IdentMap.find ident var_map)) in
-          young_vars, uvar
+          { young_vars; scheme = uvar }
         in
         IdentMap.fold
           (fun ident type_var map ->

@@ -59,7 +59,10 @@ and unifier_var = descriptor UnionFind.point
 and unifier_term = [ `Cons of type_cons * unifier_var list ]
 
 (** A scheme is a list of young variables and a constraint. *)
-and unifier_scheme = unifier_var list * unifier_var
+and unifier_scheme = {
+  mutable young_vars: unifier_var list;
+  mutable scheme: unifier_var;
+}
 
 (** The unifier actually provides the base solver with the necessary stubs to
     create pre-allocated constraints and terms. *)
@@ -120,7 +123,7 @@ val string_of_uvar: ?string_of_key:(unifier_var -> string) -> ?caml_types:bool -
 (** Print a scheme. Use it to get the type of top-level bindings as a string
     "val f: 'a -> ...". *)
 val string_of_scheme: ?string_of_key:(unifier_var -> string) -> ?caml_types:bool ->
-      string -> unifier_var list * unifier_var -> string
+      string -> unifier_scheme -> string
 
 (** {3 Core functions} *)
 
@@ -128,8 +131,7 @@ val string_of_scheme: ?string_of_key:(unifier_var -> string) -> ?caml_types:bool
     current rank, we must create a instance. This function takes care of
     avoiding all cycles (fingers crossed!) and returns a fresh copy of a
     unification variable. *)
-val fresh_copy:
-  unifier_env -> descriptor UnionFind.point list * unifier_var -> unifier_var
+val fresh_copy: unifier_env -> unifier_scheme -> unifier_var
 
 (** Recursively change terms that depend on {!Algebra.Make.type_var}s into
     unification vars. This function implements the "explicit sharing" concept by

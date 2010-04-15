@@ -36,7 +36,10 @@ and unifier_var = descriptor UnionFind.point
 and unifier_term = [
   `Cons of type_cons * unifier_var list
 ]
-and unifier_scheme = unifier_var list * unifier_var
+and unifier_scheme = {
+  mutable young_vars: unifier_var list;
+  mutable scheme: unifier_var;
+}
 
 (* Since TypeCons is not a functor, we were able to bootstrap the types above.
  * Now we can create a SOLVER module (modulo one ugly hack). *)
@@ -46,11 +49,18 @@ let new_var_ref = ref (fun _ -> assert false)
 module BaseSolver = struct
   type var = unifier_var
   type scheme = unifier_scheme
-  type instance = unifier_var list
+  type instance = unifier_var list ref
 
-  let new_var name = UnionFind.fresh { name; rank = -1; term = None; ready = false }
-  let new_scheme () = assert false
-  let new_instance () = assert false
+  let new_var name =
+    UnionFind.fresh { name; rank = -1; term = None; ready = false }
+
+  let new_scheme () = {
+    young_vars = [];
+    scheme = UnionFind.fresh
+               { name = fresh_name (); rank = -1; term = None; ready = false }
+  }
+
+  let new_instance () = ref []
 
   let string_of_var uvar = (UnionFind.find uvar).name
 end
@@ -179,7 +189,7 @@ let string_of_uvars ?caml_types uvars =
 
 (* For printing type schemes *)
 let string_of_scheme ?string_of_key ?caml_types ident scheme =
-  let young_vars, uvar = scheme in
+  let { young_vars; scheme = uvar } = scheme in
   let young_vars = List.filter (fun x -> (UnionFind.find x).term = None) young_vars in
   Printf.sprintf "val %s: %s" ident (string_of_uvar ?string_of_key ~young_vars ?caml_types uvar)
 
@@ -201,7 +211,7 @@ let fresh_unifier_var ?term ?prefix ?name unifier_env =
   uvar
 
 (* Create a fresh copy of a scheme for instanciation *)
-let fresh_copy unifier_env (young_vars, scheme_uvar) =
+let fresh_copy unifier_env { young_vars; scheme = scheme_uvar } =
   let mapping = Hashtbl.create 16 in
   let call_stack = Hashtbl.create 16 in
   let base_rank = (UnionFind.find scheme_uvar).rank in

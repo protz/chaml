@@ -43,7 +43,7 @@ OCAMLLIBPATH = $(shell ocamlc -where)
 #DOCFILES = $(shell find chaml stdlib -iname '*.ml' -or -iname '*.mli') #`find $(OCAMLLIBPATH) -maxdepth 1 -iname '*.mli' -and -not -iname 'condition.mli'`
 DOCFILES = chaml/constraint.mli chaml/oCamlConstraintGenerator.mli\
 	   chaml/unify.mli\
-	   chaml/solver.mli\
+	   chaml/solver.mli chaml/lambdaTerms.mli\
 	   chaml/algebra.mli chaml/unionFind.mli\
 	   chaml/typePrinter.mli\
 	   stdlib/*.mli #`find $(OCAMLLIBPATH) -maxdepth 1 -iname '*.mli' -and -not -iname 'condition.mli'`
