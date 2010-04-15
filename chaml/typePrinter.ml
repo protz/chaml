@@ -61,6 +61,7 @@ module Make (S: Algebra.SOLVER) = struct
       let string_of_key = match string_of_key with
         | None ->
             (fun key ->
+              let key = S.string_of_var key in
               begin match Jhashtbl.find_opt greek_of_repr key with
                 | None ->
                     let letter = fresh_greek_var () in

@@ -39,8 +39,9 @@ val string_of_error: error -> string
     [UnionFind.find uvar] where [uvar] is a [unifier_var]. *)
 type descriptor = {
   mutable term: unifier_term option;
-  name: string; (** This is just used for tracing and debugging the unifier. *)
+  name: string;
   mutable rank: int;
+  mutable ready: bool;
 }
 
 (** The type of unificator variables. They are often called [uvar] in the code.
@@ -85,11 +86,7 @@ end
     {!unifier_var}s because the type variables have globally unique names.
     However, we use a [Map] to translate identifiers into schemes because
     identifiers do have a scope. *)
-type unifier_env = {
-  current_pool: Pool.t;
-  uvar_of_tterm: (Algebra.Make(BaseSolver).type_term, unifier_var) Hashtbl.t;
-  scheme_of_ident: unifier_scheme IdentMap.t;
-}
+type unifier_env
 
 (** This is just a wrapper to get the current pool. *)
 val current_pool: unifier_env -> Pool.t
@@ -99,6 +96,15 @@ val current_rank: unifier_env -> int
 
 (** Create a new pool, increment the rank. *)
 val step_env: unifier_env -> unifier_env
+
+(** Get the current mapping of schemes to identifiers *)
+val scheme_of_ident: unifier_env -> unifier_scheme IdentMap.t
+
+(** Set it *)
+val set_scheme_of_ident: unifier_env -> unifier_scheme IdentMap.t -> unifier_env
+
+(** Get a fresh environment to start working *)
+val fresh_env: unit -> unifier_env
 
 (** {3 Printing and debugging} *)
 

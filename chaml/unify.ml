@@ -29,6 +29,7 @@ type descriptor = {
   mutable term: unifier_term option;
   name: string;
   mutable rank: int;
+  mutable ready: bool;
 }
 
 and unifier_var = descriptor UnionFind.point
@@ -47,7 +48,7 @@ module BaseSolver = struct
   type scheme = unifier_scheme
   type instance = unifier_var list
 
-  let new_var name = UnionFind.fresh { name; rank = -1; term = None }
+  let new_var name = UnionFind.fresh { name; rank = -1; term = None; ready = false }
   let new_scheme () = assert false
   let new_instance () = assert false
 
@@ -91,13 +92,20 @@ end
  * constraint not pollute one branch's scope with the other one's.*)
 type unifier_env = {
   current_pool: Pool.t;
-  uvar_of_tterm: (type_term, unifier_var) Hashtbl.t;
+  (* uvar_of_tterm: (type_term, unifier_var) Hashtbl.t; *)
   scheme_of_ident: unifier_scheme IdentMap.t;
 }
 
 (* This occurs quite frequently *)
 let current_pool env = env.current_pool
 let current_rank env = env.current_pool.Pool.rank
+let scheme_of_ident unifier_env = unifier_env.scheme_of_ident
+let set_scheme_of_ident unifier_env scheme_of_ident = { unifier_env with scheme_of_ident }
+let fresh_env () = {
+    current_pool = Pool.base_pool;
+    (* uvar_of_tterm = Hashtbl.create 64; *)
+    scheme_of_ident = IdentMap.empty;
+  }
 
 (* This creates a new environment with a fresh pool inside that has
  * current_rank+1 *)
@@ -188,7 +196,7 @@ let fresh_unifier_var ?term ?prefix ?name unifier_env =
       | Some name ->
           name
   in
-  let uvar = UnionFind.fresh { term; name; rank; } in
+  let uvar = UnionFind.fresh { term; name; rank; ready = true } in
   Pool.add current_pool uvar;
   uvar
 
@@ -250,25 +258,38 @@ let fresh_copy unifier_env (young_vars, scheme_uvar) =
 
 (* What we have is bare unifier vars that don't have a proper rank, etc. So if
  * we haven't seen them yet, we set their rank properly, and we add them to the
- * environment's hash table. *)
+ * environment's hash table.
+ *
+ * BEWARE BEWARE: the following nasty sequence of events can happen:
+ * - uvar_of_tterm uvar
+ * - unify uvar with something else
+ * - uvar's hash changes
+ * - uvar_of_tterm uvar
+ *
+ * We cannot use the full variable as the key for the Hashtbl. We cannot use its
+ * repr either. So we must use the name (what a pity!). We might have a
+ * uniquely-generated (Oo.id (object end)) later on but for now on that'll be ok
+ * (have a look at fresh_name in Algebra to convince yourself the names are
+ * globally unique). *)
 let rec uvar_of_tterm: unifier_env -> type_term -> unifier_var =
   fun unifier_env type_term ->
-    let rec uvar_of_tterm: type_term -> unifier_var = fun tterm ->
-    match Jhashtbl.find_opt unifier_env.uvar_of_tterm tterm with
-      | Some uvar ->
-          uvar
-      | None ->
-          match tterm with
-            | `Var uvar ->
-                (UnionFind.find uvar).rank <- current_rank unifier_env;
-                let open Pool in
-                unifier_env.current_pool.members <-
-                  (uvar :: unifier_env.current_pool.members);
-                Hashtbl.add unifier_env.uvar_of_tterm tterm uvar;
-                uvar
-            | `Cons (cons, args) ->
-                let term = `Cons (cons, List.map uvar_of_tterm args) in
-                fresh_unifier_var ~term unifier_env
+    let ensure_ready uvar =
+      let repr = UnionFind.find uvar in
+      if not repr.ready then begin
+        repr.rank <- current_rank unifier_env;
+        let open Pool in
+        unifier_env.current_pool.members <- (uvar :: unifier_env.current_pool.members);
+        repr.ready <- true;
+      end
+    in
+    let rec uvar_of_tterm tterm =
+      match tterm with
+        | `Var uvar ->
+            ensure_ready uvar;
+            uvar
+        | `Cons (cons, args) ->
+            let term = `Cons (cons, List.map uvar_of_tterm args) in
+            fresh_unifier_var ~term unifier_env
     in
     uvar_of_tterm type_term
 

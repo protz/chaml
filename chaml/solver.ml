@@ -90,7 +90,7 @@ let solve =
            * let. young_vars is all the young variables that are possibly
            * quantified inside that scheme *)
           let t_uvar = uvar_of_tterm unifier_env (tv_tt t) in
-          let scheme = IdentMap.find ident unifier_env.scheme_of_ident in
+          let scheme = IdentMap.find ident (scheme_of_ident unifier_env) in
           let ident_s = string_of_ident ident in
           let instance = fresh_copy unifier_env scheme in
           Error.debug
@@ -213,25 +213,21 @@ let solve =
           new_map
       in
       let new_map =
-        List.fold_left solve_branch unifier_env.scheme_of_ident schemes
+        List.fold_left solve_branch (scheme_of_ident unifier_env) schemes
       in
-      let new_env = { unifier_env with scheme_of_ident = new_map } in
+      let new_env = set_scheme_of_ident unifier_env new_map in
       analyze new_env c
   in
-  let initial_env = {
-    current_pool = Pool.base_pool;
-    uvar_of_tterm = Hashtbl.create 64;
-    scheme_of_ident = IdentMap.empty;
-  } in
+  let initial_env = fresh_env () in
   try
     let knowledge = analyze initial_env konstraint in
-    Hashtbl.iter
+    (* Hashtbl.iter
       (fun k v -> Error.debug "[Rank] %s: %d\n"
                     (UnionFind.find v).name
                     (UnionFind.find v).rank)
-      knowledge.uvar_of_tterm;
+      knowledge.uvar_of_tterm; *)
     let module JIM = Jmap.Make(IdentMap) in
-    let kv = JIM.to_list knowledge.scheme_of_ident in
+    let kv = JIM.to_list (scheme_of_ident knowledge) in
     let kv = List.filter (fun ((_, pos), _) -> not pos.Location.loc_ghost) kv in
     let kv = List.sort (fun ((_, pos), _) ((_, pos'), _) -> compare pos pos') kv in
     let print_kv (ident, scheme) =
