@@ -1,4 +1,3 @@
-let f =
-  let g x = x in
-  let _ = g 1 in
-  g
+let bug f x =
+  let _ = f x in
+  f

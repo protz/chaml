@@ -261,6 +261,9 @@ let rec uvar_of_tterm: unifier_env -> type_term -> unifier_var =
           match tterm with
             | `Var uvar ->
                 (UnionFind.find uvar).rank <- current_rank unifier_env;
+                let open Pool in
+                unifier_env.current_pool.members <-
+                  (uvar :: unifier_env.current_pool.members);
                 Hashtbl.add unifier_env.uvar_of_tterm tterm uvar;
                 uvar
             | `Cons (cons, args) ->
