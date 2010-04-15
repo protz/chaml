@@ -22,7 +22,7 @@ module Make (S: Algebra.SOLVER) = struct
   open Algebra.Identifiers
 
   type term = [
-    | `Let of (pattern * term) list * term 
+    | `Let of (pattern * term) list * term
     | `Instance of ident * S.instance
     | `App of term * term
     | `Lambda of pattern * term

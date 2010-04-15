@@ -49,7 +49,7 @@ end
 
 (** This module contains everything related to type constructors. This is
     separated from the rest as in {!Unify} we need to define first the types
-    that make up the {!SOLVER} and then instanciate an {!Algebra.Make}. *) 
+    that make up the {!SOLVER} and then instanciate an {!Algebra.Make}. *)
 module TypeCons: sig
 
   (** {3 Type constructors and helpers} *)

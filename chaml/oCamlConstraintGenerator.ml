@@ -106,61 +106,41 @@ module Make(S: Algebra.SOLVER) = struct
               }
           | Ppat_tuple patterns ->
             let module JIM = Jmap.Make(IdentMap) in
-            (* This represents the sub patterns. If the pattern is (e1, e2, e3),
-             * then we generate x1 x2 x3 such that t = x1 * x2 * x3 *)
             let xis = List.map (fun _ -> fresh_type_var ()) patterns in
-
-            (* This is a tail-rec function that works with accumulators *)
-            let rec combine known_map known_vars known_patterns known_constraints = function
-              | (new_pattern :: remaining_patterns, xi :: xis) ->
-                  let {
-                      konstraint = sub_constraint;
-                      var_map = sub_map;
-                      introduced_vars = sub_vars;
-                      lambda_pattern = sub_pattern;
-                    } =
-                    generate_constraint_pattern xi new_pattern
-                  in
-                  (* We must check that no variable is bound in multiple place
-                   * in the pattern. *)
-                  let inter_map = JIM.inter known_map sub_map in
-                  if not (IdentMap.is_empty inter_map) then begin
-                    let bad_ident = string_of_ident (List.hd (JIM.keys inter_map)) in
-                    raise_error (VariableBoundSeveralTimes (bad_ident, ppat_loc))
-                  end;
-                  (* Note that must remember both the sub-pattern's variables
-                   * and our own xi *)
-                  let new_map = JIM.union known_map sub_map in
-                  let new_constraint_list = sub_constraint :: known_constraints in
-                  let new_vars = xi :: sub_vars @ known_vars in
-                  let new_patterns = sub_pattern :: known_patterns in
-                  combine new_map new_vars new_patterns new_constraint_list (remaining_patterns, xis)
-              | ([], []) ->
-                  (* We've consumed all the patterns, let's return *)
-                  let konstraint = constr_conj known_constraints in
-                  known_map, List.rev known_vars, List.rev known_patterns, konstraint
-              | _ ->
-                  assert false
+            let patterns = List.map2
+              (fun pattern xi ->
+                let { konstraint; var_map; introduced_vars; lambda_pattern; } =
+                  generate_constraint_pattern xi pattern
+                in
+                konstraint, var_map, xi :: introduced_vars, lambda_pattern)
+              patterns
+              xis
             in
-
-            let pattern_map, pattern_vars, lambda_patterns, pattern_constraint =
-              combine IdentMap.empty [] [] [] (patterns, xis)
+            let pattern_constraint = constr_conj (List.map (fun (x, _, _, _) -> x) patterns) in
+            let pattern_map = List.fold_left
+              (fun known_map sub_map ->
+                let inter_map = JIM.inter known_map sub_map in
+                if not (IdentMap.is_empty inter_map) then begin
+                  let bad_ident = string_of_ident (List.hd (JIM.keys inter_map)) in
+                  raise_error (VariableBoundSeveralTimes (bad_ident, ppat_loc))
+                end;
+                JIM.union known_map sub_map
+              )
+              IdentMap.empty
+              (List.map (fun (_, x, _, _) -> x) patterns)
             in
+            let pattern_vars = List.flatten (List.map (fun (_, _, x, _) -> x) patterns) in
+            let lambda_pattern = `Tuple (List.map (fun (_, _, _, x) -> x) patterns) in
             let konstraint = `Equals (x, type_cons "*" (tvl_ttl xis)) in
             let konstraint = `Conj (konstraint, pattern_constraint) in
             {
               konstraint;
               var_map = pattern_map;
               introduced_vars = pattern_vars;
-              lambda_pattern = `Tuple lambda_patterns;
+              lambda_pattern;
             }
           | Ppat_or (pat1, pat2) ->
-            (* Ppat_or example: match ... with pat1 | pat2 -> ...
-             *
-             * It's the opposite of the pattern above: we want every bound identifier
-             * to occur on both sides. The folding allows use to generate equality
-             * constraints for each of the type variables that's been generated on
-             * the two sides. *)
+            (* match e1 with p1 | p2 -> *)
             let module JIM = Jmap.Make(IdentMap) in
             let { konstraint = c1; var_map = map1; introduced_vars = vars1; lambda_pattern = lp1 } =
               generate_constraint_pattern x pat1
@@ -173,6 +153,8 @@ module Make(S: Algebra.SOLVER) = struct
               let bad_ident = string_of_ident (List.hd (JIM.keys xor_map)) in
               raise_error (VariableMustOccurBothSides (bad_ident, ppat_loc))
             end;
+            (* If identifier i is bound to type variable x1 on the left and x2
+             * on the right, this just generates the constraint "x1 = x2" *)
             let constraints =
               IdentMap.fold
                 (fun k (v, _) acc ->
