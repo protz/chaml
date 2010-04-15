@@ -23,14 +23,19 @@ module Make (S: Algebra.SOLVER) = struct
 
   type term = [
     | `Let of (pattern * term) list * term 
-    | `Instance of S.instance * ident
+    | `Instance of ident * S.instance
     | `App of term * term
     | `Lambda of pattern * term
-    | `Const of
-        [ `Char of char | `Int of int | `Float of float | `String of string ]
+    | `Const of [
+        | `Char of char
+        | `Int of int
+        | `Float of float
+        | `String of string ]
   ]
   and pattern = [
-    | `Var of S.scheme * ident
+    | `Var of ident * S.scheme
     | `Tuple of pattern list
+    | `Or of pattern * pattern
+    | `Any
   ]
 end

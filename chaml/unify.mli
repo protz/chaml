@@ -146,7 +146,7 @@ val string_of_scheme: ?string_of_key:(unifier_var -> string) -> ?caml_types:bool
     the scheme replaced by copies of them. This function takes care of
     avoiding all cycles (fingers crossed!) and returns a fresh copy of the
     scheme's unification variable. *)
-val fresh_copy: unifier_env -> unifier_scheme -> unifier_var
+val fresh_copy: unifier_env -> unifier_scheme -> unifier_scheme
 
 (** When the constraint generator requests a variable, the {!SOLVER] answers with
     what is said to be a "not ready" variable. We cannot use a variable in the

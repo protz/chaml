@@ -213,7 +213,8 @@ let _ =
   test2' ();
   print_newline ();
   test3 ();
+  let open Bash in
   Printf.printf
     "--- %s --- %s ---\n"
-    (Bash.color Bash.colors.Bash.green "%d%% good" (100 * !good / (!bad + !good)))
-    (Bash.color Bash.colors.Bash.red "%d%% bad" (100 * !bad / (!bad + !good)));
+    (color colors.green "%d%% good" (100 * !good / (!bad + !good)))
+    (color colors.red "%d%% bad" (100 * !bad / (!bad + !good)));

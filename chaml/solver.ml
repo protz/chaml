@@ -84,18 +84,21 @@ let solve =
           Error.debug "[SEquals] %a = %a\n" uvar_name uvar1 uvar_name uvar2;
           unify_or_raise unifier_env uvar1 uvar2;
           unifier_env
-      | `Instance (ident, `Var uvar) ->
-          (* For instance: ident = f (with let f x = x), and t = int -> int *)
-          (* scheme is basically what came out of solving the left branch of the
+      | `Instance (ident, `Var uvar, solver_instance) ->
+          (* For instance: ident = f (with let f x = x), and t = int -> int
+           * scheme is basically what came out of solving the left branch of the
            * let. young_vars is all the young variables that are possibly
            * quantified inside that scheme *)
           ensure_ready unifier_env uvar;
           let scheme = IdentMap.find ident (scheme_of_ident unifier_env) in
           let ident_s = string_of_ident ident in
-          let instance = fresh_copy unifier_env scheme in
+          let { scheme_var = instance; young_vars = new_vars } =
+            fresh_copy unifier_env scheme
+          in
           Error.debug
               "[SInstance] Taking an instance of %s: %a\n" ident_s uvar_name instance;
           unify_or_raise unifier_env instance uvar;
+          solver_instance := new_vars;
           unifier_env
       | `Conj (c1, c2) ->
           (* Do *NOT* forward _unifier_env! Identifiers in c1's scope must not

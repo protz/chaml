@@ -250,12 +250,13 @@ let fresh_copy unifier_env { young_vars; scheme_var = scheme_uvar } =
                         original
           end
   in
-  List.iter
+  let new_vars = List.map
     (fun v ->
        let v' = fresh_unifier_var ~prefix:"dup" unifier_env in
-       Hashtbl.add mapping (UnionFind.find v) v'
+       Hashtbl.add mapping (UnionFind.find v) v';
+       v'
     )
-    young_vars;
+    young_vars in
   let print_pairs buf () =
     let pairs = Jhashtbl.map_list
       mapping
@@ -264,7 +265,7 @@ let fresh_copy unifier_env { young_vars; scheme_var = scheme_uvar } =
     Buffer.add_string buf (String.concat ", " pairs)
   in
   Error.debug "[UCopy] Mapping: %a\n" print_pairs ();
-  fresh_copy scheme_uvar
+  { scheme_var = fresh_copy scheme_uvar; young_vars = new_vars }
 
 (* This actually sets up the rank properly and adds the variable in the current
  * pool if this hasn't been done already. Extremely useful when the solver

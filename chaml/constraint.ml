@@ -34,7 +34,7 @@ module Make (S: Algebra.SOLVER) = struct
     | `Conj of type_constraint * type_constraint
     | `Exists of type_var list * type_constraint
     | `Equals of type_var * type_term
-    | `Instance of ident * type_var
+    | `Instance of ident * type_var * S.instance
     | `Let of type_scheme list * type_constraint
   ]
 
@@ -104,7 +104,7 @@ module Make (S: Algebra.SOLVER) = struct
             let t1 = string_of_type_var t1 in
             let t2 = string_of_type pp_env t2 in
             String.concat "" [t1; " = "; t2]
-        | `Instance (x, t) ->
+        | `Instance (x, t, _) ->
             let x = string_of_ident x in
             let t = string_of_type_var t in
             String.concat "" [x; " < "; t]
