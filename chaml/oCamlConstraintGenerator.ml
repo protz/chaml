@@ -23,10 +23,10 @@ open Error
 module Make(S: Algebra.SOLVER) = struct
 
   module Lambda = LambdaTerms.Make(S)
-  module TConstraint = Constraint.Make(S)
-  module TAlgebra = Algebra.Make(S)
-  open TConstraint
-  open TAlgebra
+  module Constraint_ = Constraint.Make(S)
+  module Algebra_ = Algebra.Make(S)
+  open Constraint_
+  open Algebra_
   open Algebra.TypeCons
   open Algebra.Identifiers
 
@@ -34,7 +34,7 @@ module Make(S: Algebra.SOLVER) = struct
     | NotImplemented of string * Location.t
     | VariableBoundSeveralTimes of string * Location.t
     | VariableMustOccurBothSides of string * Location.t
-    | AlgebraError of TAlgebra.error
+    | AlgebraError of Algebra_.error
 
   exception Error of error
   let raise_error e = raise (Error e)
@@ -74,14 +74,15 @@ module Make(S: Algebra.SOLVER) = struct
      * specific identifier.
      *
      * *)
-    let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * type_var IdentMap.t * type_var list) =
+    let rec generate_constraint_pattern: type_var -> pattern -> (type_constraint * (type_var * S.scheme) IdentMap.t * type_var list) =
       fun x { ppat_desc; ppat_loc } ->
         match ppat_desc with
           | Ppat_any ->
               `True, IdentMap.empty, []
           | Ppat_var v ->
               let var = ident v ppat_loc in
-              let var_map = IdentMap.add var x IdentMap.empty in
+              let solver_scheme = S.new_scheme () in
+              let var_map = IdentMap.add var (x, solver_scheme) IdentMap.empty in
               `True, var_map, []
           | Ppat_tuple patterns ->
             (* as in "JIdentMap" *)
@@ -137,7 +138,8 @@ module Make(S: Algebra.SOLVER) = struct
             end;
             let constraints =
               IdentMap.fold
-                (fun k v acc -> `Equals (IdentMap.find k map2, tv_tt v) :: acc)
+                (fun k (v, _) acc ->
+                   `Equals (fst (IdentMap.find k map2), tv_tt v) :: acc)
                 map1
                 []
             in
@@ -260,7 +262,8 @@ module Make(S: Algebra.SOLVER) = struct
                   let_constr
                 in
                 let constraints = List.map generate_branch pat_expr_list in
-                let map = IdentMap.add ident1 x1 IdentMap.empty in
+                let solver_scheme = S.new_scheme () in
+                let map = IdentMap.add ident1 (x1, solver_scheme) IdentMap.empty in
                 let scheme = [x1], constr_e1, map in
                 `Let ([scheme], constr_conj constraints)
               else
@@ -313,14 +316,15 @@ module Make(S: Algebra.SOLVER) = struct
             | _ ->
                 raise_error (NotImplemented ("some structure item", pstr_loc))
         in
-        let default_bindings =
+        let default_bindings: type_scheme list =
           let plus_scheme =
             let plus_var = fresh_type_var ~letter:'z' () in
             let plus_type =
               type_cons_arrow type_cons_int (type_cons_arrow type_cons_int type_cons_int)
             in
             let pos = Location.none in
-            let plus_map = IdentMap.add (ident "+" pos) plus_var IdentMap.empty in
+            let solver_scheme = S.new_scheme () in
+            let plus_map = IdentMap.add (ident "+" pos) (plus_var, solver_scheme) IdentMap.empty in
             [plus_var], `Equals (plus_var, plus_type), plus_map
           in
           let mult_scheme =
@@ -329,7 +333,8 @@ module Make(S: Algebra.SOLVER) = struct
               type_cons_arrow type_cons_int (type_cons_arrow type_cons_int type_cons_int)
             in
             let pos = Location.none in
-            let mult_map = IdentMap.add (ident "*" pos) mult_var IdentMap.empty in
+            let solver_scheme = S.new_scheme () in
+            let mult_map = IdentMap.add (ident "*" pos) (mult_var, solver_scheme) IdentMap.empty in
             [mult_var], `Equals (mult_var, mult_type), mult_map
           in
           [plus_scheme; mult_scheme]
@@ -343,7 +348,7 @@ module Make(S: Algebra.SOLVER) = struct
           topmost_constraint
 
     (* Useful for let pattern = expression ... *)
-    and generate_constraint_pat_expr: pattern * expression -> type_var list * type_constraint * type_var IdentMap.t =
+    and generate_constraint_pat_expr: pattern * expression -> type_scheme =
       fun (pat, expr) ->
         let x = fresh_type_var ~letter:'x' () in
         let c1, var_map, generated_vars = generate_constraint_pattern x pat in
@@ -359,7 +364,7 @@ module Make(S: Algebra.SOLVER) = struct
       `Ok (generate_constraint structure, `Const (`Int 255))
     with
       | Error e -> `Error e
-      | TAlgebra.Error e -> `Error (AlgebraError e)
+      | Algebra_.Error e -> `Error (AlgebraError e)
 
   let string_of_error =
     let print_loc () { Location.loc_start; Location.loc_end; Location.loc_ghost } =
@@ -383,6 +388,6 @@ module Make(S: Algebra.SOLVER) = struct
           "%a: variable %s must occur on both sides of this pattern\n"
           print_loc loc v
     | AlgebraError e ->
-        TAlgebra.string_of_error e
+        Algebra_.string_of_error e
 
 end

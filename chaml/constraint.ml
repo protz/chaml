@@ -27,7 +27,7 @@ module Make (S: Algebra.SOLVER) = struct
   type type_scheme =
       type_var list
     * type_constraint
-    * type_var IdentMap.t
+    * (type_var * S.scheme) IdentMap.t
 
   and type_constraint = [
       `True
@@ -145,7 +145,7 @@ module Make (S: Algebra.SOLVER) = struct
         let buf = Buf.create () in
         let l = ref [] in
         IdentMap.iter
-          (fun i v ->
+          (fun i (v, _) ->
             l := (String.concat " : " [string_of_ident i; string_of_type_var v]) :: !l)
           var_map;
         Buf.add buf (String.concat "; " !l);

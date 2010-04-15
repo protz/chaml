@@ -194,8 +194,11 @@ let solve =
          * and a pointer to a variable that contains the constraint associated
          * to the identifier. *)
         let assign_scheme: ident -> unifier_scheme = fun ident ->
-          let uvar = uvar_of_tterm unifier_env (tv_tt (IdentMap.find ident var_map)) in
-          { young_vars; scheme = uvar }
+          let tterm, scheme = IdentMap.find ident var_map in
+          let uvar = uvar_of_tterm unifier_env (tv_tt tterm) in
+          scheme.young_vars <- young_vars;
+          unify_or_raise unifier_env uvar scheme.scheme;
+          scheme
         in
         IdentMap.fold
           (fun ident type_var map ->
@@ -209,7 +212,7 @@ let solve =
                      (string_of_ident ident) (IdentMap.find ident r)));
              r
           )
-          (var_map: type_var IdentMap.t :> type_term IdentMap.t)
+          (var_map: (type_var * unifier_scheme) IdentMap.t :> (type_term * unifier_scheme) IdentMap.t)
           new_map
       in
       let new_map =

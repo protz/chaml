@@ -66,7 +66,17 @@ and unifier_scheme = {
 
 (** The unifier actually provides the base solver with the necessary stubs to
     create pre-allocated constraints and terms. *)
-module BaseSolver: Algebra.SOLVER
+module BaseSolver: sig
+  type var = unifier_var
+  type scheme = unifier_scheme
+  type instance = unifier_var list ref
+
+  val new_var: string -> var
+  val new_scheme: unit -> scheme
+  val new_instance: unit -> instance
+
+  val string_of_var: var -> string
+end
 
 (** {3 Pools and environments} *)
 

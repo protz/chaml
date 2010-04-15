@@ -39,7 +39,7 @@ module Make: functor (S: Algebra.SOLVER) -> sig
   type type_scheme =
       Algebra.Make(S).type_var list
     * type_constraint
-    * Algebra.Make(S).type_var IdentMap.t
+    * (Algebra.Make(S).type_var * S.scheme) IdentMap.t
 
   (** The definition of a constraint. [`Dump] is not really useful, we could use
       [`True], but left for the sake of compatibility with mini.
