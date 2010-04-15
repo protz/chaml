@@ -33,8 +33,8 @@ let string_of_error = function
   | UnifyError e ->
       Unify.string_of_error e
 
-let unify_or_raise unifier_env t1 t2 =
-  match (unify unifier_env t1 t2) with
+let unify_or_raise unifier_env uvar1 uvar2 =
+  match (unify unifier_env uvar1 uvar2) with
   | `Ok -> ();
   | `Error e -> raise (Error (UnifyError e))
 
@@ -78,24 +78,24 @@ let solve =
       | `True ->
           Error.debug "[STrue] Returning from True\n";
           unifier_env
-      | `Equals (t1, t2) ->
-          let t1 = uvar_of_tterm unifier_env (tv_tt t1) in
-          let t2 = uvar_of_tterm unifier_env t2 in
-          Error.debug "[SEquals] %s = %s\n" (UnionFind.find t1).name (UnionFind.find t2).name;
-          unify_or_raise unifier_env t1 t2;
+      | `Equals (`Var uvar1, t2) ->
+          ensure_ready unifier_env uvar1;
+          let uvar2 = uvar_of_term unifier_env t2 in
+          Error.debug "[SEquals] %a = %a\n" uvar_name uvar1 uvar_name uvar2;
+          unify_or_raise unifier_env uvar1 uvar2;
           unifier_env
-      | `Instance (ident, t) ->
+      | `Instance (ident, `Var uvar) ->
           (* For instance: ident = f (with let f x = x), and t = int -> int *)
           (* scheme is basically what came out of solving the left branch of the
            * let. young_vars is all the young variables that are possibly
            * quantified inside that scheme *)
-          let t_uvar = uvar_of_tterm unifier_env (tv_tt t) in
+          ensure_ready unifier_env uvar;
           let scheme = IdentMap.find ident (scheme_of_ident unifier_env) in
           let ident_s = string_of_ident ident in
           let instance = fresh_copy unifier_env scheme in
           Error.debug
               "[SInstance] Taking an instance of %s: %a\n" ident_s uvar_name instance;
-          unify_or_raise unifier_env instance t_uvar;
+          unify_or_raise unifier_env instance uvar;
           unifier_env
       | `Conj (c1, c2) ->
           (* Do *NOT* forward _unifier_env! Identifiers in c1's scope must not
@@ -104,17 +104,13 @@ let solve =
           analyze unifier_env c1
       | `Exists (xis, c) ->
           (* This makes sure we add the existentially defined variables as
-           * universally quantified in the currently enclosing let definition.
-           * *)
-          Jlist.ignore_map
-            (uvar_of_tterm unifier_env)
-            (tvl_ttl xis);
+           * universally quantified within the currently enclosing let
+           * definition.  *)
+          List.iter (fun (`Var x) -> ensure_ready unifier_env x) xis;
           analyze unifier_env c
       | `Let (schemes, c2) ->
           (* We take all the schemes, and schedule them for execution. *)
           schedule_schemes unifier_env schemes c2
-      | `Dump ->
-          unifier_env
   (* This one only implements scheduling and merging multiple simultaneous let
    * definitions. This roughly corresponds to S-SOLVE-LET. *)
   and schedule_schemes: unifier_env -> type_scheme list -> type_constraint -> unifier_env =
@@ -126,29 +122,21 @@ let solve =
        * *)
       let solve_branch: unifier_scheme IdentMap.t -> type_scheme -> unifier_scheme IdentMap.t =
         fun new_map scheme ->
-        let vars, konstraint, var_map = scheme in
-
-        (* --- Debug --- *)
-        let module JIM = Jmap.Make(IdentMap) in
-        let idents = JIM.keys var_map in
-        let idents = List.map string_of_ident idents in
-        let idents = String.concat ", " idents in
-        Error.debug_simple
-          (Bash.color 219 "[SLeft] Solving scheme for %s\n" idents);
-        (* --- End Debug --- *)
-
         (* Create a fresh environment to type the left part in it. This also
          * allows us to create a fresh pool which will contain all the
          * existentially quantified variables in it. *)
         let sub_env = step_env unifier_env in
+        let vars, konstraint, var_map = scheme in
 
-        (* Solve the constraint in the scheme. *)
-        let _unifier_env' =
-          analyze sub_env konstraint
-        in
-        let current_pool = current_pool sub_env in
+        (* --- Debug --- *)
+        Error.debug "%a" (fun buf () ->
+          let module JIM = Jmap.Make(IdentMap) in
+          let idents = JIM.keys var_map in
+          let idents = List.map string_of_ident idents in
+          let idents = String.concat ", " idents in
+          Buffer.add_string buf (Bash.color 219 "[SLeft] Solving scheme for %s\n" idents);
+        ) ();
 
-        (* Debug *)
         let debug_inpool l =
           let rank = current_rank sub_env in
           let members =
@@ -158,8 +146,18 @@ let solve =
                    Printf.sprintf "%s(%d)" repr.name repr.rank)
               l
           in
-          Error.debug_simple (Bash.color 208 "[InPool] %d: %s\n" rank (String.concat ", " members));
+          Error.debug "%a"
+            (fun buf () -> Buffer.add_string buf (
+              Bash.color 208 "[InPool] %d: %s\n" rank (String.concat ", " members)))
+            ();
         in
+        (* --- End Debug --- *)
+
+        (* Solve the constraint in the scheme. *)
+        let _unifier_env' =
+          analyze sub_env konstraint
+        in
+        let current_pool = current_pool sub_env in
 
         (* We want to keep "young" variables that have been introduced while
          * solving the constraint attached to that branch. We don't want to
@@ -190,27 +188,26 @@ let solve =
 
         debug_inpool young_vars;
 
-        (* Each identifier is assigned a scheme. It's a list of the young vars
-         * and a pointer to a variable that contains the constraint associated
-         * to the identifier. *)
+        (* Fill in the schemes that have been pre-allocated by the constraint
+         * generator. Reminder: these are variables that are not ready!. *)
         let assign_scheme: ident -> unifier_scheme = fun ident ->
-          let tterm, scheme = IdentMap.find ident var_map in
-          let uvar = uvar_of_tterm unifier_env (tv_tt tterm) in
-          let _ = uvar_of_tterm unifier_env (tv_tt (`Var scheme.scheme)) in
+          let (`Var uvar), scheme = IdentMap.find ident var_map in
+          ensure_ready unifier_env uvar;
+          ensure_ready unifier_env scheme.scheme_var;
           scheme.young_vars <- young_vars;
-          unify_or_raise unifier_env scheme.scheme uvar;
+          unify_or_raise unifier_env scheme.scheme_var uvar;
           scheme
         in
         IdentMap.fold
           (fun ident type_var map ->
              let r = IdentMap.add ident (assign_scheme ident) map in
              let string_of_key = fun x -> (UnionFind.find x).name in
-             Error.debug_simple
-               (Bash.color
+             Error.debug "%a"
+               (fun buf () -> Buffer.add_string buf (Bash.color
                   185
                   "[SScheme] Got %s\n"
                   (string_of_scheme ~string_of_key
-                     (string_of_ident ident) (IdentMap.find ident r)));
+                     (string_of_ident ident) (IdentMap.find ident r)))) ();
              r
           )
           (var_map: (type_var * unifier_scheme) IdentMap.t :> (type_term * unifier_scheme) IdentMap.t)
@@ -229,7 +226,7 @@ let solve =
       (fun k v -> Error.debug "[Rank] %s: %d\n"
                     (UnionFind.find v).name
                     (UnionFind.find v).rank)
-      knowledge.uvar_of_tterm; *)
+      knowledge.uvar_of_term; *)
     let module JIM = Jmap.Make(IdentMap) in
     let kv = JIM.to_list (scheme_of_ident knowledge) in
     let kv = List.filter (fun ((_, pos), _) -> not pos.Location.loc_ghost) kv in

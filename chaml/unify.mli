@@ -61,11 +61,15 @@ and unifier_term = [ `Cons of type_cons * unifier_var list ]
 (** A scheme is a list of young variables and a constraint. *)
 and unifier_scheme = {
   mutable young_vars: unifier_var list;
-  mutable scheme: unifier_var;
+  mutable scheme_var: unifier_var;
 }
 
 (** The unifier actually provides the base solver with the necessary stubs to
-    create pre-allocated constraints and terms. *)
+    create pre-allocated constraints and terms. We need to expose all the
+    internals of this module because the solver needs to be aware of the type
+    equalities between scheme and unifier_scheme for instance (unless we provide
+    wrappers around that which we don't really want to do). The other solution
+    is for {Unify} to provide a unifier_scheme_of_basesolver_scheme funtion. *)
 module BaseSolver: sig
   type var = unifier_var
   type scheme = unifier_scheme
@@ -137,20 +141,28 @@ val string_of_scheme: ?string_of_key:(unifier_var -> string) -> ?caml_types:bool
 
 (** {3 Core functions} *)
 
-(** When instanciating a type scheme, if the rank of the scheme is equal to the
-    current rank, we must create a instance. This function takes care of
-    avoiding all cycles (fingers crossed!) and returns a fresh copy of a
-    unification variable. *)
+(** When instanciating a type scheme, we must return a copy the variable that
+    represents the type scheme, with all the universally quantified variables in
+    the scheme replaced by copies of them. This function takes care of
+    avoiding all cycles (fingers crossed!) and returns a fresh copy of the
+    scheme's unification variable. *)
 val fresh_copy: unifier_env -> unifier_scheme -> unifier_var
 
-(** Recursively change terms that depend on {!Algebra.Make.type_var}s into
-    unification vars. This function implements the "explicit sharing" concept by
-    making sure we only have pointers to equivalence classes (and not whole
-    terms). This is discussed on p.442, see rule S-NAME-1. This implies
-    creating variables on-the-fly when dealing with type constructors, so that
-    when duplicating the associated var, the pointer to the equivalence class is
-    retained. *)
-val uvar_of_tterm: unifier_env -> Algebra.Make(BaseSolver).type_term -> unifier_var
+(** When the constraint generator requests a variable, the {!SOLVER] answers with
+    what is said to be a "not ready" variable. We cannot use a variable in the
+    solver and the unifier if it's not ready. There is a mark on variable to
+    tell if they have been made ready or not, so you should always call this
+    function before accessing a variable that's been created by the constraint
+    generator.
+    *)
+val ensure_ready: unifier_env -> unifier_var -> unit
+
+(** This function transforms a type term (let's say, T = [`Cons ("->", uvar1,
+    uvar2)]) into a proper unification variable which is equated with term T. It
+    implements explicit sharing by hashconsing constructors (two subsequent
+    calls with the same constructor will return the same variable). It also
+    makes sure all variables are ready before returning. *)
+val uvar_of_term: unifier_env -> Algebra.Make(BaseSolver).type_term -> unifier_var
 
 (** The main function, called by the solver to unify terms. *)
 val unify: unifier_env -> unifier_var -> unifier_var -> [ `Ok | `Error of error ]

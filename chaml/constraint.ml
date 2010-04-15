@@ -36,7 +36,6 @@ module Make (S: Algebra.SOLVER) = struct
     | `Equals of type_var * type_term
     | `Instance of ident * type_var
     | `Let of type_scheme list * type_constraint
-    | `Dump
   ]
 
 
@@ -115,8 +114,6 @@ module Make (S: Algebra.SOLVER) = struct
             let schemes = String.concat sep (List.map (string_of_type_scheme pp_env i') schemes) in
             let c = string_of_constraint pp_env i c in
             String.concat "" ("let\n" :: i' :: schemes :: ["\n"; i; "in\n"; i; c])
-        | `Dump ->
-            "dump\n"
       and string_of_type_scheme pp_env i s =
         let open Jstring in
         let xs, c, var_map = s in

@@ -340,7 +340,7 @@ module Make(S: Algebra.SOLVER) = struct
           [plus_scheme; mult_scheme]
         in
         let topmost_constraint =
-          List.fold_right generate_constraint_structure_item structure `Dump
+          List.fold_right generate_constraint_structure_item structure `True
         in
         if opt_default_bindings then
           `Let (default_bindings, topmost_constraint)

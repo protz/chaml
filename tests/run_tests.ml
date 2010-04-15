@@ -182,14 +182,14 @@ let _ =
   let test3 () =
     print_endline (Bash.box "Constraint Generation - first series of tests");
     let o = Ocamlbuild_plugin.run_and_read
-      ("./chaml.native --no-print-types --disable generalize-match " ^
+      ("./chaml.native --dont-print-types --disable generalize-match " ^
       "--disable default-bindings --print-constraint tests/test_constraint.ml")
     in
     let fd = open_out "_constraint" in
     output_string fd o;
     close_out fd;
     let o = Ocamlbuild_plugin.run_and_read
-      ("./chaml.native --no-print-types " ^
+      ("./chaml.native --dont-print-types " ^
       "--disable default-bindings --print-constraint tests/test_constraint.ml")
     in
     let fd = open_out "_constraint2" in

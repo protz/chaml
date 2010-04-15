@@ -38,7 +38,7 @@ and unifier_term = [
 ]
 and unifier_scheme = {
   mutable young_vars: unifier_var list;
-  mutable scheme: unifier_var;
+  mutable scheme_var: unifier_var;
 }
 
 (* Since TypeCons is not a functor, we were able to bootstrap the types above.
@@ -56,7 +56,7 @@ module BaseSolver = struct
 
   let new_scheme () = {
     young_vars = [];
-    scheme = UnionFind.fresh
+    scheme_var = UnionFind.fresh
                { name = fresh_name ~prefix:"scheme" (); rank = -1; term = None; ready = false }
   }
 
@@ -102,7 +102,7 @@ end
  * constraint not pollute one branch's scope with the other one's.*)
 type unifier_env = {
   current_pool: Pool.t;
-  (* uvar_of_tterm: (type_term, unifier_var) Hashtbl.t; *)
+  (* uvar_of_term: (type_term, unifier_var) Hashtbl.t; *)
   scheme_of_ident: unifier_scheme IdentMap.t;
 }
 
@@ -113,7 +113,7 @@ let scheme_of_ident unifier_env = unifier_env.scheme_of_ident
 let set_scheme_of_ident unifier_env scheme_of_ident = { unifier_env with scheme_of_ident }
 let fresh_env () = {
     current_pool = Pool.base_pool;
-    (* uvar_of_tterm = Hashtbl.create 64; *)
+    (* uvar_of_term = Hashtbl.create 64; *)
     scheme_of_ident = IdentMap.empty;
   }
 
@@ -189,7 +189,7 @@ let string_of_uvars ?caml_types uvars =
 
 (* For printing type schemes *)
 let string_of_scheme ?string_of_key ?caml_types ident scheme =
-  let { young_vars; scheme = uvar } = scheme in
+  let { young_vars; scheme_var = uvar } = scheme in
   let young_vars = List.filter (fun x -> (UnionFind.find x).term = None) young_vars in
   Printf.sprintf "val %s: %s" ident (string_of_uvar ?string_of_key ~young_vars ?caml_types uvar)
 
@@ -211,7 +211,7 @@ let fresh_unifier_var ?term ?prefix ?name unifier_env =
   uvar
 
 (* Create a fresh copy of a scheme for instanciation *)
-let fresh_copy unifier_env { young_vars; scheme = scheme_uvar } =
+let fresh_copy unifier_env { young_vars; scheme_var = scheme_uvar } =
   let mapping = Hashtbl.create 16 in
   let call_stack = Hashtbl.create 16 in
   let base_rank = (UnionFind.find scheme_uvar).rank in
@@ -266,49 +266,53 @@ let fresh_copy unifier_env { young_vars; scheme = scheme_uvar } =
   Error.debug "[UCopy] Mapping: %a\n" print_pairs ();
   fresh_copy scheme_uvar
 
+(* This actually sets up the rank properly and adds the variable in the current
+ * pool if this hasn't been done already. Extremely useful when the solver
+ * encounters variables that have been allocated by the constraint generator and
+ * that are not ready yet. *)
+let ensure_ready unifier_env uvar =
+  let repr = UnionFind.find uvar in
+  if not repr.ready then begin
+    repr.rank <- current_rank unifier_env;
+    let open Pool in
+    unifier_env.current_pool.members <- (uvar :: unifier_env.current_pool.members);
+    repr.ready <- true;
+  end
+
 (* What we have is bare unifier vars that don't have a proper rank, etc. So if
  * we haven't seen them yet, we set their rank properly, and we add them to the
  * environment's hash table.
  *
  * BEWARE BEWARE: the following nasty sequence of events can happen:
- * - uvar_of_tterm uvar
+ * - uvar_of_term uvar
  * - unify uvar with something else
  * - uvar's hash changes
- * - uvar_of_tterm uvar
+ * - uvar_of_term uvar
  *
  * We cannot use the full variable as the key for the Hashtbl. We cannot use its
  * repr either. So we must use the name (what a pity!). We might have a
  * uniquely-generated (Oo.id (object end)) later on but for now on that'll be ok
  * (have a look at fresh_name in Algebra to convince yourself the names are
  * globally unique). *)
-let rec uvar_of_tterm: unifier_env -> type_term -> unifier_var =
+let rec uvar_of_term: unifier_env -> type_term -> unifier_var =
   let known_terms = Hashtbl.create 64 in
   fun unifier_env type_term ->
-    let ensure_ready uvar =
-      let repr = UnionFind.find uvar in
-      if not repr.ready then begin
-        repr.rank <- current_rank unifier_env;
-        let open Pool in
-        unifier_env.current_pool.members <- (uvar :: unifier_env.current_pool.members);
-        repr.ready <- true;
-      end
-    in
-    let rec uvar_of_tterm tterm =
+    let rec uvar_of_term tterm =
       match tterm with
         | `Var uvar ->
-            ensure_ready uvar;
+            ensure_ready unifier_env uvar;
             uvar
         | `Cons (cons, args) ->
             match Jhashtbl.find_opt known_terms tterm with
               | Some uvar ->
                   uvar
               | None ->
-                  let term = `Cons (cons, List.map uvar_of_tterm args) in
+                  let term = `Cons (cons, List.map uvar_of_term args) in
                   let uvar = fresh_unifier_var ~term unifier_env in
                   Hashtbl.add known_terms tterm uvar;
                   uvar
     in
-    uvar_of_tterm type_term
+    uvar_of_term type_term
 
 let debug_unify =
   fun v1 v2 ->

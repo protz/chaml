@@ -57,7 +57,6 @@ module Make: functor (S: Algebra.SOLVER) -> sig
     | `Equals of Algebra.Make(S).type_var * Algebra.Make(S).type_term
     | `Instance of ident * Algebra.Make(S).type_var
     | `Let of type_scheme list * type_constraint
-    | `Dump
   ]
 
   (** We enforce some invariants by requiring that in some places we deal with a

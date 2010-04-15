@@ -119,7 +119,7 @@ let _ =
     [
       "--print-ast", Arg.Set arg_print_ast, "print the AST as parsed by the OCaml frontend";
       "--print-constraint", Arg.Set arg_print_constraint, "print the constraint in a format mini can parse";
-      "--no-print-types", Arg.Clear arg_print_types, "print the inferred types, à la ocamlc -i";
+      "--dont-print-types", Arg.Clear arg_print_types, "don't print the inferred types, à la ocamlc -i";
       "--print-typed-ast", Arg.Set arg_print_typed_ast, "print the AST annotated with the types found by the solver";
       "--enable", Arg.String (add_opt true), "enable one of the options above";
       "--disable", Arg.String (add_opt false), "disable one of the options above";
@@ -152,9 +152,11 @@ let _ =
     in
     if !arg_print_constraint then begin
       let pretty_printing = Options.get_opt "pretty-printing" in
-      print_string
-        (Constraint.PrettyPrinter.string_of_constraint ~pretty_printing konstraint);
-      flush stdout;
+      let str =
+        (Constraint.PrettyPrinter.string_of_constraint ~pretty_printing konstraint) in
+      String.blit "dump" 0 str (String.length str - 4) 4;
+      print_string (str^"\n");
+      flush stdout
     end;
     (* Constraint solving *)
     let print_types = !arg_print_types in
