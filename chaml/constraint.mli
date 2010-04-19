@@ -24,9 +24,8 @@
 
 module Make: functor (S: Algebra.SOLVER) -> sig
 
-  (* To get the ident type in scope. *)
-  open Algebra.Identifiers
   open Algebra.Core
+  open Algebra.Identifiers
 
   (** Here we differ slightly from the definition in ATTAPL. A scheme is made of a
       list of universally quantified variables, a constraint that has to be

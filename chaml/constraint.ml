@@ -20,7 +20,7 @@
 module Make (S: Algebra.SOLVER) = struct
 
   open Algebra.TypeCons
-  include Algebra.Identifiers
+  open Algebra.Identifiers
   open Algebra.Core
 
   type type_scheme =
