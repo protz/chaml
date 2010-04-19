@@ -10,7 +10,7 @@
 (*                                                                     *)
 (***********************************************************************)
 
-(* $Id: printast.ml 9406 2009-11-01 21:52:29Z frisch $ *)
+(* $Id: printast.ml 10227 2010-04-02 12:53:33Z xleroy $ *)
 
 open Asttypes;;
 open Format;;
@@ -510,6 +510,9 @@ and module_type i ppf x =
       line i ppf "Pmty_with\n";
       module_type i ppf mt;
       list i longident_x_with_constraint ppf l;
+  | Pmty_typeof m ->
+      line i ppf "Pmty_typeof\n";
+      module_expr i ppf m
 
 and signature i ppf x = list i signature_item ppf x
 

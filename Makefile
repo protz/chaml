@@ -4,20 +4,26 @@ BUILDFLAGS=-I stdlib -I utils -I parsing -cflag -strict-sequence
 .PHONY: tests doc
 
 all:
+	./yacchack.sh
 	ocamlbuild $(BUILDFLAGS) chaml/chaml.native
+	./noyacchack.sh
 
 debug:
+	./yacchack.sh
 	ocamlbuild -tag warn_A -tag warn_e -tag warn_z -tag debug \
 	  $(BUILDFLAGS) -tag use_unix chaml/chaml.byte
 	OCAMLRUNPARAM=b=1 ./chaml.byte \
 		--print-constraint --enable pretty-printing --enable debug\
 		--disable default-bindings\
 		test.ml
+	./noyacchack.sh
 
 tests:
+	./yacchack.sh
 	#ocamlbuild $(BUILDFLAGS) -I chaml -menhir "menhir --trace" tests/run_tests.byte chaml/chaml.native
 	ocamlbuild $(BUILDFLAGS) -I chaml tests/run_tests.byte chaml/chaml.native
 	./run_tests.byte
+	./noyacchack.sh
 
 stdlib_tests:
 	ocamlbuild stdlib/tests.native

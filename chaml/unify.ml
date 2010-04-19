@@ -68,7 +68,7 @@ end
 (* We're good to go! *)
 
 open Algebra.Core
-module TypePrinter_ = TypePrinter.Make(BaseSolver) open TypePrinter_
+open TypePrinter
 
 (* A pool contains all the variables with a given rank. *)
 module Pool = struct
@@ -129,10 +129,10 @@ let step_env env =
  * parameter is used when printing a unification variable whose internal name we
  * want to display (to track unification progress). Do not use it if you want to
  * see a "real" type. *)
-let inspect_uvar: ?debug:unit -> unifier_var -> inspected_var =
+let inspect_uvar: ?debug:unit -> unifier_var -> unifier_var inspected_var =
   fun ?debug uvar ->
     let seen = Hashtbl.create 16 in
-    let rec inspect_uvar: unifier_var -> inspected_var =
+    let rec inspect_uvar: unifier_var -> unifier_var inspected_var =
     fun uvar ->
       let repr = UnionFind.find uvar in
       begin match Jhashtbl.find_opt seen repr with
@@ -169,29 +169,32 @@ let inspect_uvar: ?debug:unit -> unifier_var -> inspected_var =
     in
     inspect_uvar uvar
 
+let debug_var_printer = `Custom (fun uvar -> (UnionFind.find uvar).name)
+let regular_var_printer = `Auto (fun uvar -> (UnionFind.find uvar).name)
+
 (* This is mainly for debugging *)
 let rec uvar_name: Buffer.t -> unifier_var -> unit =
   fun buf uvar -> match UnionFind.find uvar with
     | { name = s; term = None; _ } ->
         Printf.bprintf buf "%s" s
     | { name = s; term = Some cons; _ } ->
-        let string_of_key uvar = (UnionFind.find uvar).name in
         Buffer.add_string buf
-          (string_of_type ~string_of_key (inspect_uvar ~debug:() uvar))
+          (string_of_type ~string_of_key:debug_var_printer (inspect_uvar ~debug:() uvar))
 
 (* For error messages *)
-let string_of_uvar ?string_of_key ?caml_types ?young_vars uvar =
+let string_of_uvar ?debug ?caml_types ?young_vars uvar =
+  let string_of_key = if Option.unit_bool debug then debug_var_printer else regular_var_printer in
   string_of_type ?string_of_key ?caml_types ?young_vars (inspect_uvar uvar)
 
 (* For error messages. Same distinction, see typePrinter.mli *)
 let string_of_uvars ?caml_types uvars =
-  string_of_types ?caml_types (List.map inspect_uvar uvars)
+  string_of_types ~string_of_key:regular_var_printer ?caml_types (List.map inspect_uvar uvars)
 
 (* For printing type schemes *)
-let string_of_scheme ?string_of_key ?caml_types ident scheme =
+let string_of_scheme ?debug ?caml_types ident scheme =
   let { young_vars; scheme_var = uvar } = scheme in
   let young_vars = List.filter (fun x -> (UnionFind.find x).term = None) young_vars in
-  Printf.sprintf "val %s: %s" ident (string_of_uvar ?string_of_key ~young_vars ?caml_types uvar)
+  Printf.sprintf "val %s: %s" ident (string_of_uvar ?debug ~young_vars ?caml_types uvar)
 
 
 (* Create a fresh variable and add it to the current pool *)

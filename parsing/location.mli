@@ -39,9 +39,9 @@ val init : Lexing.lexbuf -> string -> unit
 val curr : Lexing.lexbuf -> t
 (** Get the location of the current token from the [lexbuf]. *)
 
-val symbol_rloc: Lexing.position -> Lexing.position -> t
+val symbol_rloc: unit -> t
 val symbol_gloc: unit -> t
-val rhs_loc: Lexing.position -> Lexing.position -> t
+val rhs_loc: int -> t
 
 val input_name: string ref
 val input_lexbuf: Lexing.lexbuf option ref

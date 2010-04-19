@@ -10,7 +10,7 @@
 (*                                                                     *)
 (***********************************************************************)
 
-(* $Id: parsetree.mli 9547 2010-01-22 12:48:24Z doligez $ *)
+(* $Id: parsetree.mli 10227 2010-04-02 12:53:33Z xleroy $ *)
 
 (* Abstract syntax tree produced by parsing *)
 
@@ -66,16 +66,16 @@ type pattern =
     ppat_loc: Location.t }
 
 and pattern_desc =
-    Ppat_any (**)
-  | Ppat_var of string (**)
+    Ppat_any
+  | Ppat_var of string
   | Ppat_alias of pattern * string
   | Ppat_constant of constant
-  | Ppat_tuple of pattern list (**)
+  | Ppat_tuple of pattern list
   | Ppat_construct of Longident.t * pattern option * bool
   | Ppat_variant of label * pattern option
   | Ppat_record of (Longident.t * pattern) list * closed_flag
   | Ppat_array of pattern list
-  | Ppat_or of pattern * pattern (**)
+  | Ppat_or of pattern * pattern
   | Ppat_constraint of pattern * core_type
   | Ppat_type of Longident.t
   | Ppat_lazy of pattern
@@ -85,12 +85,12 @@ type expression =
     pexp_loc: Location.t }
 
 and expression_desc =
-    Pexp_ident of Longident.t (**)
+    Pexp_ident of Longident.t
   | Pexp_constant of constant
-  | Pexp_let of rec_flag * (pattern * expression) list * expression (**)
-  | Pexp_function of label * expression option * (pattern * expression) list (**)
-  | Pexp_apply of expression * (label * expression) list (**)
-  | Pexp_match of expression * (pattern * expression) list (**)
+  | Pexp_let of rec_flag * (pattern * expression) list * expression
+  | Pexp_function of label * expression option * (pattern * expression) list
+  | Pexp_apply of expression * (label * expression) list
+  | Pexp_match of expression * (pattern * expression) list
   | Pexp_try of expression * (pattern * expression) list
   | Pexp_tuple of expression list
   | Pexp_construct of Longident.t * expression option * bool
@@ -207,6 +207,7 @@ and module_type_desc =
   | Pmty_signature of signature
   | Pmty_functor of string * module_type * module_type
   | Pmty_with of module_type * (Longident.t * with_constraint) list
+  | Pmty_typeof of module_expr
 
 and signature = signature_item list
 
@@ -255,8 +256,8 @@ and structure_item =
     pstr_loc: Location.t }
 
 and structure_item_desc =
-    Pstr_eval of expression (**)
-  | Pstr_value of rec_flag * (pattern * expression) list (**)
+    Pstr_eval of expression
+  | Pstr_value of rec_flag * (pattern * expression) list
   | Pstr_primitive of string * value_description
   | Pstr_type of (string * type_declaration) list
   | Pstr_exception of string * exception_declaration

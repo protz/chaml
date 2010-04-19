@@ -29,4 +29,4 @@ module BaseSolver = struct
   let string_of_var s = s
 end
 
-type pvar = TypePrinter.Make(BaseSolver).inspected_var
+type pvar = string TypePrinter.inspected_var

@@ -204,12 +204,11 @@ let solve =
         IdentMap.fold
           (fun ident type_var map ->
              let r = IdentMap.add ident (assign_scheme ident) map in
-             let string_of_key = fun x -> (UnionFind.find x).name in
              Error.debug "%a"
                (fun buf () -> Buffer.add_string buf (Bash.color
                   185
                   "[SScheme] Got %s\n"
-                  (string_of_scheme ~string_of_key
+                  (string_of_scheme
                      (string_of_ident ident) (IdentMap.find ident r)))) ();
              r
           )

@@ -32,8 +32,8 @@
  * discard the subtle differences in parenthesing between ChaML and OCaml.
  * *)
 
-module TypePrinter_ = TypePrinter.Make(ParserTypes.BaseSolver) open TypePrinter_
 module Constraint_ = Constraint.Make(ParserTypes.BaseSolver) open Constraint_
+open TypePrinter
 
 let parse_output output =
   let lexbuf = Lexing.from_string output in
@@ -74,7 +74,7 @@ let _ =
       let l = List.length (List.hd ts) in
       let compare_and_print: int -> (string * ParserTypes.pvar) list -> unit = fun i rs ->
         let names, types = List.split rs in
-        let types = List.map (string_of_type ~caml_types:true) types in
+        let types = List.map (string_of_type ~string_of_key:(`Auto (fun x -> x)) ~caml_types:true) types in
         let i = i + 1 in
         let sp = if i >= 10 then "" else " " in
         (*Printf.printf "%s = %s\n" (print_type type1) (print_type type2);*)
