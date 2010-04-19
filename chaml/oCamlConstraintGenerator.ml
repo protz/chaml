@@ -60,24 +60,24 @@ module Make(S: Algebra.SOLVER) = struct
     let module Types = struct
       type constraint_pattern = {
         p_constraint: type_constraint;
-        lambda_pattern: Lambda.pattern;
+        pat: Lambda.pattern;
         var_map: (type_var * S.scheme) IdentMap.t;
         introduced_vars: type_var list;
       }
 
       type constraint_expression = {
         e_constraint: type_constraint;
-        lambda_term: Lambda.term;
+        expr: Lambda.expression;
       }
 
       type constraint_pat_expr = {
         scheme: type_scheme;
-        pat_expr: Lambda.pattern * Lambda.term;
+        pat_expr: Lambda.pattern * Lambda.expression;
       }
 
       type constraint_structure = {
         s_constraint: type_constraint;
-        s_term: Lambda.term;
+        s_term: Lambda.expression;
       }
     end in
     let open Types in
@@ -107,7 +107,7 @@ module Make(S: Algebra.SOLVER) = struct
                 p_constraint = `True;
                 var_map = IdentMap.empty;
                 introduced_vars = [];
-                lambda_pattern = `Any;
+                pat = `Any;
               }
           | Ppat_var v ->
               let var = ident v ppat_loc in
@@ -117,17 +117,17 @@ module Make(S: Algebra.SOLVER) = struct
                 p_constraint = `True;
                 var_map;
                 introduced_vars = [];
-                lambda_pattern = `Var (var, solver_scheme);
+                pat = `Var (var, solver_scheme);
               }
           | Ppat_tuple patterns ->
             let module JIM = Jmap.Make(IdentMap) in
             let xis = List.map (fun _ -> fresh_type_var ()) patterns in
             let patterns = List.map2
               (fun pattern xi ->
-                let { p_constraint = konstraint; var_map; introduced_vars; lambda_pattern; } =
+                let { p_constraint = konstraint; var_map; introduced_vars; pat; } =
                   generate_constraint_pattern xi pattern
                 in
-                konstraint, var_map, xi :: introduced_vars, lambda_pattern)
+                konstraint, var_map, xi :: introduced_vars, pat)
               patterns
               xis
             in
@@ -145,22 +145,22 @@ module Make(S: Algebra.SOLVER) = struct
               (List.map (fun (_, x, _, _) -> x) patterns)
             in
             let pattern_vars = List.flatten (List.map (fun (_, _, x, _) -> x) patterns) in
-            let lambda_pattern = `Tuple (List.map (fun (_, _, _, x) -> x) patterns) in
+            let pat = `Tuple (List.map (fun (_, _, _, x) -> x) patterns) in
             let konstraint = `Equals (x, type_cons "*" (tvl_ttl xis)) in
             let p_constraint = `Conj (konstraint, pattern_constraint) in
             {
               p_constraint;
               var_map = pattern_map;
               introduced_vars = pattern_vars;
-              lambda_pattern;
+              pat;
             }
           | Ppat_or (pat1, pat2) ->
             (* match e1 with p1 | p2 -> *)
             let module JIM = Jmap.Make(IdentMap) in
-            let { p_constraint = c1; var_map = map1; introduced_vars = vars1; lambda_pattern = lp1 } =
+            let { p_constraint = c1; var_map = map1; introduced_vars = vars1; pat = lp1 } =
               generate_constraint_pattern x pat1
             in
-            let { p_constraint = c2; var_map = map2; introduced_vars = vars2; lambda_pattern = lp2 } =
+            let { p_constraint = c2; var_map = map2; introduced_vars = vars2; pat = lp2 } =
               generate_constraint_pattern x pat2
             in
             let xor_map = JIM.xor map1 map2 in
@@ -181,7 +181,7 @@ module Make(S: Algebra.SOLVER) = struct
               p_constraint = constr_conj (c1 :: c2 :: constraints);
               var_map = map1;
               introduced_vars = vars1 @ vars2;
-              lambda_pattern = `Or (lp1, lp2);
+              pat = `Or (lp1, lp2);
             }
           | _ ->
               raise_error (NotImplemented ("some pattern", ppat_loc))
@@ -200,11 +200,11 @@ module Make(S: Algebra.SOLVER) = struct
               let solver_instance = S.new_instance () in
               let ident = ident x pexp_loc in
               let e_constraint = `Instance (ident, t, solver_instance) in
-              let lambda_term = `Instance (ident, solver_instance) in
-              { e_constraint; lambda_term; }
+              let expr = `Instance (ident, solver_instance) in
+              { e_constraint; expr; }
           | Pexp_constant c ->
               let open Asttypes in
-              let e_constraint, lambda_term = match c with
+              let e_constraint, expr = match c with
                 | Const_int x ->
                     `Equals (t, type_cons_int), `Int x
                 | Const_char x ->
@@ -215,7 +215,7 @@ module Make(S: Algebra.SOLVER) = struct
                     `Equals (t, type_cons_float), `Float x
                 | _ -> raise_error (NotImplemented ("int32 or int64 or intnative", pexp_loc))
               in
-              { e_constraint; lambda_term = `Const lambda_term; }
+              { e_constraint; expr = `Const expr; }
           | Pexp_function (_, _, pat_expr_list) ->
               (* As in the definition. We could generate fresh variables for each
                * branch of the pattern-matching. The conjunction would then force
@@ -229,17 +229,17 @@ module Make(S: Algebra.SOLVER) = struct
               in
               let generate_branch (pat, expr) =
                 (* roughly [[ pat: X1 ]] *)
-                let { p_constraint = c1; var_map; introduced_vars; lambda_pattern } =
+                let { p_constraint = c1; var_map; introduced_vars; pat } =
                   generate_constraint_pattern x1 pat
                 in
                 (* [[ t: X2 ]] *)
-                let { e_constraint = c2; lambda_term } = generate_constraint_expression x2 expr in
+                let { e_constraint = c2; expr } = generate_constraint_expression x2 expr in
                 let let_constr = `Let ([[], c1, var_map], c2) in
                 (* This allows to properly scope the variables that are inner to
                  * each pattern. x1 and x2 are a level higher since they are shared
                  * accross patterns. This wouldn't change much as the variables are
                  * fresh anyway, but let's do that properly! *)
-                `Exists (introduced_vars, let_constr), (lambda_pattern, lambda_term)
+                `Exists (introduced_vars, let_constr), (pat, expr)
               in
               let constraints, patexprs =
                 List.split (List.map generate_branch pat_expr_list)
@@ -247,7 +247,7 @@ module Make(S: Algebra.SOLVER) = struct
               let e_constraint =
                 `Exists ([x1; x2], constr_conj (arrow_constr :: constraints))
               in
-              { e_constraint; lambda_term = `Lambda patexprs }
+              { e_constraint; expr = `Lambda patexprs }
 
           | Pexp_apply (e1, label_expr_list) ->
               (* ti: xi *)
@@ -262,7 +262,7 @@ module Make(S: Algebra.SOLVER) = struct
               in
               let sub_constraints, terms =
                 List.split
-                  (List.map (fun { e_constraint; lambda_term } -> e_constraint, lambda_term) sub_constraints)
+                  (List.map (fun { e_constraint; expr } -> e_constraint, expr) sub_constraints)
               in
               (* build the type constructor t1 -> (t2 -> (... -> (tn -> t))) *)
               let arrow_type = List.fold_right type_cons_arrow (tvl_ttl xis) (tv_tt t) in
@@ -271,7 +271,7 @@ module Make(S: Algebra.SOLVER) = struct
               (* x1 = t1 -> ... -> tn *)
               let equals_constr: type_constraint = `Equals (x1, arrow_type) in
               (* [[ e1: x1 ]] *)
-              let { e_constraint = arrow_constr; lambda_term = e1 } =
+              let { e_constraint = arrow_constr; expr = e1 } =
                 generate_constraint_expression x1 e1
               in
               (* combine both: [[ e1: t1 -> t2 -> ... -> tn -> t ]] *)
@@ -282,14 +282,14 @@ module Make(S: Algebra.SOLVER) = struct
               in
               { 
                 e_constraint = `Exists (x1 :: xis, konstraint);
-                lambda_term =  `App (e1, terms)
+                expr =  `App (e1, terms)
               }
           | Pexp_let (rec_flag, pat_expr_list, e2) ->
               (* Once again, the list of pattern/expressions is here because of
                * let ... and ... in e2 (multiple simultaneous definitions *)
               if rec_flag <> Asttypes.Nonrecursive then
                 raise_error (NotImplemented ("rec flag", pexp_loc));
-              let { e_constraint = c2; lambda_term = lambda_term_e2 } =
+              let { e_constraint = c2; expr = expr_e2 } =
                 generate_constraint_expression t e2
               in
               let run pat_expr =
@@ -301,7 +301,7 @@ module Make(S: Algebra.SOLVER) = struct
               let constraints, pat_expr = List.split (List.map run pat_expr_list) in
               {
                 e_constraint = `Let (constraints, c2);
-                lambda_term =  `Let (pat_expr, lambda_term_e2);
+                expr =  `Let (pat_expr, expr_e2);
               }
           | Pexp_match (e1, pat_expr_list) ->
               if opt_generalize_match then
@@ -319,7 +319,7 @@ module Make(S: Algebra.SOLVER) = struct
                 (* This is going to be simplified first *)
                 let x1 = fresh_type_var ~letter:'x' () in
                 let ident1 = ident (random_ident_name ()) Location.none in
-                let { e_constraint = constr_e1; lambda_term = term_e1 } =
+                let { e_constraint = constr_e1; expr = term_e1 } =
                   generate_constraint_expression x1 e1
                 in
                 let generate_branch (pat, expr) =
@@ -329,18 +329,18 @@ module Make(S: Algebra.SOLVER) = struct
                   let solver_instance = S.new_instance () in
                   let instance_constr = `Instance (ident1, y, solver_instance) in
                   (* It also satisfies the constraints of the pattern *)
-                  let { p_constraint = c1; var_map; introduced_vars; lambda_pattern } =
+                  let { p_constraint = c1; var_map; introduced_vars; pat } =
                     generate_constraint_pattern y pat
                   in
                   let c = constr_conj [instance_constr; c1] in
                   (* Generate constraints for the expression *)
-                  let { e_constraint = c2; lambda_term } =
+                  let { e_constraint = c2; expr } =
                     generate_constraint_expression t expr
                   in
                   let let_constr: type_constraint =
                     `Let ([y :: introduced_vars, c, var_map], c2)
                   in
-                  let_constr, (lambda_pattern, lambda_term)
+                  let_constr, (pat, expr)
                 in
                 let constraints, pat_exprs =
                   List.split (List.map generate_branch pat_expr_list)
@@ -353,30 +353,30 @@ module Make(S: Algebra.SOLVER) = struct
                  * type-checking generalized match. *)
                 {
                   e_constraint = `Let ([scheme], constr_conj constraints);
-                  lambda_term = `Match (term_e1, pat_exprs)
+                  expr = `Match (term_e1, pat_exprs)
                 }
               else
                 let x1 = fresh_type_var ~letter:'x' () in
-                let { e_constraint = constr_e1; lambda_term = term_e1 } =
+                let { e_constraint = constr_e1; expr = term_e1 } =
                   generate_constraint_expression x1 e1
                 in
                 let generate_branch (pat, expr) =
-                  let { p_constraint = c1; var_map; introduced_vars; lambda_pattern } =
+                  let { p_constraint = c1; var_map; introduced_vars; pat } =
                     generate_constraint_pattern x1 pat
                   in
-                  let { e_constraint = c2; lambda_term } =
+                  let { e_constraint = c2; expr } =
                     generate_constraint_expression t expr
                   in
                   (* This rule doesn't generalize, ocaml-style. *)
                   let let_constr: type_constraint = `Let ([[], c1, var_map], c2) in
-                  `Exists (introduced_vars, let_constr), (lambda_pattern, lambda_term)
+                  `Exists (introduced_vars, let_constr), (pat, expr)
                 in
                 let constraints, pat_exprs = 
                   List.split (List.map generate_branch pat_expr_list)
                 in
                 {
                   e_constraint = `Exists ([x1], constr_conj (constr_e1 :: constraints));
-                  lambda_term = `Match (term_e1, pat_exprs);
+                  expr = `Match (term_e1, pat_exprs);
                 }
           | _ ->
               raise_error (NotImplemented ("some expression", pexp_loc))
@@ -421,12 +421,12 @@ module Make(S: Algebra.SOLVER) = struct
                 }
             | Pstr_eval expr ->
                 let t = fresh_type_var ~letter:'t' () in
-                let { e_constraint = c; lambda_term; } =
+                let { e_constraint = c; expr; } =
                   generate_constraint_expression t expr
                 in
                 let c = `Exists ([t], c) in
                 let s_constraint = `Let ([[], c, IdentMap.empty], c2) in
-                let s_term = `Let ([`Any, lambda_term], t2) in
+                let s_term = `Let ([`Any, expr], t2) in
                 { s_constraint; s_term; }
             | _ ->
                 raise_error (NotImplemented ("some structure item", pstr_loc))
@@ -468,16 +468,16 @@ module Make(S: Algebra.SOLVER) = struct
     and generate_constraint_pat_expr: pattern * expression -> constraint_pat_expr =
       fun (pat, expr) ->
         let x = fresh_type_var ~letter:'x' () in
-        let { p_constraint = c1; var_map; introduced_vars; lambda_pattern } =
+        let { p_constraint = c1; var_map; introduced_vars; pat } =
           generate_constraint_pattern x pat
         in
-        let { e_constraint = c1'; lambda_term } =
+        let { e_constraint = c1'; expr } =
           generate_constraint_expression x expr
         in
         let konstraint = `Exists (introduced_vars, `Conj (c1, c1')) in
         {
           scheme = [x], konstraint, var_map;
-          pat_expr = lambda_pattern, lambda_term
+          pat_expr = pat, expr
         }
     in
 

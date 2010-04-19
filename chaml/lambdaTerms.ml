@@ -3,7 +3,7 @@
 (*  Copyright (C) 2010 Jonathan Protzenko                                    *)
 (*                                                                           *)
 (*  This program is free software: you can redistribute it and/or modify     *)
-(*  it under the terms of the GNU General Public License as published by     *)
+(*  it under the expressions of the GNU General Public License as published by     *)
 (*  the Free Software Foundation, either version 3 of the License, or        *)
 (*  (at your option) any later version.                                      *)
 (*                                                                           *)
@@ -21,12 +21,12 @@ module Make (S: Algebra.SOLVER) = struct
 
   open Algebra.Identifiers
 
-  type term = [
-    | `Let of (pattern * term) list * term
+  type expression = [
+    | `Let of (pattern * expression) list * expression
     | `Instance of ident * S.instance
-    | `App of term * term list
-    | `Lambda of (pattern * term) list
-    | `Match of term * (pattern * term) list
+    | `App of expression * expression list
+    | `Lambda of (pattern * expression) list
+    | `Match of expression * (pattern * expression) list
     | `Const of [
         | `Char of char
         | `Int of int

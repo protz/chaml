@@ -19,19 +19,19 @@
 
 (** An AST annotated with {!Algebra.SOLVER} types. *)
 
-(** The constraint generator generates a constraint as well as a {!Make.term}
+(** The constraint generator generates a constraint as well as a {!Make.expression}
     that represents a well-typed AST when the solving has been done. *)
 
 module Make: functor (S: Algebra.SOLVER) -> sig
 
   open Algebra.Identifiers
 
-  type term = [
-    | `Let of (pattern * term) list * term 
+  type expression = [
+    | `Let of (pattern * expression) list * expression 
     | `Instance of ident * S.instance
-    | `App of term * term list (** Maybe we can simplify this later on (do we really want it?) *)
-    | `Lambda of (pattern * term) list (** This will be converted later on to a simple form that uses `Match. *)
-    | `Match of term * (pattern * term) list
+    | `App of expression * expression list (** Maybe we can simplify this later on (do we really want it?) *)
+    | `Lambda of (pattern * expression) list (** This will be converted later on to a simple form that uses `Match. *)
+    | `Match of expression * (pattern * expression) list
     | `Const of [
         | `Char of char
         | `Int of int

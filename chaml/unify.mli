@@ -148,7 +148,7 @@ val string_of_scheme: ?string_of_key:(unifier_var -> string) -> ?caml_types:bool
     scheme's unification variable. *)
 val fresh_copy: unifier_env -> unifier_scheme -> unifier_scheme
 
-(** When the constraint generator requests a variable, the {!SOLVER} answers with
+(** When the constraint generator requests a variable, the {!Algebra.SOLVER} answers with
     what is said to be a "not ready" variable. We cannot use a variable in the
     solver and the unifier if it's not ready. There is a mark on variable to
     tell if they have been made ready or not, so you should always call this
