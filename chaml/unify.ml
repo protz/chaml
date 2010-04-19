@@ -42,14 +42,14 @@ and unifier_scheme = {
 }
 
 (* Since TypeCons is not a functor, we were able to bootstrap the types above.
- * Now we can create a SOLVER module (modulo one ugly hack). *)
+ * Now we can create a SOLVER module. *)
 
-let new_var_ref = ref (fun _ -> assert false)
+type unifier_instance = unifier_var list ref
 
 module BaseSolver = struct
   type var = unifier_var
   type scheme = unifier_scheme
-  type instance = unifier_var list ref
+  type instance = unifier_instance
 
   let new_var name =
     UnionFind.fresh { name; rank = -1; term = None; ready = false }

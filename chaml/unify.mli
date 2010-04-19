@@ -65,6 +65,9 @@ and unifier_scheme = {
   mutable scheme_var: unifier_var;
 }
 
+(** Useful to know what's in the constraint-generated term. *)
+type unifier_instance = unifier_var list ref
+
 (** The unifier actually provides the base solver with the necessary stubs to
     create pre-allocated constraints and terms. We need to expose all the
     internals of this module because the solver needs to be aware of the type
@@ -74,7 +77,7 @@ and unifier_scheme = {
 module BaseSolver: sig
   type var = unifier_var
   type scheme = unifier_scheme
-  type instance = unifier_var list ref
+  type instance = unifier_instance
 
   val new_var: string -> var
   val new_scheme: unit -> scheme

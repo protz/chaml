@@ -17,21 +17,52 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The solver works on top of the unifier and the constraint generator. *)
+open Algebra.Identifiers
 
-(** This can be forwarded to other modules that depend on a solver. This is
-    actually borrowed from [Unify]. *)
-module BaseSolver: module type of Unify.BaseSolver
+(** This describes a System F variable. *)
+type f_var = {
+  name: string;
+}
 
-(** Describes a unification or solving error.  *)
-type error
+(** This describes a System F type. *)
+type f_type = f_var Algebra.Core.type_term
 
-(** Create a human-readable representation of an error. *)
-val string_of_error: error -> string
+(** This is a Sytem F instance. *)
+type f_instance = f_type
 
-(** This is the only useful function. It takes a set of constraints and returns
-    a typed AST. It explains that it takes a type constraint that's been built
-    with this very solver's data structures. *)
-val solve: caml_types:bool -> print_types:bool ->
-  Constraint.Make(BaseSolver).type_constraint ->
-  [`Ok | `Error of error]
+(** Well, it's the same for a scheme. *)
+type f_scheme = f_var list * f_type
+
+type var = [
+  | `Var of ident * f_scheme
+]
+
+(** The type of Core ASTs *)
+type expression = [
+  | `Let of pattern * expression * expression 
+  | `Instance of ident * f_instance
+  | `App of expression * expression list
+  | `Lambda of var * expression
+  | `Match of expression * (pattern * expression) list
+  | `Const of [
+      | `Char of char
+      | `Int of int
+      | `Float of string (** This will have to be converted too *)
+      | `String of string
+      | `Unit (** This will eventually be removed when we have data types *)]
+]
+and pattern = [
+    var
+  | `Tuple of pattern list
+  | `Or of pattern * pattern
+  | `Any
+]
+
+(** Extract an AST based on System F types from the {!Constraint} generator's
+    output. *)
+let rec extract = function
+  | _ -> assert false
+
+(** Translate this AST into the core language. *)
+let rec translate = function
+  | _ -> assert false
