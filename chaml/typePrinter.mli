@@ -34,6 +34,12 @@ type 'var inspected_var = [
   | `Alias of 'var inspected_var * 'var type_var
 ]
 
+(** When printing a type, you can choose to provide the conversion function from
+    ['var] to a string. For instance, you might want to debug a type made of
+    unification variables and print internal names. This is what the [`Custom]
+    tag is for. On the other hand, you might want the type printer to pick names
+    for you. In that case, the [`Auto] tag is what you want. You then provide a
+    function that gives you a ['uniq] key for each ['var]. *)
 type ('var, 'uniq) var_printer = [
     `Auto of 'var -> 'uniq
   | `Custom of 'var -> string

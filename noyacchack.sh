@@ -1,2 +1,4 @@
 #!/bin/sh
-mv /tmp/parser.mly parsing
+if [ -f /tmp/parser.mly ]; then
+  mv /tmp/parser.mly parsing
+fi
