@@ -117,9 +117,7 @@ module Identifiers: sig
 
 end
 
-module Make: functor (S: SOLVER) -> sig
-
-  open S
+module Core: sig
 
   (** {3 Error handling} *)
 
@@ -139,15 +137,15 @@ module Make: functor (S: SOLVER) -> sig
   (** {3 Core types} *)
 
   (** This is what is called X in ATTAPL *)
-  type type_var = [
-    `Var of var
+  type 'var type_var = [
+    `Var of 'var
   ]
 
   (** This is what is called T ::= X | F (X1, ..., Xn) in ATTAPL. Used in many
       places. *)
-  type type_term = [
-      type_var
-    | `Cons of TypeCons.type_cons * type_term list
+  type 'var type_term = [
+      'var type_var
+    | `Cons of TypeCons.type_cons * 'var type_term list
   ]
 
 end

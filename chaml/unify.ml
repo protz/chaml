@@ -67,7 +67,7 @@ end
 
 (* We're good to go! *)
 
-module Algebra_ = Algebra.Make(BaseSolver) open Algebra_
+open Algebra.Core
 module TypePrinter_ = TypePrinter.Make(BaseSolver) open TypePrinter_
 
 (* A pool contains all the variables with a given rank. *)
@@ -295,7 +295,7 @@ let ensure_ready unifier_env uvar =
  * uniquely-generated (Oo.id (object end)) later on but for now on that'll be ok
  * (have a look at fresh_name in Algebra to convince yourself the names are
  * globally unique). *)
-let rec uvar_of_term: unifier_env -> type_term -> unifier_var =
+let rec uvar_of_term: unifier_env -> unifier_var type_term -> unifier_var =
   let known_terms = Hashtbl.create 64 in
   fun unifier_env type_term ->
     let rec uvar_of_term tterm =

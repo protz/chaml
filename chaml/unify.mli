@@ -23,6 +23,7 @@
 
 open Algebra.TypeCons
 open Algebra.Identifiers
+open Algebra.Core
 
 (** {3 Error handling} *)
 
@@ -162,7 +163,7 @@ val ensure_ready: unifier_env -> unifier_var -> unit
     implements explicit sharing by hashconsing constructors (two subsequent
     calls with the same constructor will return the same variable). It also
     makes sure all variables are ready before returning. *)
-val uvar_of_term: unifier_env -> Algebra.Make(BaseSolver).type_term -> unifier_var
+val uvar_of_term: unifier_env -> unifier_var type_term -> unifier_var
 
 (** The main function, called by the solver to unify terms. *)
 val unify: unifier_env -> unifier_var -> unifier_var -> [ `Ok | `Error of error ]

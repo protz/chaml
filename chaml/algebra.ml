@@ -157,21 +157,20 @@ module Identifiers = struct
 
 end
 
-module Make (S: SOLVER) = struct
+module Core = struct
 
-  open S
   include Errors
 
   (** This is what is called X in ATTAPL *)
-  type type_var = [
-    `Var of var
+  type 'var type_var = [
+    `Var of 'var
   ]
 
   (** This is what is called T ::= X | F (X1, ..., Xn) in ATTAPL. Used in many
       places. *)
-  type type_term = [
-      type_var
-    | `Cons of TypeCons.type_cons * type_term list
+  type 'var type_term = [
+      'var type_var
+    | `Cons of TypeCons.type_cons * 'var type_term list
   ]
 
 end

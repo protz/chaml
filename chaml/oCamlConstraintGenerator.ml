@@ -24,9 +24,8 @@ module Make(S: Algebra.SOLVER) = struct
 
   module Lambda = LambdaTerms.Make(S)
   module Constraint_ = Constraint.Make(S)
-  module Algebra_ = Algebra.Make(S)
   open Constraint_
-  open Algebra_
+  open Algebra.Core
   open Algebra.TypeCons
   open Algebra.Identifiers
 
@@ -34,7 +33,7 @@ module Make(S: Algebra.SOLVER) = struct
     | NotImplemented of string * Location.t
     | VariableBoundSeveralTimes of string * Location.t
     | VariableMustOccurBothSides of string * Location.t
-    | AlgebraError of Algebra_.error
+    | AlgebraError of Algebra.Core.error
 
   exception Error of error
   let raise_error e = raise (Error e)
@@ -61,8 +60,8 @@ module Make(S: Algebra.SOLVER) = struct
       type constraint_pattern = {
         p_constraint: type_constraint;
         pat: Lambda.pattern;
-        var_map: (type_var * S.scheme) IdentMap.t;
-        introduced_vars: type_var list;
+        var_map: (S.var type_var * S.scheme) IdentMap.t;
+        introduced_vars: S.var type_var list;
       }
 
       type constraint_expression = {
@@ -99,7 +98,7 @@ module Make(S: Algebra.SOLVER) = struct
      * specific identifier.
      *
      * *)
-    let rec generate_constraint_pattern: type_var -> pattern -> constraint_pattern =
+    let rec generate_constraint_pattern: S.var type_var -> pattern -> constraint_pattern =
       fun x { ppat_desc; ppat_loc } ->
         match ppat_desc with
           | Ppat_any ->
@@ -193,7 +192,7 @@ module Make(S: Algebra.SOLVER) = struct
      * is labeled. What is the expression option for?
      *
      * *)
-    and generate_constraint_expression: type_var -> expression -> constraint_expression =
+    and generate_constraint_expression: S.var type_var -> expression -> constraint_expression =
       fun t { pexp_desc; pexp_loc } ->
         match pexp_desc with
           | Pexp_ident (Longident.Lident x) ->
@@ -488,7 +487,7 @@ module Make(S: Algebra.SOLVER) = struct
       `Ok (s_constraint, s_term)
     with
       | Error e -> `Error e
-      | Algebra_.Error e -> `Error (AlgebraError e)
+      | Algebra.Core.Error e -> `Error (AlgebraError e)
 
   let string_of_error =
     let print_loc () { Location.loc_start; Location.loc_end; Location.loc_ghost } =
@@ -512,6 +511,6 @@ module Make(S: Algebra.SOLVER) = struct
           "%a: variable %s must occur on both sides of this pattern\n"
           print_loc loc v
     | AlgebraError e ->
-        Algebra_.string_of_error e
+        Algebra.Core.string_of_error e
 
 end

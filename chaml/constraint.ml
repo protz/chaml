@@ -21,28 +21,27 @@ module Make (S: Algebra.SOLVER) = struct
 
   open Algebra.TypeCons
   include Algebra.Identifiers
-  module Algebra_ = Algebra.Make(S)
-  open Algebra_
+  open Algebra.Core
 
   type type_scheme =
-      type_var list
+      S.var type_var list
     * type_constraint
-    * (type_var * S.scheme) IdentMap.t
+    * (S.var type_var * S.scheme) IdentMap.t
 
   and type_constraint = [
       `True
     | `Conj of type_constraint * type_constraint
-    | `Exists of type_var list * type_constraint
-    | `Equals of type_var * type_term
-    | `Instance of ident * type_var * S.instance
+    | `Exists of S.var type_var list * type_constraint
+    | `Equals of S.var type_var * S.var type_term
+    | `Instance of ident * S.var type_var * S.instance
     | `Let of type_scheme list * type_constraint
   ]
 
 
   (* The polymorphic variants allow us to make a difference between simply a
    * variable and a more general term. But we need to do the casts ourselves. *)
-  let tv_tt x = (x: type_var :> type_term)
-  let tvl_ttl x = (x: type_var list :> type_term list)
+  let tv_tt x = (x: 'a type_var :> 'a type_term)
+  let tvl_ttl x = (x: 'a type_var list :> 'a type_term list)
 
 
   module PrettyPrinter = struct

@@ -21,8 +21,8 @@ open Unify
 module BaseSolver = Unify.BaseSolver
 
 module Constraint_ = Constraint.Make(BaseSolver) open Constraint_
-module Algebra_ = Algebra.Make(BaseSolver) open Algebra_
 open Algebra.Identifiers
+open Algebra.Core
 
 type error =
   | UnifyError of Unify.error
@@ -213,7 +213,7 @@ let solve =
                      (string_of_ident ident) (IdentMap.find ident r)))) ();
              r
           )
-          (var_map: (type_var * unifier_scheme) IdentMap.t :> (type_term * unifier_scheme) IdentMap.t)
+          (var_map: (unifier_var type_var * unifier_scheme) IdentMap.t :> (unifier_var type_term * unifier_scheme) IdentMap.t)
           new_map
       in
       let new_map =

@@ -19,13 +19,13 @@
 
 module Make (S: Algebra.SOLVER) = struct
 
-  module Algebra_ = Algebra.Make(S) open Algebra_
+  open Algebra.Core
   open Algebra.TypeCons
 
   type inspected_var = [
-      type_var
+      S.var type_var
     | `Cons of type_cons * inspected_var list
-    | `Alias of inspected_var * type_var
+    | `Alias of inspected_var * S.var type_var
   ]
 
   let prec =
@@ -135,6 +135,6 @@ module Make (S: Algebra.SOLVER) = struct
     List.hd (string_of_types ?string_of_key ?caml_types ?young_vars [uvar])
 
   let string_of_term type_term =
-      string_of_type (type_term: Algebra.Make(S).type_term :> inspected_var)
+      string_of_type (type_term: S.var type_term :> inspected_var)
 
 end

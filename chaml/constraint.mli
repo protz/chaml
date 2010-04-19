@@ -26,6 +26,7 @@ module Make: functor (S: Algebra.SOLVER) -> sig
 
   (* To get the ident type in scope. *)
   open Algebra.Identifiers
+  open Algebra.Core
 
   (** Here we differ slightly from the definition in ATTAPL. A scheme is made of a
       list of universally quantified variables, a constraint that has to be
@@ -37,9 +38,9 @@ module Make: functor (S: Algebra.SOLVER) -> sig
       instance.)
     *)
   type type_scheme =
-      Algebra.Make(S).type_var list
+      S.var type_var list
     * type_constraint
-    * (Algebra.Make(S).type_var * S.scheme) IdentMap.t
+    * (S.var type_var * S.scheme) IdentMap.t
 
   (** The definition of a constraint. [`Dump] is not really useful, we could use
       [`True], but left for the sake of compatibility with mini.
@@ -53,25 +54,25 @@ module Make: functor (S: Algebra.SOLVER) -> sig
   and type_constraint = [
       `True
     | `Conj of type_constraint * type_constraint
-    | `Exists of Algebra.Make(S).type_var list * type_constraint
-    | `Equals of Algebra.Make(S).type_var * Algebra.Make(S).type_term
-    | `Instance of ident * Algebra.Make(S).type_var * S.instance
+    | `Exists of S.var type_var list * type_constraint
+    | `Equals of S.var type_var * S.var type_term
+    | `Instance of ident * S.var type_var * S.instance
     | `Let of type_scheme list * type_constraint
   ]
 
   (** We enforce some invariants by requiring that in some places we deal with a
       variable and not a term. However, we often need to subtype. This function
       provides a quick and convenient way to do that. *)
-  val tv_tt: Algebra.Make(S).type_var -> Algebra.Make(S).type_term
+  val tv_tt: S.var type_var -> S.var type_term
 
   (** Same wrapper for convenience. *)
-  val tvl_ttl: Algebra.Make(S).type_var list -> Algebra.Make(S).type_term list
+  val tvl_ttl: S.var type_var list -> S.var type_term list
 
 
   (** A pretty-printer for constraints. Pretty-prints in a format suitable for
       reading by mini. *)
   module PrettyPrinter: sig
-    val string_of_type_var: Algebra.Make(S).type_var -> string
+    val string_of_type_var: S.var type_var -> string
     val string_of_constraint: pretty_printing:bool -> type_constraint -> string
   end
 
