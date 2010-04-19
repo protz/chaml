@@ -19,30 +19,27 @@
 
 (** An AST annotated with {!Algebra.SOLVER} types. *)
 
-(** The constraint generator generates a constraint as well as a {!Make.expression}
+(** The constraint generator generates a constraint as well as a {!Make.('instance, 'scheme) expression}
     that represents a well-typed AST when the solving has been done. *)
 
-module Make: functor (S: Algebra.SOLVER) -> sig
+open Algebra.Identifiers
 
-  open Algebra.Identifiers
-
-  type expression = [
-    | `Let of (pattern * expression) list * expression 
-    | `Instance of ident * S.instance
-    | `App of expression * expression list (** Maybe we can simplify this later on (do we really want it?) *)
-    | `Lambda of (pattern * expression) list (** This will be converted later on to a simple form that uses `Match. *)
-    | `Match of expression * (pattern * expression) list
-    | `Const of [
-        | `Char of char
-        | `Int of int
-        | `Float of string (** This will have to be converted too *)
-        | `String of string
-        | `Unit (** This will eventually be removed when we have data types *)]
-  ]
-  and pattern = [
-    | `Var of ident * S.scheme
-    | `Tuple of pattern list
-    | `Or of pattern * pattern
-    | `Any
-  ]
-end
+type ('instance, 'scheme) expression = [
+  | `Let of (('instance, 'scheme) pattern * ('instance, 'scheme) expression) list * ('instance, 'scheme) expression 
+  | `Instance of ident * 'instance
+  | `App of ('instance, 'scheme) expression * ('instance, 'scheme) expression list (** Maybe we can simplify this later on (do we really want it?) *)
+  | `Lambda of (('instance, 'scheme) pattern * ('instance, 'scheme) expression) list (** This will be converted later on to a simple form that uses `Match. *)
+  | `Match of ('instance, 'scheme) expression * (('instance, 'scheme) pattern * ('instance, 'scheme) expression) list
+  | `Const of [
+      | `Char of char
+      | `Int of int
+      | `Float of string (** This will have to be converted too *)
+      | `String of string
+      | `Unit (** This will eventually be removed when we have data types *)]
+]
+and ('instance, 'scheme) pattern = [
+  | `Var of ident * 'scheme
+  | `Tuple of ('instance, 'scheme) pattern list
+  | `Or of ('instance, 'scheme) pattern * ('instance, 'scheme) pattern
+  | `Any
+]

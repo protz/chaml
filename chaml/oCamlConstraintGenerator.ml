@@ -22,7 +22,6 @@ open Error
 
 module Make(S: Algebra.SOLVER) = struct
 
-  module Lambda = LambdaTerms.Make(S)
   module Constraint_ = Constraint.Make(S)
   open Constraint_
   open Algebra.Core
@@ -57,26 +56,29 @@ module Make(S: Algebra.SOLVER) = struct
         structure ->
 
     let module Types = struct
+      type lambda_pattern = (S.instance, S.scheme) LambdaTerms.pattern
+      type lambda_expression = (S.instance, S.scheme) LambdaTerms.expression
+
       type constraint_pattern = {
         p_constraint: type_constraint;
-        pat: Lambda.pattern;
+        pat: lambda_pattern;
         var_map: (S.var type_var * S.scheme) IdentMap.t;
         introduced_vars: S.var type_var list;
       }
 
       type constraint_expression = {
         e_constraint: type_constraint;
-        expr: Lambda.expression;
+        expr: lambda_expression;
       }
 
       type constraint_pat_expr = {
         scheme: type_scheme;
-        pat_expr: Lambda.pattern * Lambda.expression;
+        pat_expr: lambda_pattern * lambda_expression;
       }
 
       type constraint_structure = {
         s_constraint: type_constraint;
-        s_term: Lambda.expression;
+        s_term: lambda_expression;
       }
     end in
     let open Types in
