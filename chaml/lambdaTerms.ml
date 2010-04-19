@@ -31,7 +31,8 @@ module Make (S: Algebra.SOLVER) = struct
         | `Char of char
         | `Int of int
         | `Float of string
-        | `String of string ]
+        | `String of string
+        | `Unit ]
   ]
   and pattern = [
     | `Var of ident * S.scheme

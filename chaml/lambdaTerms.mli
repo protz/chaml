@@ -36,7 +36,8 @@ module Make: functor (S: Algebra.SOLVER) -> sig
         | `Char of char
         | `Int of int
         | `Float of string (** This will have to be converted too *)
-        | `String of string ]
+        | `String of string
+        | `Unit (** This will eventually be removed when we have data types *)]
   ]
   and pattern = [
     | `Var of ident * S.scheme

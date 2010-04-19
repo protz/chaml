@@ -74,6 +74,11 @@ module Make(S: Algebra.SOLVER) = struct
         scheme: type_scheme;
         pat_expr: Lambda.pattern * Lambda.term;
       }
+
+      type constraint_structure = {
+        s_constraint: type_constraint;
+        s_term: Lambda.term;
+      }
     end in
     let open Types in
 
@@ -293,10 +298,10 @@ module Make(S: Algebra.SOLVER) = struct
                 in
                 scheme, pat_expr
               in
-              let constraints, lambdas = List.split (List.map run pat_expr_list) in
+              let constraints, pat_expr = List.split (List.map run pat_expr_list) in
               {
                 e_constraint = `Let (constraints, c2);
-                lambda_term =  `Let (lambdas, lambda_term_e2);
+                lambda_term =  `Let (pat_expr, lambda_term_e2);
               }
           | Pexp_match (e1, pat_expr_list) ->
               if opt_generalize_match then
@@ -317,7 +322,6 @@ module Make(S: Algebra.SOLVER) = struct
                 let { e_constraint = constr_e1; lambda_term = term_e1 } =
                   generate_constraint_expression x1 e1
                 in
-                (* Each branch has its instance of the type scheme. *)
                 let generate_branch (pat, expr) =
                   (* Create a fresh variable *)
                   let y = fresh_type_var ~letter:'y' () in
@@ -325,22 +329,32 @@ module Make(S: Algebra.SOLVER) = struct
                   let solver_instance = S.new_instance () in
                   let instance_constr = `Instance (ident1, y, solver_instance) in
                   (* It also satisfies the constraints of the pattern *)
-                  let { p_constraint = c1; var_map; introduced_vars; _ } =
+                  let { p_constraint = c1; var_map; introduced_vars; lambda_pattern } =
                     generate_constraint_pattern y pat
                   in
                   let c = constr_conj [instance_constr; c1] in
                   (* Generate constraints for the expression *)
-                  let c2 = generate_constraint_expression t expr in
+                  let { e_constraint = c2; lambda_term } =
+                    generate_constraint_expression t expr
+                  in
                   let let_constr: type_constraint =
                     `Let ([y :: introduced_vars, c, var_map], c2)
                   in
-                  let_constr
+                  let_constr, (lambda_pattern, lambda_term)
                 in
-                let constraints = List.map generate_branch pat_expr_list in
+                let constraints, pat_exprs =
+                  List.split (List.map generate_branch pat_expr_list)
+                in
                 let solver_scheme = S.new_scheme () in
                 let map = IdentMap.add ident1 (x1, solver_scheme) IdentMap.empty in
                 let scheme = [x1], constr_e1, map in
-                `Let ([scheme], constr_conj constraints)
+                (* XXX the fake ident we introduce is not kept in the lambda
+                 * tree we generate. Anyway, it's not like we have any hope of
+                 * type-checking generalized match. *)
+                {
+                  e_constraint = `Let ([scheme], constr_conj constraints);
+                  lambda_term = `Match (term_e1, pat_exprs)
+                }
               else
                 let x1 = fresh_type_var ~letter:'x' () in
                 let { e_constraint = constr_e1; lambda_term = term_e1 } =
@@ -355,7 +369,7 @@ module Make(S: Algebra.SOLVER) = struct
                   in
                   (* This rule doesn't generalize, ocaml-style. *)
                   let let_constr: type_constraint = `Let ([[], c1, var_map], c2) in
-                  `Exists (introduced_vars, let_constr), (pat, expr)
+                  `Exists (introduced_vars, let_constr), (lambda_pattern, lambda_term)
                 in
                 let constraints, pat_exprs = 
                   List.split (List.map generate_branch pat_expr_list)
@@ -386,19 +400,34 @@ module Make(S: Algebra.SOLVER) = struct
      * For top-level definitions, the variables end up free in the environment.
      *
      * *)
-    and generate_constraint: structure -> type_constraint =
+    and generate_constraint_structure: structure -> constraint_structure =
       fun structure ->
-        let generate_constraint_structure_item = fun { pstr_desc; pstr_loc } c2 ->
+        let generate_constraint_structure_item =
+          fun { pstr_desc; pstr_loc } { s_constraint = c2; s_term = t2 } ->
           match pstr_desc with
             | Pstr_value (rec_flag, pat_expr_list) ->
                 if rec_flag <> Asttypes.Nonrecursive then
                   raise_error (NotImplemented ("rec flag", pstr_loc));
-                `Let (List.map generate_constraint_pat_expr pat_expr_list, c2)
+                let generate_branch pat_expr =
+                  let { scheme; pat_expr } = generate_constraint_pat_expr pat_expr in
+                  scheme, pat_expr
+                in
+                let schemes, pat_exprs =
+                  List.split (List.map generate_branch pat_expr_list)
+                in
+                {
+                  s_constraint = `Let (schemes, c2);
+                  s_term = `Let (pat_exprs, t2);
+                }
             | Pstr_eval expr ->
                 let t = fresh_type_var ~letter:'t' () in
-                let c = generate_constraint_expression t expr in
+                let { e_constraint = c; lambda_term; } =
+                  generate_constraint_expression t expr
+                in
                 let c = `Exists ([t], c) in
-                `Let ([[], c, IdentMap.empty], c2)
+                let s_constraint = `Let ([[], c, IdentMap.empty], c2) in
+                let s_term = `Let ([`Any, lambda_term], t2) in
+                { s_constraint; s_term; }
             | _ ->
                 raise_error (NotImplemented ("some structure item", pstr_loc))
         in
@@ -425,13 +454,15 @@ module Make(S: Algebra.SOLVER) = struct
           in
           [plus_scheme; mult_scheme]
         in
-        let topmost_constraint =
-          List.fold_right generate_constraint_structure_item structure `True
+        let finish = { s_constraint = `True; s_term = `Const `Unit } in
+        let topmost_structure_item =
+          List.fold_right generate_constraint_structure_item structure finish
         in
+        let { s_constraint = topmost_constraint; s_term } = topmost_structure_item in
         if opt_default_bindings then
-          `Let (default_bindings, topmost_constraint)
+          { s_constraint = `Let (default_bindings, topmost_constraint); s_term; }
         else
-          topmost_constraint
+          topmost_structure_item
 
     (* Useful for let pattern = expression ... *)
     and generate_constraint_pat_expr: pattern * expression -> constraint_pat_expr =
@@ -446,14 +477,15 @@ module Make(S: Algebra.SOLVER) = struct
         let konstraint = `Exists (introduced_vars, `Conj (c1, c1')) in
         {
           scheme = [x], konstraint, var_map;
-          pat_expr = lambda_pattern * lambda_term
+          pat_expr = lambda_pattern, lambda_term
         }
     in
 
     (** The "driver" for OCaml constraint generation. Takes care of catching all
         errors and returning an understandable error message. *)
     try
-      `Ok (generate_constraint structure, `Const (`Int 255))
+      let { s_constraint; s_term } = generate_constraint_structure structure in
+      `Ok (s_constraint, s_term)
     with
       | Error e -> `Error e
       | Algebra_.Error e -> `Error (AlgebraError e)
