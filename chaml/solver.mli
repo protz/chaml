@@ -33,5 +33,5 @@ val string_of_error: error -> string
     a typed AST. It explains that it takes a type constraint that's been built
     with this very solver's data structures. *)
 val solve: caml_types:bool -> print_types:bool ->
-  Constraint.Make(BaseSolver).type_constraint * LambdaTerms.Make(BaseSolver).term ->
+  Constraint.Make(BaseSolver).type_constraint ->
   [`Ok | `Error of error]

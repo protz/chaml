@@ -69,7 +69,7 @@ and unifier_scheme = {
     internals of this module because the solver needs to be aware of the type
     equalities between scheme and unifier_scheme for instance (unless we provide
     wrappers around that which we don't really want to do). The other solution
-    is for {Unify} to provide a unifier_scheme_of_basesolver_scheme funtion. *)
+    is for {!Unify} to provide a unifier_scheme_of_basesolver_scheme funtion. *)
 module BaseSolver: sig
   type var = unifier_var
   type scheme = unifier_scheme
@@ -148,7 +148,7 @@ val string_of_scheme: ?string_of_key:(unifier_var -> string) -> ?caml_types:bool
     scheme's unification variable. *)
 val fresh_copy: unifier_env -> unifier_scheme -> unifier_scheme
 
-(** When the constraint generator requests a variable, the {!SOLVER] answers with
+(** When the constraint generator requests a variable, the {!SOLVER} answers with
     what is said to be a "not ready" variable. We cannot use a variable in the
     solver and the unifier if it's not ready. There is a mark on variable to
     tell if they have been made ready or not, so you should always call this

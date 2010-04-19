@@ -161,7 +161,7 @@ let _ =
     (* Constraint solving *)
     let print_types = !arg_print_types in
     let caml_types = Options.get_opt "caml-types" in
-    let r = Solver.solve ~caml_types ~print_types (konstraint, hterm) in
+    let r = Solver.solve ~caml_types ~print_types konstraint in
     begin match r with
       | `Error e ->
           let e = Solver.string_of_error e in

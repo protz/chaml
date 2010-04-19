@@ -18,18 +18,19 @@
 (*****************************************************************************)
 
 module Make (S: Algebra.SOLVER) = struct
-  module Algebra_ = Algebra.Make(S) open Algebra_
+
   open Algebra.Identifiers
 
   type term = [
     | `Let of (pattern * term) list * term
     | `Instance of ident * S.instance
-    | `App of term * term
-    | `Lambda of pattern * term
+    | `App of term * term list
+    | `Lambda of (pattern * term) list
+    | `Match of term * (pattern * term) list
     | `Const of [
         | `Char of char
         | `Int of int
-        | `Float of float
+        | `Float of string
         | `String of string ]
   ]
   and pattern = [

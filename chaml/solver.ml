@@ -70,7 +70,7 @@ let propagate_ranks uvar =
 let solve =
   fun ~caml_types:opt_caml_types
     ~print_types:opt_print_types
-    (konstraint, hterm) ->
+    konstraint ->
 
   let rec analyze: unifier_env -> type_constraint -> unifier_env =
     fun unifier_env type_constraint ->

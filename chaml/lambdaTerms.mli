@@ -28,14 +28,20 @@ module Make: functor (S: Algebra.SOLVER) -> sig
 
   type term = [
     | `Let of (pattern * term) list * term 
-    | `Instance of S.instance * ident
-    | `App of term * term
-    | `Lambda of pattern * term
-    | `Const of
-        [ `Char of char | `Int of int | `Float of float | `String of string ]
+    | `Instance of ident * S.instance
+    | `App of term * term list (** Maybe we can simplify this later on (do we really want it?) *)
+    | `Lambda of (pattern * term) list (** This will be converted later on to a simple form that uses `Match. *)
+    | `Match of term * (pattern * term) list
+    | `Const of [
+        | `Char of char
+        | `Int of int
+        | `Float of string (** This will have to be converted too *)
+        | `String of string ]
   ]
   and pattern = [
-    | `Var of S.scheme * ident
+    | `Var of ident * S.scheme
     | `Tuple of pattern list
+    | `Or of pattern * pattern
+    | `Any
   ]
 end
