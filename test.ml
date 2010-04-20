@@ -1,3 +1,1 @@
-let bug f x =
-  let _ = f x in
-  f
+let f = function (x, y) -> x | _ -> 2

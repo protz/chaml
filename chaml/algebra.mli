@@ -49,7 +49,7 @@ end
 
 (** This module contains everything related to type constructors. This is
     separated from the rest as in {!Unify} we need to define first the types
-    that make up the {!SOLVER} and then instanciate an {!Algebra.Make}. *)
+    that make up the {!SOLVER} and then use {!Algebra.Core}. *)
 module TypeCons: sig
 
   (** {3 Type constructors and helpers} *)
@@ -122,7 +122,7 @@ module Core: sig
   (** {3 Error handling} *)
 
   (** Some operations can throw exceptions (arity mismatch, etc.) At the moment,
-      only {!type_cons} can have such a behaviour. *)
+      only {!TypeCons.type_cons} can have such a behaviour. *)
   type error
 
   (** We use exceptions here because [Algebra] is an internal module, so we want

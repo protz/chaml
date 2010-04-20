@@ -21,9 +21,10 @@ exception Error of string
 
 open Algebra.Identifiers
 open Algebra.TypeCons
+open Algebra.Core
+open TypePrinter
 
-(* We first need to define those types. We cannot build the Algebra.Make module
- * yet as we first need to be able to defined BaseSolver *)
+(* We first need to define those types. These are needed for the Basesolver. *)
 
 type descriptor = {
   mutable term: unifier_term option;
@@ -41,10 +42,9 @@ and unifier_scheme = {
   mutable scheme_var: unifier_var;
 }
 
-(* Since TypeCons is not a functor, we were able to bootstrap the types above.
- * Now we can create a SOLVER module. *)
-
 type unifier_instance = unifier_var list ref
+
+(* Now we can define cleanly the {!Algebra.SOLVER}. *)
 
 module BaseSolver = struct
   type var = unifier_var
@@ -56,8 +56,9 @@ module BaseSolver = struct
 
   let new_scheme () = {
     young_vars = [];
-    scheme_var = UnionFind.fresh
-               { name = fresh_name ~prefix:"scheme" (); rank = -1; term = None; ready = false }
+    scheme_var =
+      UnionFind.fresh
+        { name = fresh_name ~prefix:"scheme" (); rank = -1; term = None; ready = false }
   }
 
   let new_instance () = ref []
@@ -65,12 +66,8 @@ module BaseSolver = struct
   let string_of_var uvar = (UnionFind.find uvar).name
 end
 
-(* We're good to go! *)
-
-open Algebra.Core
-open TypePrinter
-
 (* A pool contains all the variables with a given rank. *)
+
 module Pool = struct
   type t = {
     rank: int;

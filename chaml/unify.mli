@@ -103,7 +103,7 @@ module Pool: sig
 end
 
 (** This is used by the solver to pass down information through the recursive
-    calls. We use a [Hashtbl] to translate {!Algebra.Make.type_var}s into
+    calls. We use a [Hashtbl] to translate {!Algebra.Core.type_var}s into
     {!unifier_var}s because the type variables have globally unique names.
     However, we use a [Map] to translate identifiers into schemes because
     identifiers do have a scope. *)

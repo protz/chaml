@@ -19,7 +19,7 @@
 
 (** An AST annotated with {!Algebra.SOLVER} types. *)
 
-(** The constraint generator generates a constraint as well as a {!Make.('instance, 'scheme) expression}
+(** The constraint generator generates a constraint as well as a {!expression}
     that represents a well-typed AST when the solving has been done. *)
 
 open Algebra.Identifiers

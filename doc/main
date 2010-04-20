@@ -6,7 +6,8 @@ and is guaranteed to be correctly typed.
 
 
 {2 Core Modules}
-{!modules: OCamlConstraintGenerator Constraint Unify Solver LambdaTerms Algebra
+{!modules: OCamlConstraintGenerator Constraint Unify Solver LambdaTerms
+Translator Algebra
 }
 
 {2 Helper modules}
