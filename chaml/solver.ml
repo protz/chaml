@@ -26,12 +26,16 @@ open Algebra.Core
 
 type error =
   | UnifyError of Unify.error
+  | UnboundIdentifier of ident
 
 exception Error of error
+let raise_error x = raise (Error x)
 
 let string_of_error = function
   | UnifyError e ->
       Unify.string_of_error e
+  | UnboundIdentifier i ->
+      Printf.sprintf "Unbound identifier %s\n" (string_of_ident i)
 
 let unify_or_raise unifier_env uvar1 uvar2 =
   match (unify unifier_env uvar1 uvar2) with
@@ -95,7 +99,13 @@ let solve =
            * let. young_vars is all the young variables that are possibly
            * quantified inside that scheme *)
           ensure_ready unifier_env uvar;
-          let scheme = IdentMap.find ident (scheme_of_ident unifier_env) in
+          let scheme =
+            try
+              IdentMap.find ident (scheme_of_ident unifier_env)
+            with
+              Not_found ->
+                raise_error (UnboundIdentifier ident)
+          in
           let ident_s = string_of_ident ident in
           let { scheme_var = instance; young_vars = new_vars } =
             fresh_copy unifier_env scheme
