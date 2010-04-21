@@ -103,6 +103,7 @@ module TypeCons = struct
   (* That way these constructors are global and we can test type equality by using
    * == (faster) *)
   let type_cons_arrow x y = type_cons "->" [x; y]
+  let type_cons_tuple xs = type_cons "*" xs
   let type_cons_int = type_cons "int" []
   let type_cons_char = type_cons "char" []
   let type_cons_string = type_cons "string" []

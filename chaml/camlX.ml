@@ -25,6 +25,7 @@ type ('instance, 'scheme) expression = [
   | `App of ('instance, 'scheme) expression * ('instance, 'scheme) expression list
   | `Lambda of (('instance, 'scheme) pattern * ('instance, 'scheme) expression) list
   | `Match of ('instance, 'scheme) expression * (('instance, 'scheme) pattern * ('instance, 'scheme) expression) list
+  | `Tuple of ('instance, 'scheme) expression list
   | `Const of [
       | `Char of char
       | `Int of int

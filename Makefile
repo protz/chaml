@@ -33,7 +33,8 @@ clean:
 	ocamlbuild -clean
 
 count:
-	wc -l `find chaml stdlib tests -iname '*.ml' -or -iname '*.mli' -or -iname '*.mly' -or -iname '*.mll'` | sort -n
+	#wc -l `find chaml stdlib tests -iname '*.ml' -or -iname '*.mli' -or -iname '*.mly' -or -iname '*.mll'` | sort -n
+	sloccount chaml tests stdlib Makefile *.sh
 
 build_graph:
 	ocamldoc -dot -I _build/chaml/ -I _build/parsing/ -I _build/stdlib/ \
@@ -49,7 +50,7 @@ OCAMLLIBPATH = $(shell ocamlc -where)
 #DOCFILES = $(shell find chaml stdlib -iname '*.ml' -or -iname '*.mli') #`find $(OCAMLLIBPATH) -maxdepth 1 -iname '*.mli' -and -not -iname 'condition.mli'`
 DOCFILES = chaml/constraint.mli chaml/oCamlConstraintGenerator.mli\
 	   chaml/unify.mli\
-	   chaml/solver.mli chaml/lambdaTerms.mli\
+	   chaml/solver.mli chaml/camlX.mli\
 	   chaml/algebra.mli chaml/unionFind.mli\
 	   chaml/typePrinter.mli chaml/translator.mli\
 	   stdlib/*.mli #`find $(OCAMLLIBPATH) -maxdepth 1 -iname '*.mli' -and -not -iname 'condition.mli'`

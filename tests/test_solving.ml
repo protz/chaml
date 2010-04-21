@@ -75,3 +75,27 @@ let f9 g h =
     fun _ -> h
   in
   g
+
+(* Tuples *)
+let f10 x y =
+  let v = (x, (x, y)) in
+  snd (snd x)
+
+let f11 (y, x) = (x, x)
+
+let f12 a b = match (a, b) with
+  | x -> fst x
+  | y -> snd y
+
+let f12 ((a, b), (c, d)) = (a, b, c, d)
+
+let f13 x =
+  let g y = (y, x) in
+  (g 2, g 3.)
+
+let f14 a = (
+  match a with
+  | (x, y) -> (y, x)
+  ,
+  (fun x -> (x, a)) 2
+)

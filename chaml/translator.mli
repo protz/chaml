@@ -19,50 +19,13 @@
 
 (** This modules transforms the AST obtained from the constraint generator, that
     contains {!Algebra.SOLVER} structures, into a regular AST built on System F
-    types. It then performs another transformation to simplify the structure and
-    remove useless constructs. *)
+    types. A future module named [Desugar] will transform this into simpler
+    ocnstructs. *)
 
 open Unify
 open Algebra.Identifiers
 
-(** This describes a System F variable. *)
-type f_type_var
-(** This describes a System F type. *)
-type f_type
-(** This is a Sytem F instance. *)
-type f_instance
-(** Well, it's the same for a scheme. *)
-type f_scheme
+type t
 
-(** Extract an AST based on System F types from the {!Constraint} generator's
-    output. *)
-val extract: (unifier_instance, unifier_scheme) LambdaTerms.expression -> (f_instance, f_scheme) LambdaTerms.expression
-
-(** The type used to reference lambda variables in the AST. *)
-type var = [
-  | `Var of ident * f_scheme
-]
-
-(** The type of Core ASTs *)
-type expression = [
-  | `Let of pattern * expression * expression 
-  | `Instance of ident * f_instance
-  | `App of expression * expression list
-  | `Lambda of var * expression
-  | `Match of expression * (pattern * expression) list
-  | `Const of [
-      | `Char of char
-      | `Int of int
-      | `Float of string (** This will have to be converted too *)
-      | `String of string
-      | `Unit (** This will eventually be removed when we have data types *)]
-]
-and pattern = [
-    var
-  | `Tuple of pattern list
-  | `Or of pattern * pattern
-  | `Any
-]
-
-(** Translate this AST into the core language. *)
-val translate: (f_instance, f_scheme) LambdaTerms.expression -> expression
+val translate: (unifier_instance, unifier_scheme) CamlX.expression -> t
+val string_of_t: t -> string

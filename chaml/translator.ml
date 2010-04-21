@@ -19,50 +19,28 @@
 
 open Algebra.Identifiers
 
-(** This describes a System F variable. *)
-type f_type_var = {
-  name: string;
-}
-
-(** This describes a System F type. *)
-type f_type = f_type_var Algebra.Core.type_term
-
-(** This is a Sytem F instance. *)
-type f_instance = f_type
-
-(** Well, it's the same for a scheme. *)
-type f_scheme = f_type_var list * f_type
-
-type var = [
-  | `Var of ident * f_scheme
+type f_type_var = { index: int; }
+type type_var = f_type_var Algebra.Core.type_var
+type type_term = [
+    type_var
+  | `Cons of Algebra.TypeCons.type_cons * type_term list
+  | `Forall of type_term
 ]
 
-(** The type of Core ASTs *)
-type expression = [
-  | `Let of pattern * expression * expression 
-  | `Instance of ident * f_instance
-  | `App of expression * expression list
-  | `Lambda of var * expression
-  | `Match of expression * (pattern * expression) list
-  | `Const of [
-      | `Char of char
-      | `Int of int
-      | `Float of string (** This will have to be converted too *)
-      | `String of string
-      | `Unit (** This will eventually be removed when we have data types *)]
-]
-and pattern = [
-    var
-  | `Tuple of pattern list
-  | `Or of pattern * pattern
-  | `Any
-]
+type type_instance = f_type_var list
+type type_scheme = f_type_var list * type_term
+type t = (type_instance, type_scheme) CamlX.expression
 
-(** Extract an AST based on System F types from the {!Constraint} generator's
-    output. *)
-let rec extract = function
-  | _ -> assert false
+module DeBruijn = struct
+  let lift: int -> type_term -> type_term =
+    fun _ _ -> assert false
 
-(** Translate this AST into the core language. *)
-let rec translate = function
-  | _ -> assert false
+  let subst: type_term -> f_type_var -> type_term =
+    fun _ _ -> assert false
+end
+
+let translate _ =
+  `Const (`Int 42)
+
+let string_of_t =
+  fun _ -> assert false

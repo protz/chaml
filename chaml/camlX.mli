@@ -17,7 +17,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** An AST annotated with {!Algebra.SOLVER} types. *)
+(** An explicitely typed AST (eXplicit Caml). The ['instance] and ['scheme] type
+    parameters are initially those of the Solver. Module {!Translator} turns
+    these into F types with De Bruijn indices. *)
 
 (** The constraint generator generates a constraint as well as a {!expression}
     that represents a well-typed AST when the solving has been done. *)
@@ -30,6 +32,7 @@ type ('instance, 'scheme) expression = [
   | `App of ('instance, 'scheme) expression * ('instance, 'scheme) expression list (** Maybe we can simplify this later on (do we really want it?) *)
   | `Lambda of (('instance, 'scheme) pattern * ('instance, 'scheme) expression) list (** This will be converted later on to a simple form that uses `Match. *)
   | `Match of ('instance, 'scheme) expression * (('instance, 'scheme) pattern * ('instance, 'scheme) expression) list
+  | `Tuple of ('instance, 'scheme) expression list
   | `Const of [
       | `Char of char
       | `Int of int

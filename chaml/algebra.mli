@@ -73,6 +73,9 @@ module TypeCons: sig
   (** A convenient wrapper to quickly access the arrow constructor. *)
   val type_cons_arrow : 'a -> 'a -> [> `Cons of type_cons * 'a list ]
 
+  (** A convenient wrapper to quickly access the tuple constructor of any length *)
+  val type_cons_tuple : 'a list -> [> `Cons of type_cons * 'a list ]
+
   (** A convenient wrapper to quickly access the int constructor. *)
   val type_cons_int : [> `Cons of type_cons * 'a list ]
 

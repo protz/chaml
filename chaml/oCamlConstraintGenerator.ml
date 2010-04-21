@@ -56,8 +56,8 @@ module Make(S: Algebra.SOLVER) = struct
         structure ->
 
     let module Types = struct
-      type lambda_pattern = (S.instance, S.scheme) LambdaTerms.pattern
-      type lambda_expression = (S.instance, S.scheme) LambdaTerms.expression
+      type lambda_pattern = (S.instance, S.scheme) CamlX.pattern
+      type lambda_expression = (S.instance, S.scheme) CamlX.expression
 
       type constraint_pattern = {
         p_constraint: type_constraint;
@@ -147,7 +147,7 @@ module Make(S: Algebra.SOLVER) = struct
             in
             let pattern_vars = List.flatten (List.map (fun (_, _, x, _) -> x) patterns) in
             let pat = `Tuple (List.map (fun (_, _, _, x) -> x) patterns) in
-            let konstraint = `Equals (x, type_cons "*" (tvl_ttl xis)) in
+            let konstraint = `Equals (x, type_cons_tuple (tvl_ttl xis)) in
             let p_constraint = `Conj (konstraint, pattern_constraint) in
             {
               p_constraint;
@@ -379,6 +379,21 @@ module Make(S: Algebra.SOLVER) = struct
                   e_constraint = `Exists ([x1], constr_conj (constr_e1 :: constraints));
                   expr = `Match (term_e1, pat_exprs);
                 }
+          | Pexp_tuple (expressions) ->
+              let generate exp =
+                let xi = fresh_type_var ~letter:'u' () in
+                let { e_constraint; expr; } = generate_constraint_expression xi exp in
+                xi, e_constraint, expr
+              in
+              let xis, constraints, expressions =
+                Jlist.split3 (List.map generate expressions)
+              in
+              let konstraint =
+                constr_conj (`Equals (t, type_cons_tuple xis) :: constraints)
+              in
+              let konstraint = `Exists (xis, konstraint) in
+              let expr = `Tuple (expressions) in
+              { e_constraint = konstraint; expr; }
           | _ ->
               raise_error (NotImplemented ("some expression", pexp_loc))
 
