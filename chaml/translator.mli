@@ -26,18 +26,13 @@ open Unify
 open Algebra.Identifiers
 
 (** This describes a System F variable. *)
-type f_var = {
-  name: string;
-}
-
+type f_type_var
 (** This describes a System F type. *)
-type f_type = f_var Algebra.Core.type_term
-
+type f_type
 (** This is a Sytem F instance. *)
-type f_instance = f_type
-
+type f_instance
 (** Well, it's the same for a scheme. *)
-type f_scheme = f_var list * f_type
+type f_scheme
 
 (** Extract an AST based on System F types from the {!Constraint} generator's
     output. *)

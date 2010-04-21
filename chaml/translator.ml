@@ -20,18 +20,18 @@
 open Algebra.Identifiers
 
 (** This describes a System F variable. *)
-type f_var = {
+type f_type_var = {
   name: string;
 }
 
 (** This describes a System F type. *)
-type f_type = f_var Algebra.Core.type_term
+type f_type = f_type_var Algebra.Core.type_term
 
 (** This is a Sytem F instance. *)
 type f_instance = f_type
 
 (** Well, it's the same for a scheme. *)
-type f_scheme = f_var list * f_type
+type f_scheme = f_type_var list * f_type
 
 type var = [
   | `Var of ident * f_scheme
