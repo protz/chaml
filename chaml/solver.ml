@@ -64,7 +64,12 @@ let propagate_ranks uvar =
     end
   in
   let repr = UnionFind.find uvar in
-  ignore (dont_loop repr.rank uvar)
+  let old_rank = repr.rank in
+  let r = ignore (dont_loop repr.rank uvar) in
+  let open Bash in
+  if repr.rank < old_rank then
+    Error.debug_simple (color 42 "[SPropagate] Shifted young var's rank\n");
+  r
 
 
 let solve =
@@ -184,11 +189,11 @@ let solve =
         (* See lemma 10.6.7 in ATTAPL. This is needed. *)
         debug_inpool young_vars;
         List.iter propagate_ranks young_vars;
+        debug_inpool young_vars;
 
         (* We can just get rid of the old vars: they have been unified with a
          * var that's already in its own pool, with a lower rank. *)
         let young_vars = List.filter is_young young_vars in
-
         debug_inpool young_vars;
 
         (* Fill in the schemes that have been pre-allocated by the constraint

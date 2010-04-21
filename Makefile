@@ -41,6 +41,7 @@ build_graph:
 	  -I _build/tests/ -I _build/utils/ chaml/*.ml* -o graph.dot
 	dot -Tpng graph.dot > graph.png
 	convert graph.png -rotate 90 graph.png
+	rm -f graph.dot
 
 graph: build_graph
 	eog graph.png

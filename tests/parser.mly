@@ -64,7 +64,7 @@ type_expr:
   { e }
 | e = type_expr AS v = type_var
   { `Alias (e, v) }
-| e1 = type_expr ARROW e2 = type_expr
+| e1 = type_expr ARROW option(EOL) e2 = type_expr
   { type_cons_arrow e1 e2 }
 | e = type_product
   { type_cons "*" e }
@@ -90,9 +90,9 @@ type_constr:
   { type_cons_unit }
 
 type_product:
-| e = type_product_elt TIMES es = type_product
+| e = type_product_elt TIMES option(EOL) es = type_product
   { e :: es }
-| e1 = type_product_elt TIMES e2 = type_product_elt
+| e1 = type_product_elt TIMES option(EOL) e2 = type_product_elt
   { [e1; e2] }
 
 type_product_elt:

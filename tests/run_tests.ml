@@ -44,7 +44,10 @@ let test_pass, test_fail =
   let fill s =
     let l = String.length s in
     let l = Bash.twidth - 3 - l in
-    let l = if l < 0 then l + Bash.twidth else l in
+    let rec fill l =
+      if l < 0 then fill (l + Bash.twidth) else l
+    in
+    let l = fill l in
     let spaces = String.make l ' ' in
     s ^ spaces
   in

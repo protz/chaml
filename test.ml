@@ -1,1 +1,3 @@
-let f = function (x, y) -> (y, x) | _ -> (2, 2.)
+let v4 =
+  let g a = 2 + a in
+  g 2

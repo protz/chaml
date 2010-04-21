@@ -82,7 +82,7 @@ module TypeCons = struct
     fun cons_name args ->
       begin match Jhashtbl.find_opt global_constructor_table cons_name with
       | Some cons ->
-          if List.length args != cons.cons_arity then
+          if List.length args <> cons.cons_arity then
             raise_error (BadNumberOfArguments cons_name);
           `Cons (cons, args)
       | None ->

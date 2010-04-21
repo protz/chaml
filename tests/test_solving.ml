@@ -99,3 +99,10 @@ let f14 a = (
   ,
   (fun x -> (x, a)) 2
 )
+
+(* let boris _ =
+  let x y = (y, y) in 
+  let x y = x (x y) in 
+  let x y = x (x y) in 
+  let x y = x (x y) in 
+  x (fun z -> z) *)
