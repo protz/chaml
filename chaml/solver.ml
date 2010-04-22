@@ -229,7 +229,7 @@ let solve =
                (fun buf () -> Buffer.add_string buf (Bash.color
                   185
                   "[SScheme] Got %s\n"
-                  (string_of_scheme
+                  (string_of_scheme ~debug:()
                      (string_of_ident ident) (IdentMap.find ident r)))) ();
              r
           )
