@@ -207,6 +207,8 @@ let _ =
     let o'' = Ocamlbuild_plugin.run_and_read
       "mini --start parse-constraint _constraint2"
     in
+    Unix.unlink "_constraint";
+    Unix.unlink "_constraint2";
     compare [o; o'; o''];
   in
   test1 ();

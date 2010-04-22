@@ -68,12 +68,7 @@ let propagate_ranks uvar =
     end
   in
   let repr = UnionFind.find uvar in
-  let old_rank = repr.rank in
-  let r = ignore (dont_loop repr.rank uvar) in
-  let open Bash in
-  if repr.rank < old_rank then
-    Error.debug_simple (color 42 "[SPropagate] Shifted young var's rank\n");
-  r
+  ignore (dont_loop repr.rank uvar)
 
 
 let solve =
@@ -155,14 +150,24 @@ let solve =
           Buffer.add_string buf (Bash.color 219 "[SLeft] Solving scheme for %s\n" idents);
         ) ();
 
-        let debug_inpool l =
+        let debug_inpool ?prev_ranks l =
           let rank = current_rank sub_env in
-          let members =
-            List.map
-              (fun x ->
-                 let repr = (UnionFind.find x) in
-                   Printf.sprintf "%s(%d)" repr.name repr.rank)
-              l
+          let members = match prev_ranks with
+            | None ->
+                List.map
+                  (fun x ->
+                     let repr = (UnionFind.find x) in
+                       Printf.sprintf "%s(%d)" repr.name repr.rank)
+                  l
+            | Some ranks ->
+                List.map2
+                  (fun var old_rank ->
+                    let repr = (UnionFind.find var) in
+                    if old_rank <> repr.rank then
+                      Bash.color 42 "%s(%d)" repr.name repr.rank
+                    else
+                      Printf.sprintf "%s(%d)" repr.name repr.rank)
+                  l ranks
           in
           Error.debug "%a"
             (fun buf () -> Buffer.add_string buf (
@@ -198,8 +203,9 @@ let solve =
 
         (* See lemma 10.6.7 in ATTAPL. This is needed. *)
         debug_inpool young_vars;
+        let prev_ranks = List.map (fun x -> (UnionFind.find x).rank) young_vars in
         List.iter propagate_ranks young_vars;
-        debug_inpool young_vars;
+        debug_inpool ~prev_ranks young_vars;
 
         (* We can just get rid of the old vars: they have been unified with a
          * var that's already in its own pool, with a lower rank. *)
