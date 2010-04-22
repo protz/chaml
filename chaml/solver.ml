@@ -140,6 +140,13 @@ let solve =
          * existentially quantified variables in it. *)
         let sub_env = step_env unifier_env in
         let vars, konstraint, var_map = scheme in
+        IdentMap.iter
+          (fun ident (`Var uvar, scheme) ->
+             ensure_ready sub_env uvar;
+             ensure_ready sub_env scheme.scheme_var;
+             unify_or_raise sub_env scheme.scheme_var uvar;
+          )
+          var_map;
 
         (* --- Debug --- *)
         Error.debug "%a" (fun buf () ->
@@ -177,7 +184,7 @@ let solve =
         (* --- End Debug --- *)
 
         (* Solve the constraint in the scheme. *)
-        let sub_unifier_env =
+        let _sub_unifier_env =
           analyze sub_env konstraint
         in
         let current_pool = current_pool sub_env in
@@ -216,10 +223,7 @@ let solve =
          * generator. Reminder: these are variables that are not ready!. *)
         let assign_scheme: ident -> unifier_scheme = fun ident ->
           let (`Var uvar), scheme = IdentMap.find ident var_map in
-          ensure_ready sub_unifier_env uvar;
-          ensure_ready sub_unifier_env scheme.scheme_var;
           scheme.young_vars <- young_vars;
-          unify_or_raise unifier_env scheme.scheme_var uvar;
           scheme
         in
         IdentMap.fold
