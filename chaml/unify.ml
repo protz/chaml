@@ -317,7 +317,8 @@ let rec uvar_of_term: unifier_env -> unifier_var type_term -> unifier_var =
 
 let debug_unify =
   fun v1 v2 ->
-    Error.debug "[UUnify] Unifying %a with %a\n" uvar_name v1 uvar_name v2
+    Error.debug "[UUnify] Unifying %a(%d) with %a(%d)\n"
+      uvar_name v1 (UnionFind.find v1).rank uvar_name v2 (UnionFind.find v2).rank
 
 (* The exceptions that might be thrown in the process. *)
 type error =

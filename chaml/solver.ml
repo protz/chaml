@@ -177,7 +177,7 @@ let solve =
         (* --- End Debug --- *)
 
         (* Solve the constraint in the scheme. *)
-        let _unifier_env' =
+        let sub_unifier_env =
           analyze sub_env konstraint
         in
         let current_pool = current_pool sub_env in
@@ -216,8 +216,8 @@ let solve =
          * generator. Reminder: these are variables that are not ready!. *)
         let assign_scheme: ident -> unifier_scheme = fun ident ->
           let (`Var uvar), scheme = IdentMap.find ident var_map in
-          ensure_ready unifier_env uvar;
-          ensure_ready unifier_env scheme.scheme_var;
+          ensure_ready sub_unifier_env uvar;
+          ensure_ready sub_unifier_env scheme.scheme_var;
           scheme.young_vars <- young_vars;
           unify_or_raise unifier_env scheme.scheme_var uvar;
           scheme
