@@ -109,6 +109,9 @@ end
     identifiers do have a scope. *)
 type unifier_env
 
+(** If you need a specific pool.... *)
+val get_pool: unifier_env -> int -> Pool.t
+
 (** This is just a wrapper to get the current pool. *)
 val current_pool: unifier_env -> Pool.t
 

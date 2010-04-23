@@ -98,19 +98,23 @@ end
  * multiple simultaneous let bindings. Moreover, it is important in a `Conj
  * constraint not pollute one branch's scope with the other one's.*)
 type unifier_env = {
-  current_pool: Pool.t;
-  (* uvar_of_term: (type_term, unifier_var) Hashtbl.t; *)
+  current_pool: int;
+  pools: Pool.t InfiniteArray.t;
   scheme_of_ident: unifier_scheme IdentMap.t;
 }
 
 (* This occurs quite frequently *)
-let current_pool env = env.current_pool
-let current_rank env = env.current_pool.Pool.rank
+let get_pool env i =
+  assert (i <= env.current_pool && i >= 0);
+  InfiniteArray.get env.pools i
+
+let current_pool env = get_pool env env.current_pool
+let current_rank env = (current_pool env).Pool.rank
 let scheme_of_ident unifier_env = unifier_env.scheme_of_ident
 let set_scheme_of_ident unifier_env scheme_of_ident = { unifier_env with scheme_of_ident }
 let fresh_env () = {
-    current_pool = Pool.base_pool;
-    (* uvar_of_term = Hashtbl.create 64; *)
+    current_pool = 0;
+    pools = InfiniteArray.make Pool.base_pool;
     scheme_of_ident = IdentMap.empty;
   }
 
@@ -119,7 +123,9 @@ let fresh_env () = {
 let step_env env =
   let new_rank = current_rank env + 1 in
   let new_pool = { Pool.base_pool with Pool.rank = new_rank } in
-  { env with current_pool = new_pool }
+  let new_pool_index = env.current_pool + 1 in
+  InfiniteArray.set env.pools new_pool_index new_pool;
+  { env with current_pool = new_pool_index; }
 
 (* Transforms the unification graph into a non-cyclic structure where cycles
  * have been replaced by `Alias, suitable for printing. The ?debug optional
@@ -276,7 +282,7 @@ let ensure_ready unifier_env uvar =
   if not repr.ready then begin
     repr.rank <- current_rank unifier_env;
     let open Pool in
-    unifier_env.current_pool.members <- (uvar :: unifier_env.current_pool.members);
+    (current_pool unifier_env).members <- (uvar :: (current_pool unifier_env).members);
     repr.ready <- true;
   end
 
@@ -334,13 +340,14 @@ let unify unifier_env v1 v2 =
     fun unifier_env v1 v2 ->
     if not (UnionFind.equivalent v1 v2) then
       (* Keeps the second argument's descriptor and updates the rank *)
+      let repr1, repr2 = UnionFind.find v1, UnionFind.find v2 in
       let merge v1 v2 =
-        let repr1, repr2 = UnionFind.find v1, UnionFind.find v2 in
         let r = min repr1.rank repr2.rank in
         UnionFind.union v1 v2;
         repr2.rank <- r
       in
-      match UnionFind.find v1, UnionFind.find v2 with
+      assert (repr1.rank >= 0 && repr2.rank >= 0);
+      match repr1, repr2 with
         | { term = Some t1; _ }, { term = Some t2; _ } ->
             let `Cons (c1, args1) = t1 and `Cons (c2, args2) = t2 in
             if not (c1 == c2) then

@@ -140,6 +140,8 @@ let solve =
          * existentially quantified variables in it. *)
         let sub_env = step_env unifier_env in
         let vars, konstraint, var_map = scheme in
+        (* Make sure we register the variables that haven't been initialized yet
+         * into the sub environment's pool, that's where they belong. *)
         IdentMap.iter
           (fun ident (`Var uvar, scheme) ->
              ensure_ready sub_env uvar;
@@ -156,7 +158,6 @@ let solve =
           let idents = String.concat ", " idents in
           Buffer.add_string buf (Bash.color 219 "[SLeft] Solving scheme for %s\n" idents);
         ) ();
-
         let debug_inpool ?prev_ranks l =
           let rank = current_rank sub_env in
           let members = match prev_ranks with
@@ -181,13 +182,22 @@ let solve =
               Bash.color 208 "[InPool] %d: %s\n" rank (String.concat ", " members)))
             ();
         in
+        let debug_scheme buf (scheme, ident) =
+          let scheme_str = string_of_scheme
+            ~debug:()
+            (string_of_ident ident)
+            scheme
+          in
+          let str = Bash.color 185 "[SScheme] Got %s\n" scheme_str in
+          Buffer.add_string buf str
+        in
         (* --- End Debug --- *)
 
         (* Solve the constraint in the scheme. *)
         let _sub_unifier_env =
           analyze sub_env konstraint
         in
-        let current_pool = current_pool sub_env in
+        let sub_pool = current_pool sub_env in
 
         (* We want to keep "young" variables that have been introduced while
          * solving the constraint attached to that branch. We don't want to
@@ -195,9 +205,9 @@ let solve =
         let is_young uvar =
           let desc = UnionFind.find uvar in
           assert (desc.rank <= current_rank sub_env);
-          desc.rank = current_rank sub_env && desc.term = None
+          desc.rank = current_rank sub_env
         in
-        let young_vars = current_pool.Pool.members in
+        let young_vars = sub_pool.Pool.members in
 
         (* Filter out duplicates. This isn't necessary but still this should
          * speed things up. *)
@@ -208,7 +218,7 @@ let solve =
             young_vars
         in
 
-        (* See lemma 10.6.7 in ATTAPL. This is needed. *)
+        (* This is rank propagation. See lemma 10.6.7 in ATTAPL. This is needed. *)
         debug_inpool young_vars;
         let prev_ranks = List.map (fun x -> (UnionFind.find x).rank) young_vars in
         List.iter propagate_ranks young_vars;
@@ -216,27 +226,28 @@ let solve =
 
         (* We can just get rid of the old vars: they have been unified with a
          * var that's already in its own pool, with a lower rank. *)
-        let young_vars = List.filter is_young young_vars in
+        let young_vars, old_vars = List.partition is_young young_vars in
         debug_inpool young_vars;
 
+        (* Send back the old vars in their respective pools *)
+        List.iter
+          (fun var ->
+            let repr = UnionFind.find var in
+            let the_vars_pool = get_pool unifier_env repr.rank in
+            Pool.add the_vars_pool var
+          )
+          old_vars;
+
         (* Fill in the schemes that have been pre-allocated by the constraint
-         * generator. Reminder: these are variables that are not ready!. *)
+         * generator. The variables are ready, that was done at the beginning. *)
         let assign_scheme: ident -> unifier_scheme = fun ident ->
           let (`Var uvar), scheme = IdentMap.find ident var_map in
           scheme.young_vars <- young_vars;
+          Error.debug "%a" debug_scheme (scheme, ident);
           scheme
         in
         IdentMap.fold
-          (fun ident type_var map ->
-             let r = IdentMap.add ident (assign_scheme ident) map in
-             Error.debug "%a"
-               (fun buf () -> Buffer.add_string buf (Bash.color
-                  185
-                  "[SScheme] Got %s\n"
-                  (string_of_scheme ~debug:()
-                     (string_of_ident ident) (IdentMap.find ident r)))) ();
-             r
-          )
+          (fun ident type_var -> IdentMap.add ident (assign_scheme ident))
           (var_map: (unifier_var type_var * unifier_scheme) IdentMap.t :> (unifier_var type_term * unifier_scheme) IdentMap.t)
           new_map
       in
