@@ -28,3 +28,7 @@ let map_none v = function
 let unit_bool = function
   | None -> false
   | Some () -> true
+
+let extract = function
+  | Some v -> v
+  | None -> assert false

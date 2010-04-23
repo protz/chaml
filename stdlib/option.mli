@@ -30,3 +30,6 @@ val map_none : 'a -> 'a option -> 'a
     morphism from [unit option] to [bool]. [None] maps to [false] and [Some ()]
     to true. *)
 val unit_bool : unit option -> bool
+
+(** When you're sure you have [Some] *)
+val extract: 'a option -> 'a

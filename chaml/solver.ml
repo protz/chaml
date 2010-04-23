@@ -102,13 +102,13 @@ let solve =
                 raise_error (UnboundIdentifier ident)
           in
           let ident_s = string_of_ident ident in
-          let { scheme_var = instance; young_vars = new_vars } =
+          let { scheme_var = instance }, young_vars =
             fresh_copy unifier_env scheme
           in
           Error.debug
               "[SInstance] Taking an instance of %s: %a\n" ident_s uvar_name instance;
           unify_or_raise unifier_env instance uvar;
-          solver_instance := new_vars;
+          solver_instance := young_vars;
           unifier_env
       | `Conj (c1, c2) ->
           (* Do *NOT* forward _unifier_env! Identifiers in c1's scope must not
@@ -197,7 +197,8 @@ let solve =
         let _sub_unifier_env =
           analyze sub_env konstraint
         in
-        let sub_pool = current_pool sub_env in
+        let sub_pool = current_pool _sub_unifier_env in
+        let young_vars = sub_pool.Pool.members in
 
         (* We want to keep "young" variables that have been introduced while
          * solving the constraint attached to that branch. We don't want to
@@ -207,7 +208,6 @@ let solve =
           assert (desc.rank <= current_rank sub_env);
           desc.rank = current_rank sub_env
         in
-        let young_vars = sub_pool.Pool.members in
 
         (* Filter out duplicates. This isn't necessary but still this should
          * speed things up. *)
@@ -228,6 +228,8 @@ let solve =
          * var that's already in its own pool, with a lower rank. *)
         let young_vars, old_vars = List.partition is_young young_vars in
         debug_inpool young_vars;
+        List.iter (fun x -> (UnionFind.find x).rank <- -1) young_vars;
+        debug_inpool young_vars;
 
         (* Send back the old vars in their respective pools *)
         List.iter
@@ -242,7 +244,6 @@ let solve =
          * generator. The variables are ready, that was done at the beginning. *)
         let assign_scheme: ident -> unifier_scheme = fun ident ->
           let (`Var uvar), scheme = IdentMap.find ident var_map in
-          scheme.young_vars <- young_vars;
           Error.debug "%a" debug_scheme (scheme, ident);
           scheme
         in

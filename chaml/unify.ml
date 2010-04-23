@@ -38,7 +38,6 @@ and unifier_term = [
   `Cons of type_cons * unifier_var list
 ]
 and unifier_scheme = {
-  mutable young_vars: unifier_var list;
   mutable scheme_var: unifier_var;
 }
 
@@ -55,7 +54,6 @@ module BaseSolver = struct
     UnionFind.fresh { name; rank = -1; term = None; ready = false }
 
   let new_scheme () = {
-    young_vars = [];
     scheme_var =
       UnionFind.fresh
         { name = fresh_name ~prefix:"scheme" (); rank = -1; term = None; ready = false }
@@ -122,7 +120,7 @@ let fresh_env () = {
  * current_rank+1 *)
 let step_env env =
   let new_rank = current_rank env + 1 in
-  let new_pool = { Pool.base_pool with Pool.rank = new_rank } in
+  let new_pool = { Pool.base_pool with Pool.rank = new_rank; Pool.members = [] } in
   let new_pool_index = env.current_pool + 1 in
   InfiniteArray.set env.pools new_pool_index new_pool;
   { env with current_pool = new_pool_index; }
@@ -193,10 +191,29 @@ let string_of_uvar ?debug ?caml_types ?young_vars uvar =
 let string_of_uvars ?caml_types uvars =
   string_of_types ~string_of_key:regular_var_printer ?caml_types (List.map inspect_uvar uvars)
 
+let young_vars_of_scheme uvar =
+  let young = Hashtbl.create 16 in
+  let rec walk uvar =
+    let repr = UnionFind.find uvar in
+    match repr.term with
+    | None ->
+        begin match Jhashtbl.find_opt young repr with
+        | Some _uvar ->
+            ()
+        | None ->
+            if repr.rank == -1 then
+              Hashtbl.add young repr uvar
+        end
+    | Some (`Cons (_, cons_args)) ->
+        List.iter walk cons_args
+  in
+  walk uvar;
+  Jhashtbl.map_list young (fun _k v -> v)
+
 (* For printing type schemes *)
 let string_of_scheme ?debug ?caml_types ident scheme =
-  let { young_vars; scheme_var = uvar } = scheme in
-  let young_vars = List.filter (fun x -> (UnionFind.find x).term = None) young_vars in
+  let { scheme_var = uvar } = scheme in
+  let young_vars = young_vars_of_scheme uvar in
   Printf.sprintf "val %s: %s" ident (string_of_uvar ?debug ~young_vars ?caml_types uvar)
 
 
@@ -217,7 +234,7 @@ let fresh_unifier_var ?term ?prefix ?name unifier_env =
   uvar
 
 (* Create a fresh copy of a scheme for instanciation *)
-let fresh_copy unifier_env { young_vars; scheme_var = scheme_uvar } =
+let fresh_copy unifier_env { scheme_var = scheme_uvar } =
   let mapping = Hashtbl.create 16 in
   let call_stack = Hashtbl.create 16 in
   let base_rank = (UnionFind.find scheme_uvar).rank in
@@ -236,33 +253,37 @@ let fresh_copy unifier_env { young_vars; scheme_var = scheme_uvar } =
             uvar'
       | None ->
           begin match repr.term with
-            | None -> uvar
-            | Some (`Cons (cons_name, cons_args)) ->
-                if (UnionFind.find uvar).rank < base_rank then
+            | None ->
+                if repr.rank = (-1) then begin
+                  let new_uvar = fresh_unifier_var unifier_env in
+                  Hashtbl.add mapping repr new_uvar;
+                  new_uvar
+                end else begin
                   uvar
-                else
-                  let uvar = fresh_unifier_var unifier_env in
+                end
+            | Some (`Cons (cons_name, cons_args)) ->
+                if repr.rank = (-1) then begin
+                  let new_uvar = fresh_unifier_var unifier_env in
+                  let new_repr = UnionFind.find new_uvar in
                   try
-                    Hashtbl.add mapping repr uvar;
+                    Hashtbl.add mapping repr new_uvar;
                     Hashtbl.add call_stack uvar ();
                     let cons_args' = List.map fresh_copy cons_args in
                     Hashtbl.remove call_stack uvar;
                     let term = `Cons (cons_name, cons_args') in
-                    (UnionFind.find uvar).term <- Some term;
-                    uvar
+                    new_repr.term <- Some term;
+                    new_uvar
                   with
-                    | L.RecType (me, original) when me = uvar ->
+                    | L.RecType (me, original) when me = new_uvar ->
                         Hashtbl.replace mapping repr original;
                         original
+                end else begin
+                  uvar
+                end
           end
   in
-  let new_vars = List.map
-    (fun v ->
-       let v' = fresh_unifier_var ~prefix:"dup" unifier_env in
-       Hashtbl.add mapping (UnionFind.find v) v';
-       v'
-    )
-    young_vars in
+  let young_vars = Jhashtbl.map_list mapping (fun k v -> if k.term = None then Some v else None) in
+  let young_vars = Jlist.filter_some young_vars in
   let print_pairs buf () =
     let pairs = Jhashtbl.map_list
       mapping
@@ -271,7 +292,7 @@ let fresh_copy unifier_env { young_vars; scheme_var = scheme_uvar } =
     Buffer.add_string buf (String.concat ", " pairs)
   in
   Error.debug "[UCopy] Mapping: %a\n" print_pairs ();
-  { scheme_var = fresh_copy scheme_uvar; young_vars = new_vars }
+  { scheme_var = fresh_copy scheme_uvar }, young_vars
 
 (* This actually sets up the rank properly and adds the variable in the current
  * pool if this hasn't been done already. Extremely useful when the solver
@@ -310,10 +331,10 @@ let rec uvar_of_term: unifier_env -> unifier_var type_term -> unifier_var =
             ensure_ready unifier_env uvar;
             uvar
         | `Cons (cons, args) ->
-            match Jhashtbl.find_opt known_terms tterm with
+            (*match Jhashtbl.find_opt known_terms tterm with
               | Some uvar ->
                   uvar
-              | None ->
+              | None -> *)
                   let term = `Cons (cons, List.map uvar_of_term args) in
                   let uvar = fresh_unifier_var ~term unifier_env in
                   Hashtbl.add known_terms tterm uvar;
@@ -344,8 +365,10 @@ let unify unifier_env v1 v2 =
       let merge v1 v2 =
         let r = min repr1.rank repr2.rank in
         UnionFind.union v1 v2;
-        repr2.rank <- r
+        repr2.rank <- r;
+        repr1.rank <- r;
       in
+      debug_unify v2 v1;
       assert (repr1.rank >= 0 && repr2.rank >= 0);
       match repr1, repr2 with
         | { term = Some t1; _ }, { term = Some t2; _ } ->
@@ -358,13 +381,10 @@ let unify unifier_env v1 v2 =
             List.iter2 (fun arg1 arg2 -> unify unifier_env arg1 arg2) args1 args2;
             merge v1 v2;
         | { term = Some _; _ }, { term = None; _ } ->
-            debug_unify v2 v1;
             merge v2 v1;
         | { term = None; _ }, { term = Some _; _ } ->
-            debug_unify v2 v1;
             merge v1 v2;
         | { term = None; _ }, { term = None; _ } ->
-            debug_unify v2 v1;
             merge v1 v2
   in
   try

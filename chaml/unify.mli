@@ -61,7 +61,6 @@ and unifier_term = [ `Cons of type_cons * unifier_var list ]
 
 (** A scheme is a list of young variables and a constraint. *)
 and unifier_scheme = {
-  mutable young_vars: unifier_var list;
   mutable scheme_var: unifier_var;
 }
 
@@ -153,7 +152,7 @@ val string_of_scheme: ?debug:unit -> ?caml_types:bool ->
     the scheme replaced by copies of them. This function takes care of
     avoiding all cycles (fingers crossed!) and returns a fresh copy of the
     scheme's unification variable. *)
-val fresh_copy: unifier_env -> unifier_scheme -> unifier_scheme
+val fresh_copy: unifier_env -> unifier_scheme -> unifier_scheme * unifier_var list
 
 (** When the constraint generator requests a variable, the {!Algebra.SOLVER} answers with
     what is said to be a "not ready" variable. We cannot use a variable in the

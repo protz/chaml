@@ -43,3 +43,6 @@ val remove_duplicates :
 
 (** Find the biggest element in a list *)
 val max: int list -> int
+
+(** Turns [Some a; None; ...] into [a; ...] *)
+val filter_some: 'a option list -> 'a list

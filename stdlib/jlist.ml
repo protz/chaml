@@ -69,3 +69,7 @@ let remove_duplicates (type t') ?(hash_func=Hashtbl.hash) ?(equal_func=(=)) (l: 
   !l'
 
 let max l = List.fold_left max min_int l
+
+let filter_some l =
+  let l = List.filter (fun x -> x <> None) l in
+  List.map Option.extract l
