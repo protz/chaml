@@ -54,18 +54,19 @@ let unify_or_raise unifier_env uvar1 uvar2 =
  * *)
 let run_dfs ~occurs_check uvar =
   let seen = Uhashtbl.create 64 in
-  let rec propagate_ranks: int -> unifier_var -> int = fun parent_rank uvar ->
-    let repr = UnionFind.find uvar in
+  let rec propagate_ranks: int -> descriptor -> int = fun parent_rank repr ->
     (* Top-down *)
     if parent_rank < repr.rank then
       repr.rank <- parent_rank;
     match repr.term with
       | None ->
+          assert (repr.rank >= 0);
           repr.rank
       | Some (`Cons (cons_name, cons_args)) ->
           (* Bottom-up *)
           let ranks = List.map (dont_loop repr.rank) cons_args in
           let max_rank = Jlist.max ranks in
+          (* The result of Jlist.max is undefined when the list is empty *)
           if max_rank < repr.rank && List.length cons_args > 0 then
             repr.rank <- max_rank;
           repr.rank
@@ -81,12 +82,13 @@ let run_dfs ~occurs_check uvar =
           repr.rank
     | None ->
         Uhashtbl.add seen repr true;
-        let r = propagate_ranks rank uvar in
+        let r = propagate_ranks rank repr in
         Uhashtbl.replace seen repr false;
         r
   in
   let repr = UnionFind.find uvar in
-  ignore (dont_loop repr.rank uvar)
+  ignore (dont_loop repr.rank uvar);
+  assert (repr.rank >= 0)
 
 let solve =
   fun ~caml_types:opt_caml_types

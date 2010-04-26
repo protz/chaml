@@ -8,12 +8,21 @@ all:
 	ocamlbuild $(BUILDFLAGS) chaml/chaml.native
 	./noyacchack.sh
 
+profiling:
+	./yacchack.sh
+	ocamlbuild $(BUILDFLAGS) -tag debug chaml/chaml.native
+	./noyacchack.sh
+	valgrind --tool=callgrind ./chaml.native --dont-print-types test.ml
+	kcachegrind callgrind.out.*
+	rm -f callgrind.out.*
+
 debug:
 	./yacchack.sh
 	ocamlbuild -tag warn_A -tag warn_e -tag warn_z -tag debug \
 	  $(BUILDFLAGS) -tag use_unix chaml/chaml.byte
 	OCAMLRUNPARAM=b=1 ./chaml.byte \
 		--print-constraint --enable pretty-printing --enable debug\
+		--disable default-bindings\
 		test.ml
 	./noyacchack.sh
 
