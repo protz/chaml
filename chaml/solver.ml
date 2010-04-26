@@ -227,9 +227,7 @@ let solve =
         (* We can just get rid of the old vars: they have been unified with a
          * var that's already in its own pool, with a lower rank. *)
         let young_vars, old_vars = List.partition is_young young_vars in
-        debug_inpool young_vars;
         List.iter (fun x -> (UnionFind.find x).rank <- -1) young_vars;
-        debug_inpool young_vars;
 
         (* Send back the old vars in their respective pools *)
         List.iter
