@@ -120,7 +120,7 @@ let fresh_env () = {
  * current_rank+1 *)
 let step_env env =
   let new_rank = current_rank env + 1 in
-  let new_pool = { Pool.base_pool with Pool.rank = new_rank; Pool.members = [] } in
+  let new_pool = { Pool.rank = new_rank; Pool.members = [] } in
   let new_pool_index = env.current_pool + 1 in
   InfiniteArray.set env.pools new_pool_index new_pool;
   { env with current_pool = new_pool_index; }
@@ -235,28 +235,32 @@ let fresh_unifier_var ?term ?prefix ?name unifier_env =
 
 (* Create a fresh copy of a scheme for instanciation *)
 let fresh_copy unifier_env { scheme_var = scheme_uvar } =
-  let mapping = Hashtbl.create 16 in
-  let call_stack = Hashtbl.create 16 in
-  let base_rank = (UnionFind.find scheme_uvar).rank in
+  let module Uhashtbl = Jhashtbl.Make(struct
+      type t = descriptor
+      let equal = (==)
+      let hash d = Hashtbl.hash d.name
+    end)
+  in
+  let mapping = Uhashtbl.create 16 in
   let module L = struct exception RecType of unifier_var * unifier_var end in
   let rec fresh_copy uvar =
     let repr = UnionFind.find uvar in
-    match Jhashtbl.find_opt mapping repr with
+    match Uhashtbl.find_opt mapping repr with
       | Some uvar' ->
           (* This clearly tells us that we've hit a recursive type: we have
            * 'a = T('a). Strictly speaking, this is not necessary. It's just
            * that if we don't do that, we're unfolding the recursive types way
            * too deep. *)
-          if repr.term <> None && Hashtbl.mem call_stack uvar' then
+          (* if repr.term <> None && Hashtbl.mem call_stack uvar' then
             raise (L.RecType (uvar', uvar))
-          else
+          else *)
             uvar'
       | None ->
           begin match repr.term with
             | None ->
                 if repr.rank = (-1) then begin
                   let new_uvar = fresh_unifier_var unifier_env in
-                  Hashtbl.add mapping repr new_uvar;
+                  Uhashtbl.add mapping repr new_uvar;
                   new_uvar
                 end else begin
                   uvar
@@ -265,27 +269,27 @@ let fresh_copy unifier_env { scheme_var = scheme_uvar } =
                 if repr.rank = (-1) then begin
                   let new_uvar = fresh_unifier_var unifier_env in
                   let new_repr = UnionFind.find new_uvar in
-                  try
-                    Hashtbl.add mapping repr new_uvar;
-                    Hashtbl.add call_stack uvar ();
+                  (* try *)
+                    Uhashtbl.add mapping repr new_uvar;
+                    (* Hashtbl.add call_stack uvar (); *)
                     let cons_args' = List.map fresh_copy cons_args in
-                    Hashtbl.remove call_stack uvar;
+                    (* Uhashtbl.remove call_stack uvar; *)
                     let term = `Cons (cons_name, cons_args') in
                     new_repr.term <- Some term;
                     new_uvar
-                  with
+                  (* with
                     | L.RecType (me, original) when me = new_uvar ->
                         Hashtbl.replace mapping repr original;
-                        original
+                        original *)
                 end else begin
                   uvar
                 end
           end
   in
-  let young_vars = Jhashtbl.map_list mapping (fun k v -> if k.term = None then Some v else None) in
+  let young_vars = Uhashtbl.map_list mapping (fun k v -> if k.term = None then Some v else None) in
   let young_vars = Jlist.filter_some young_vars in
   let print_pairs buf () =
-    let pairs = Jhashtbl.map_list
+    let pairs = Uhashtbl.map_list
       mapping
       (fun k v -> let n = k.name in Jstring.bsprintf "%s: %a" n uvar_name v)
     in

@@ -133,7 +133,7 @@ module Identifiers = struct
 
   (* The mapping from all the bound identifiers in a pattern to the corresponding
    * type variables in the scheme. *)
-  module IdentMap = Map.Make (struct
+  module IdentMap = Jmap.Make (struct
     type t = ident
     let compare (x, pos1) (y, pos2) =
       match x, y with

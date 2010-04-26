@@ -19,23 +19,26 @@
 
 (** Various missing functions from the [Map] module. *)
 
-module Make: functor (M : Map.S) -> sig
+module Make: functor (Ord : Map.OrderedType) -> sig
+  module Map: module type of Map.Make(Ord)
+  include module type of Map
+
   (** Get a list of all keys in a map. *)
-  val keys : 'a M.t -> M.key list
+  val keys : 'a t -> key list
 
   (** [union m1 m2] keeps the values from [m1] *)
-  val union : 'a M.t -> 'a M.t -> 'a M.t
+  val union : 'a t -> 'a t -> 'a t
 
   (** [inter m1 m2] keeps the values from [m1] *)
-  val inter : 'a M.t -> 'a M.t -> 'a M.t
+  val inter : 'a t -> 'a t -> 'a t
 
   (** [minus m1 m2] returns [m1] minus all the elements that are also in [m2],
       that is, m1 \ (m1 ∩ m2) *)
-  val minus : 'a M.t -> 'a M.t -> 'a M.t
+  val minus : 'a t -> 'a t -> 'a t
 
   (** [xor m1 m2] is ([m1] ∪ [m2]) \ ([m1] ∩ [m2]) *)
-  val xor : 'a M.t -> 'a M.t -> 'a M.t
+  val xor : 'a t -> 'a t -> 'a t
 
   (** [to_list] translates the map to a list. *)
-  val to_list : 'a M.t -> (M.key * 'a) list
+  val to_list : 'a t -> (key * 'a) list
 end

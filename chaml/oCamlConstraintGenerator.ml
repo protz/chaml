@@ -121,7 +121,6 @@ module Make(S: Algebra.SOLVER) = struct
                 pat = `Var (var, solver_scheme);
               }
           | Ppat_tuple patterns ->
-            let module JIM = Jmap.Make(IdentMap) in
             let xis = List.map (fun _ -> fresh_type_var ()) patterns in
             let patterns = List.map2
               (fun pattern xi ->
@@ -135,12 +134,12 @@ module Make(S: Algebra.SOLVER) = struct
             let pattern_constraint = constr_conj (List.map (fun (x, _, _, _) -> x) patterns) in
             let pattern_map = List.fold_left
               (fun known_map sub_map ->
-                let inter_map = JIM.inter known_map sub_map in
+                let inter_map = IdentMap.inter known_map sub_map in
                 if not (IdentMap.is_empty inter_map) then begin
-                  let bad_ident = string_of_ident (List.hd (JIM.keys inter_map)) in
+                  let bad_ident = string_of_ident (List.hd (IdentMap.keys inter_map)) in
                   raise_error (VariableBoundSeveralTimes (bad_ident, ppat_loc))
                 end;
-                JIM.union known_map sub_map
+                IdentMap.union known_map sub_map
               )
               IdentMap.empty
               (List.map (fun (_, x, _, _) -> x) patterns)
@@ -157,16 +156,15 @@ module Make(S: Algebra.SOLVER) = struct
             }
           | Ppat_or (pat1, pat2) ->
             (* match e1 with p1 | p2 -> *)
-            let module JIM = Jmap.Make(IdentMap) in
             let { p_constraint = c1; var_map = map1; introduced_vars = vars1; pat = lp1 } =
               generate_constraint_pattern x pat1
             in
             let { p_constraint = c2; var_map = map2; introduced_vars = vars2; pat = lp2 } =
               generate_constraint_pattern x pat2
             in
-            let xor_map = JIM.xor map1 map2 in
+            let xor_map = IdentMap.xor map1 map2 in
             if not (IdentMap.is_empty xor_map) then begin
-              let bad_ident = string_of_ident (List.hd (JIM.keys xor_map)) in
+              let bad_ident = string_of_ident (List.hd (IdentMap.keys xor_map)) in
               raise_error (VariableMustOccurBothSides (bad_ident, ppat_loc))
             end;
             (* If identifier i is bound to type variable x1 on the left and x2

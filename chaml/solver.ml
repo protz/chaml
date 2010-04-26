@@ -152,8 +152,7 @@ let solve =
 
         (* --- Debug --- *)
         Error.debug "%a" (fun buf () ->
-          let module JIM = Jmap.Make(IdentMap) in
-          let idents = JIM.keys var_map in
+          let idents = IdentMap.keys var_map in
           let idents = List.map string_of_ident idents in
           let idents = String.concat ", " idents in
           Buffer.add_string buf (Bash.color 219 "[SLeft] Solving scheme for %s\n" idents);
@@ -266,8 +265,7 @@ let solve =
                     (UnionFind.find v).name
                     (UnionFind.find v).rank)
       knowledge.uvar_of_term; *)
-    let module JIM = Jmap.Make(IdentMap) in
-    let kv = JIM.to_list (scheme_of_ident knowledge) in
+    let kv = IdentMap.to_list (scheme_of_ident knowledge) in
     let kv = List.filter (fun ((_, pos), _) -> not pos.Location.loc_ghost) kv in
     let kv = List.sort (fun ((_, pos), _) ((_, pos'), _) -> compare pos pos') kv in
     let print_kv (ident, scheme) =

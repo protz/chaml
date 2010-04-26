@@ -17,6 +17,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Make (H: Hashtbl.HashedType) = struct
+
+  module Hashtbl = Hashtbl.Make(H)
+  include Hashtbl
+
+  let find_opt tbl key =
+    if Hashtbl.mem tbl key then
+      Some (Hashtbl.find tbl key)
+    else
+      None
+
+  let map_list tbl f =
+    let acc = ref [] in
+    Hashtbl.iter (fun k v -> acc := (f k v) :: !acc) tbl;
+    !acc
+
+end
+ 
 let find_opt tbl key =
   if Hashtbl.mem tbl key then
     Some (Hashtbl.find tbl key)
@@ -27,3 +45,5 @@ let map_list tbl f =
   let acc = ref [] in
   Hashtbl.iter (fun k v -> acc := (f k v) :: !acc) tbl;
   !acc
+
+

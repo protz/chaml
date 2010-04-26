@@ -17,37 +17,31 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make: functor (M: Map.S) -> sig
+module Make = functor (Ord: Map.OrderedType) -> struct
 
-  val keys: 'a M.t -> M.key list
-  val union: 'a M.t -> 'a M.t -> 'a M.t
-  val inter: 'a M.t -> 'a M.t -> 'a M.t
-  val minus: 'a M.t -> 'a M.t -> 'a M.t
-  val xor: 'a M.t -> 'a M.t -> 'a M.t
-  val to_list: 'a M.t -> (M.key * 'a) list
-
-end = functor (M: Map.S) -> struct
+  module Map = Map.Make(Ord)
+  include Map
 
   let keys m =
-    M.fold (fun k _ acc -> k :: acc) m []
+    Map.fold (fun k _ acc -> k :: acc) m []
 
   (* m1's values are kept *)
   let union m1 m2 =
-    M.fold (fun k v m -> M.add k v m) m1 m2
+    Map.fold (fun k v m -> Map.add k v m) m1 m2
 
   (* m1's values are kept *)
   let inter m1 m2 =
-    M.fold (fun k _ m1 -> if M.mem k m2 then m1 else M.remove k m1) m1 m1
+    Map.fold (fun k _ m1 -> if Map.mem k m2 then m1 else Map.remove k m1) m1 m1
 
   (* m1 minus all its elements that also belong to m2 *)
   let minus m1 m2 =
-    M.fold (fun k _ m1 -> if M.mem k m2 then M.remove k m1 else m1) m1 m1
+    Map.fold (fun k _ m1 -> if Map.mem k m2 then Map.remove k m1 else m1) m1 m1
 
   let xor m1 m2 =
     (* minus (union m1 m2) (inter m1 m2) *)
     union (minus m2 m1) (minus m1 m2)
 
   let to_list m1 =
-    M.fold (fun k v acc -> (k,v) :: acc) m1 []
+    Map.fold (fun k v acc -> (k,v) :: acc) m1 []
 
 end
