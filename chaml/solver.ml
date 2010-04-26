@@ -43,7 +43,7 @@ let unify_or_raise unifier_env uvar1 uvar2 =
   | `Error e -> raise (Error (UnifyError e))
 
 let propagate_ranks uvar =
-  let seen = Hashtbl.create 64 in
+  let seen = Uhashtbl.create 64 in
   let rec propagate_ranks: int -> unifier_var -> int = fun parent_rank uvar ->
     let repr = UnionFind.find uvar in
     (* Top-down *)
@@ -60,10 +60,11 @@ let propagate_ranks uvar =
             repr.rank <- max_rank;
           repr.rank
   and dont_loop rank uvar =
-    if Hashtbl.mem seen uvar then
-      (UnionFind.find uvar).rank
+    let repr = UnionFind.find uvar in
+    if Uhashtbl.mem seen repr then
+      repr.rank
     else begin
-      Hashtbl.add seen uvar ();
+      Uhashtbl.add seen repr ();
       propagate_ranks rank uvar
     end
   in
@@ -212,7 +213,7 @@ let solve =
          * speed things up. *)
         let young_vars =
           Jlist.remove_duplicates
-            ~hash_func:(fun x -> Hashtbl.hash (UnionFind.find x))
+            ~hash_func:(fun x -> Hashtbl.hash (UnionFind.find x).name)
             ~equal_func:UnionFind.equivalent
             young_vars
         in

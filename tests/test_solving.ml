@@ -100,6 +100,10 @@ let f14 a = (
   (fun x -> (x, a)) 2
 )
 
+(* let f15 f x =
+  let a = f x and a = f x in
+  "duh" *)
+
 (* let boris _ =
   let x y = (y, y) in 
   let x y = x (x y) in 

@@ -64,6 +64,12 @@ module BaseSolver = struct
   let string_of_var uvar = (UnionFind.find uvar).name
 end
 
+module Uhashtbl = Jhashtbl.Make(struct
+    type t = descriptor
+    let equal = (==)
+    let hash d = Hashtbl.hash d.name
+  end)
+
 (* A pool contains all the variables with a given rank. *)
 
 module Pool = struct
@@ -132,19 +138,19 @@ let step_env env =
  * see a "real" type. *)
 let inspect_uvar: ?debug:unit -> unifier_var -> unifier_var inspected_var =
   fun ?debug uvar ->
-    let seen = Hashtbl.create 16 in
+    let seen = Uhashtbl.create 16 in
     let rec inspect_uvar: unifier_var -> unifier_var inspected_var =
     fun uvar ->
       let repr = UnionFind.find uvar in
-      begin match Jhashtbl.find_opt seen repr with
+      begin match Uhashtbl.find_opt seen repr with
         | Some None ->
             let key = uvar in
-            Hashtbl.replace seen repr (Some key);
+            Uhashtbl.replace seen repr (Some key);
             `Var key
         | Some (Some key) ->
             `Var key
         | None ->
-            Hashtbl.add seen repr None;
+            Uhashtbl.add seen repr None;
             let type_term =
               match repr.term with
                 | Some (`Cons (type_cons, cons_args)) ->
@@ -152,11 +158,11 @@ let inspect_uvar: ?debug:unit -> unifier_var -> unifier_var inspected_var =
                 | None ->
                     `Var uvar
             in
-            let r = begin match Jhashtbl.find_opt seen repr with
+            let r = begin match Uhashtbl.find_opt seen repr with
               | Some (Some key) ->
                   `Alias (type_term, `Var key)
               | Some None ->
-                  Hashtbl.remove seen repr;
+                  Uhashtbl.remove seen repr;
                   if Option.unit_bool debug && repr.term <> None then
                     `Alias (type_term, `Var uvar)
                   else
@@ -192,23 +198,23 @@ let string_of_uvars ?caml_types uvars =
   string_of_types ~string_of_key:regular_var_printer ?caml_types (List.map inspect_uvar uvars)
 
 let young_vars_of_scheme uvar =
-  let young = Hashtbl.create 16 in
+  let young = Uhashtbl.create 16 in
   let rec walk uvar =
     let repr = UnionFind.find uvar in
     match repr.term with
     | None ->
-        begin match Jhashtbl.find_opt young repr with
+        begin match Uhashtbl.find_opt young repr with
         | Some _uvar ->
             ()
         | None ->
             if repr.rank == -1 then
-              Hashtbl.add young repr uvar
+              Uhashtbl.add young repr uvar
         end
     | Some (`Cons (_, cons_args)) ->
         List.iter walk cons_args
   in
   walk uvar;
-  Jhashtbl.map_list young (fun _k v -> v)
+  Uhashtbl.map_list young (fun _k v -> v)
 
 (* For printing type schemes *)
 let string_of_scheme ?debug ?caml_types ident scheme =
@@ -235,12 +241,6 @@ let fresh_unifier_var ?term ?prefix ?name unifier_env =
 
 (* Create a fresh copy of a scheme for instanciation *)
 let fresh_copy unifier_env { scheme_var = scheme_uvar } =
-  let module Uhashtbl = Jhashtbl.Make(struct
-      type t = descriptor
-      let equal = (==)
-      let hash d = Hashtbl.hash d.name
-    end)
-  in
   let mapping = Uhashtbl.create 16 in
   let module L = struct exception RecType of unifier_var * unifier_var end in
   let rec fresh_copy uvar =

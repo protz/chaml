@@ -25,6 +25,7 @@ open Algebra.TypeCons
 open Algebra.Identifiers
 open Algebra.Core
 
+
 (** {3 Error handling} *)
 
 (** In case two terms cannot be unified, an error will be returned. *)
@@ -66,6 +67,13 @@ and unifier_scheme = {
 
 (** Useful to know what's in the constraint-generated term. *)
 type unifier_instance = unifier_var list ref
+
+(** This is for your convenience when dealing with hash tables of unifier vars *)
+module Uhashtbl: module type of Jhashtbl.Make(struct
+    type t = descriptor
+    let equal = assert false
+    let hash _ = assert false
+  end)
 
 (** The unifier actually provides the base solver with the necessary stubs to
     create pre-allocated constraints and terms. We need to expose all the
