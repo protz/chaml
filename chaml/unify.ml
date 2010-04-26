@@ -152,7 +152,8 @@ let inspect_scheme: ?debug:unit -> unifier_var -> unifier_var list * unifier_var
         | Some (Some key) ->
             `Var key
         | None ->
-            assert (repr.rank = (-1));
+            if (not (Option.unit_bool debug)) then
+              assert (repr.rank = (-1));
             Uhashtbl.add seen repr None;
             let type_term =
               match repr.term with
@@ -195,7 +196,7 @@ let rec uvar_name: Buffer.t -> unifier_var -> unit =
 (* For error messages *)
 let string_of_uvar ?debug ?young_vars:opt_young_vars ?caml_types uvar =
   let string_of_key = if Option.unit_bool debug then debug_var_printer else regular_var_printer in
-  let young_vars, inspected_var = inspect_scheme uvar in
+  let young_vars, inspected_var = inspect_scheme ?debug uvar in
   let young_vars = Option.map (fun () -> young_vars) opt_young_vars in
   string_of_type ?string_of_key ?caml_types ?young_vars inspected_var
 
