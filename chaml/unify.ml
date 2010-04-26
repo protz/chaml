@@ -199,19 +199,26 @@ let string_of_uvars ?caml_types uvars =
 
 let young_vars_of_scheme uvar =
   let young = Uhashtbl.create 16 in
+  let seen = Uhashtbl.create 16 in
   let rec walk uvar =
     let repr = UnionFind.find uvar in
-    match repr.term with
+    match Uhashtbl.find_opt seen repr with
     | None ->
-        begin match Uhashtbl.find_opt young repr with
-        | Some _uvar ->
-            ()
+        begin match repr.term with
         | None ->
-            if repr.rank == -1 then
-              Uhashtbl.add young repr uvar
+            begin match Uhashtbl.find_opt young repr with
+            | Some _uvar ->
+                ()
+            | None ->
+                if repr.rank == -1 then
+                  Uhashtbl.add young repr uvar
+            end
+        | Some (`Cons (_, cons_args)) ->
+            Uhashtbl.add seen repr ();
+            List.iter walk cons_args
         end
-    | Some (`Cons (_, cons_args)) ->
-        List.iter walk cons_args
+    | Some () ->
+        ()
   in
   walk uvar;
   Uhashtbl.map_list young (fun _k v -> v)
@@ -247,14 +254,7 @@ let fresh_copy unifier_env { scheme_var = scheme_uvar } =
     let repr = UnionFind.find uvar in
     match Uhashtbl.find_opt mapping repr with
       | Some uvar' ->
-          (* This clearly tells us that we've hit a recursive type: we have
-           * 'a = T('a). Strictly speaking, this is not necessary. It's just
-           * that if we don't do that, we're unfolding the recursive types way
-           * too deep. *)
-          (* if repr.term <> None && Hashtbl.mem call_stack uvar' then
-            raise (L.RecType (uvar', uvar))
-          else *)
-            uvar'
+           uvar'
       | None ->
           begin match repr.term with
             | None ->
@@ -269,18 +269,11 @@ let fresh_copy unifier_env { scheme_var = scheme_uvar } =
                 if repr.rank = (-1) then begin
                   let new_uvar = fresh_unifier_var unifier_env in
                   let new_repr = UnionFind.find new_uvar in
-                  (* try *)
-                    Uhashtbl.add mapping repr new_uvar;
-                    (* Hashtbl.add call_stack uvar (); *)
-                    let cons_args' = List.map fresh_copy cons_args in
-                    (* Uhashtbl.remove call_stack uvar; *)
-                    let term = `Cons (cons_name, cons_args') in
-                    new_repr.term <- Some term;
-                    new_uvar
-                  (* with
-                    | L.RecType (me, original) when me = new_uvar ->
-                        Hashtbl.replace mapping repr original;
-                        original *)
+                  Uhashtbl.add mapping repr new_uvar;
+                  let cons_args' = List.map fresh_copy cons_args in
+                  let term = `Cons (cons_name, cons_args') in
+                  new_repr.term <- Some term;
+                  new_uvar
                 end else begin
                   uvar
                 end
