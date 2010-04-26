@@ -52,7 +52,7 @@ let unify_or_raise unifier_env uvar1 uvar2 =
  * - marking variables on the fly and detecting cycles (if recursive types are
  * disabled)
  * *)
-let run_dfs ~occurs_check uvar =
+let run_dfs ~occurs_check young_vars =
   let seen = Uhashtbl.create 64 in
   let rec propagate_ranks: int -> descriptor -> int = fun parent_rank repr ->
     (* Top-down *)
@@ -86,9 +86,12 @@ let run_dfs ~occurs_check uvar =
         Uhashtbl.replace seen repr false;
         r
   in
-  let repr = UnionFind.find uvar in
-  ignore (dont_loop repr.rank uvar);
-  assert (repr.rank >= 0)
+  let f uvar =
+    let repr = UnionFind.find uvar in
+    ignore (dont_loop repr.rank uvar);
+    assert (repr.rank >= 0)
+  in
+  List.iter f young_vars
 
 let solve =
   fun ~caml_types:opt_caml_types
@@ -218,15 +221,10 @@ let solve =
         in
         let sub_pool = current_pool _sub_unifier_env in
         let young_vars = sub_pool.Pool.members in
-
-        (* We want to keep "young" variables that have been introduced while
-         * solving the constraint attached to that branch. We don't want to
-         * quantify over variables that represent constructors, that's useless. *)
-        let is_young uvar =
-          let desc = UnionFind.find uvar in
-          assert (desc.rank <= current_rank sub_env);
-          desc.rank = current_rank sub_env
-        in
+        Printf.printf
+          "%d variables in pool %d\n"
+          (List.length young_vars)
+          (current_rank sub_env);
 
         (* Filter out duplicates. This isn't necessary but still this should
          * speed things up. *)
@@ -236,13 +234,24 @@ let solve =
             ~equal_func:UnionFind.equivalent
             young_vars
         in
+        let rank x = (UnionFind.find x).rank in
+        let young_vars = List.sort (fun a b -> rank a - rank b) young_vars in
 
         (* This is rank propagation. See lemma 10.6.7 in ATTAPL. This is needed. *)
         debug_inpool young_vars;
         let prev_ranks = List.map (fun x -> (UnionFind.find x).rank) young_vars in
         let occurs_check = not opt_recursive_types in
-        List.iter (run_dfs ~occurs_check) young_vars;
+        run_dfs ~occurs_check young_vars;
         debug_inpool ~prev_ranks young_vars;
+
+        (* We want to keep "young" variables that have been introduced while
+         * solving the constraint attached to that branch. We don't want to
+         * quantify over variables that represent constructors, that's useless. *)
+        let is_young uvar =
+          let desc = UnionFind.find uvar in
+          assert (desc.rank <= current_rank sub_env);
+          desc.rank = current_rank sub_env
+        in
 
         (* We can just get rid of the old vars: they have been unified with a
          * var that's already in its own pool, with a lower rank. *)

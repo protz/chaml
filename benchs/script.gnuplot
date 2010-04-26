@@ -1,7 +1,7 @@
 set datafile separator ","
 set ylabel "Time (s)"
 set xlabel "Number of lines generated"
-set logscale y
+set logscale y 2
 set terminal pngcairo
 set output "timings.png"
 plot "timings" using 1:2 title "OCaml" with linespoints, \
