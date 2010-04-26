@@ -69,6 +69,8 @@ module Options = struct
       [
         ("generalize-match",
           (true, "Generalize the pattern which is matched under a branch"));
+        ("recursive-types",
+          (false, "Allow equirecursive types"));
         ("default-bindings",
           (true, "Include default bindings for arithmetic operations (+, *...)"));
         ("caml-types",
@@ -161,7 +163,8 @@ let _ =
     (* Constraint solving *)
     let print_types = !arg_print_types in
     let caml_types = Options.get_opt "caml-types" in
-    let r = Solver.solve ~caml_types ~print_types konstraint in
+    let recursive_types = Options.get_opt "recursive-types" in
+    let r = Solver.solve ~caml_types ~print_types ~recursive_types konstraint in
     begin match r with
       | `Error e ->
           let e = Solver.string_of_error e in

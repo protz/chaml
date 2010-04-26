@@ -27,6 +27,7 @@ open Algebra.Core
 type error =
   | UnifyError of Unify.error
   | UnboundIdentifier of ident
+  | CyclicType
 
 exception Error of error
 let raise_error x = raise (Error x)
@@ -36,13 +37,22 @@ let string_of_error = function
       Unify.string_of_error e
   | UnboundIdentifier i ->
       Printf.sprintf "Unbound identifier %s\n" (string_of_ident i)
+  | CyclicType ->
+      "Recursive types detected. Please use --enable recursive-types if \
+       intended\n"
 
 let unify_or_raise unifier_env uvar1 uvar2 =
   match (unify unifier_env uvar1 uvar2) with
   | `Ok -> ();
   | `Error e -> raise (Error (UnifyError e))
 
-let propagate_ranks uvar =
+(* This function runs a DFS when we exit the left branch of a [`Let]. It takes
+ * care of:
+ * - propagating ranks
+ * - marking variables on the fly and detecting cycles (if recursive types are
+ * disabled)
+ * *)
+let run_dfs ~occurs_check uvar =
   let seen = Uhashtbl.create 64 in
   let rec propagate_ranks: int -> unifier_var -> int = fun parent_rank uvar ->
     let repr = UnionFind.find uvar in
@@ -61,20 +71,27 @@ let propagate_ranks uvar =
           repr.rank
   and dont_loop rank uvar =
     let repr = UnionFind.find uvar in
-    if Uhashtbl.mem seen repr then
-      repr.rank
-    else begin
-      Uhashtbl.add seen repr ();
-      propagate_ranks rank uvar
-    end
+    match Uhashtbl.find_opt seen repr with
+    | Some false ->
+        repr.rank
+    | Some true ->
+        if (occurs_check) then
+          raise_error (CyclicType)
+        else
+          repr.rank
+    | None ->
+        Uhashtbl.add seen repr true;
+        let r = propagate_ranks rank uvar in
+        Uhashtbl.replace seen repr false;
+        r
   in
   let repr = UnionFind.find uvar in
   ignore (dont_loop repr.rank uvar)
 
-
 let solve =
   fun ~caml_types:opt_caml_types
     ~print_types:opt_print_types
+    ~recursive_types:opt_recursive_types
     konstraint ->
 
   let rec analyze: unifier_env -> type_constraint -> unifier_env =
@@ -221,7 +238,8 @@ let solve =
         (* This is rank propagation. See lemma 10.6.7 in ATTAPL. This is needed. *)
         debug_inpool young_vars;
         let prev_ranks = List.map (fun x -> (UnionFind.find x).rank) young_vars in
-        List.iter propagate_ranks young_vars;
+        let occurs_check = not opt_recursive_types in
+        List.iter (run_dfs ~occurs_check) young_vars;
         debug_inpool ~prev_ranks young_vars;
 
         (* We can just get rid of the old vars: they have been unified with a

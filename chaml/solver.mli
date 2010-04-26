@@ -32,6 +32,6 @@ val string_of_error: error -> string
 (** This is the only useful function. It takes a set of constraints and returns
     a typed AST. It explains that it takes a type constraint that's been built
     with this very solver's data structures. *)
-val solve: caml_types:bool -> print_types:bool ->
+val solve: caml_types:bool -> print_types:bool -> recursive_types:bool ->
   Constraint.Make(BaseSolver).type_constraint ->
   [`Ok | `Error of error]

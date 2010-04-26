@@ -172,13 +172,13 @@ let _ =
   let test2' () =
     print_endline (Bash.box "Constraint Solving - recursive types");
     let o = Ocamlbuild_plugin.run_and_read
-      "./chaml.native --enable caml-types --disable generalize-match tests/tests_recursive_types.ml"
+      "./chaml.native --enable recursive-types --enable caml-types --disable generalize-match tests/tests_recursive_types.ml"
     in
     let o' = Ocamlbuild_plugin.run_and_read
       "ocamlc -rectypes -i -w a tests/tests_recursive_types.ml"
     in
     let o'' = Ocamlbuild_plugin.run_and_read
-      "./chaml.native --enable caml-types tests/tests_recursive_types.ml"
+      "./chaml.native --enable recursive-types --enable caml-types tests/tests_recursive_types.ml"
     in
     compare [o'; o''; o];
   in
