@@ -154,7 +154,7 @@ let _ =
       let pretty_printing = Options.get_opt "pretty-printing" in
       let str =
         (Constraint.PrettyPrinter.string_of_constraint ~pretty_printing konstraint) in
-      String.blit "dump" 0 str (String.length str - 4) 4;
+      String.blit "dump   " 0 str (String.length str - 7) 7;
       print_string (str^"\n");
       flush stdout
     end;
