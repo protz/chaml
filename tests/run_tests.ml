@@ -60,9 +60,9 @@ let test_pass, test_fail =
 let conversions =
   (* Hack alert ! *)
   let tbl = Hashtbl.create 4 in
-  let expanded_1 = "('a * 'a as 'a) * 'a -> ('a * 'a -> 'a * 'a -> 'b) -> 'a * 'a -> 'a * 'a -> 'b" in
+  (* let expanded_1 = "('a * 'a as 'a) * 'a -> ('a * 'a -> 'a * 'a -> 'b) -> 'a * 'a -> 'a * 'a -> 'b" in
   let correct_1 = "('a * 'a as 'a) -> ('a -> 'a -> 'b) -> 'a -> 'a -> 'b" in
-  Hashtbl.add tbl expanded_1 correct_1;
+  Hashtbl.add tbl expanded_1 correct_1; *)
   tbl
 
 let _ =
