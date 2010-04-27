@@ -220,52 +220,45 @@ let solve =
           analyze sub_env konstraint
         in
         let sub_pool = current_pool _sub_unifier_env in
-        let young_vars = sub_pool.Pool.members in
-        Printf.printf
+        let pool_vars = sub_pool.Pool.members in
+        (* Printf.printf
           "%d variables in pool %d\n"
           (List.length young_vars)
-          (current_rank sub_env);
+          (current_rank sub_env); *)
 
         (* Filter out duplicates. This isn't necessary but still this should
          * speed things up. *)
-        let young_vars =
+        let pool_vars =
           Jlist.remove_duplicates
             ~hash_func:(fun x -> Hashtbl.hash (UnionFind.find x).name)
             ~equal_func:UnionFind.equivalent
-            young_vars
+            pool_vars
         in
         let rank x = (UnionFind.find x).rank in
-        let young_vars = List.sort (fun a b -> rank a - rank b) young_vars in
+        let pool_vars = List.sort (fun a b -> rank a - rank b) pool_vars in
 
         (* This is rank propagation. See lemma 10.6.7 in ATTAPL. This is needed. *)
-        debug_inpool young_vars;
-        let prev_ranks = List.map (fun x -> (UnionFind.find x).rank) young_vars in
+        debug_inpool pool_vars;
+        let prev_ranks = List.map (fun x -> (UnionFind.find x).rank) pool_vars in
         let occurs_check = not opt_recursive_types in
-        run_dfs ~occurs_check young_vars;
-        debug_inpool ~prev_ranks young_vars;
+        run_dfs ~occurs_check pool_vars;
+        debug_inpool ~prev_ranks pool_vars;
 
-        (* We want to keep "young" variables that have been introduced while
-         * solving the constraint attached to that branch. We don't want to
-         * quantify over variables that represent constructors, that's useless. *)
-        let is_young uvar =
-          let desc = UnionFind.find uvar in
-          assert (desc.rank <= current_rank sub_env);
-          desc.rank = current_rank sub_env
-        in
-
-        (* We can just get rid of the old vars: they have been unified with a
-         * var that's already in its own pool, with a lower rank. *)
-        let young_vars, old_vars = List.partition is_young young_vars in
-        List.iter (fun x -> (UnionFind.find x).rank <- -1) young_vars;
-
-        (* Send back the old vars in their respective pools *)
+        (* Young variables are marked as belonging to a scheme, they are
+         * generalized. Old variables are sent back to their pools. *)
+        let current_rank = current_rank sub_env in
         List.iter
           (fun var ->
             let repr = UnionFind.find var in
-            let the_vars_pool = get_pool unifier_env repr.rank in
-            Pool.add the_vars_pool var
+            assert (repr.rank <= current_rank);
+            (* Is it a young variable? *)
+            if repr.rank = current_rank then
+              repr.rank <- -1
+            else
+              let the_vars_pool = get_pool unifier_env repr.rank in
+              Pool.add the_vars_pool var
           )
-          old_vars;
+          pool_vars;
 
         (* Fill in the schemes that have been pre-allocated by the constraint
          * generator. The variables are ready, that was done at the beginning. *)

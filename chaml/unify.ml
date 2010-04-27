@@ -229,7 +229,6 @@ let fresh_unifier_var ?term ?prefix ?name unifier_env =
 (* Create a fresh copy of a scheme for instanciation *)
 let fresh_copy unifier_env { scheme_var = scheme_uvar } =
   let mapping = Uhashtbl.create 16 in
-  let module L = struct exception RecType of unifier_var * unifier_var end in
   let rec fresh_copy uvar =
     let repr = UnionFind.find uvar in
     match Uhashtbl.find_opt mapping repr with
@@ -251,8 +250,8 @@ let fresh_copy unifier_env { scheme_var = scheme_uvar } =
                   let new_repr = UnionFind.find new_uvar in
                   Uhashtbl.add mapping repr new_uvar;
                   let cons_args' = List.map fresh_copy cons_args in
-                  let term = `Cons (cons_name, cons_args') in
-                  new_repr.term <- Some term;
+                  let term = Some (`Cons (cons_name, cons_args')) in
+                  new_repr.term <- term;
                   new_uvar
                 end else begin
                   uvar

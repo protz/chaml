@@ -142,22 +142,22 @@ let _ =
   let test1 () =
     print_endline (Bash.box "Constraint Solving - standard tests");
     let o = Ocamlbuild_plugin.run_and_read
-      "./chaml.native --enable caml-types --disable generalize-match tests/test_solving.ml"
+      "./chaml.native --enable caml-types --disable generalize-match tests/good/test_solving.ml"
     in
     (* Disable all warnings. It's a test, so there WILL be useless things such as
      * redundant patterns. *)
     let o' = Ocamlbuild_plugin.run_and_read
-      "ocamlc -i -w a tests/test_solving.ml"
+      "ocamlc -i -w a tests/good/test_solving.ml"
     in
     let o'' = Ocamlbuild_plugin.run_and_read
-      "./chaml.native --enable caml-types tests/test_solving.ml"
+      "./chaml.native --enable caml-types tests/good/test_solving.ml"
     in
     compare [o; o'; o''];
   in
   let test2 () =
     print_endline (Bash.box "Constraint Solving - ChaML extra features");
     let o = Ocamlbuild_plugin.run_and_read
-      "./chaml.native --enable caml-types tests/test_solving_chaml_only.ml"
+      "./chaml.native --enable caml-types tests/good/test_solving_chaml_only.ml"
     in
     let o' = String.concat "\n" [
       "val generalize_under_match: 'a -> 'b -> 'b";
@@ -172,28 +172,28 @@ let _ =
   let test2' () =
     print_endline (Bash.box "Constraint Solving - recursive types");
     let o = Ocamlbuild_plugin.run_and_read
-      "./chaml.native --enable recursive-types --enable caml-types --disable generalize-match tests/tests_recursive_types.ml"
+      "./chaml.native --enable recursive-types --enable caml-types --disable generalize-match tests/good/tests_recursive_types.ml"
     in
     let o' = Ocamlbuild_plugin.run_and_read
-      "ocamlc -rectypes -i -w a tests/tests_recursive_types.ml"
+      "ocamlc -rectypes -i -w a tests/good/tests_recursive_types.ml"
     in
     let o'' = Ocamlbuild_plugin.run_and_read
-      "./chaml.native --enable recursive-types --enable caml-types tests/tests_recursive_types.ml"
+      "./chaml.native --enable recursive-types --enable caml-types tests/good/tests_recursive_types.ml"
     in
     compare [o'; o''; o];
   in
-  let test3 () =
+  let _test3 () =
     print_endline (Bash.box "Constraint Generation - first series of tests");
     let o = Ocamlbuild_plugin.run_and_read
       ("./chaml.native --dont-print-types --disable generalize-match " ^
-      "--disable default-bindings --print-constraint tests/test_constraint.ml")
+      "--disable default-bindings --print-constraint tests/good/test_constraint.ml")
     in
     let fd = open_out "_constraint" in
     output_string fd o;
     close_out fd;
     let o = Ocamlbuild_plugin.run_and_read
-      ("./chaml.native --dont-print-types " ^
-      "--disable default-bindings --print-constraint tests/test_constraint.ml")
+      ("./chaml.native --dont-print-types \
+       --disable default-bindings --print-constraint tests/good/test_constraint.ml")
     in
     let fd = open_out "_constraint2" in
     output_string fd o;
@@ -202,7 +202,7 @@ let _ =
       "mini --start parse-constraint _constraint"
     in
     let o' = Ocamlbuild_plugin.run_and_read
-      "ocamlc -i -w a tests/test_constraint.ml"
+      "ocamlc -i -w a tests/good/test_constraint.ml"
     in
     let o'' = Ocamlbuild_plugin.run_and_read
       "mini --start parse-constraint _constraint2"
@@ -211,13 +211,57 @@ let _ =
     Unix.unlink "_constraint2";
     compare [o; o'; o''];
   in
+  let test4 () =
+    print_endline (Bash.box "Wrong tests");
+    let dir = Unix.opendir "tests/bad" in
+    while try
+      let file = Unix.readdir dir in
+      if (not (file.[0] = '.')) then begin
+        let all_failed =
+          (try
+            let _ = Ocamlbuild_plugin.run_and_read
+              (Printf.sprintf "./chaml.native --enable caml-types tests/bad/%s > /dev/null 2>&1" file) in
+            false
+          with Failure _ ->
+            true)
+          &&
+          (try
+            let _ = Ocamlbuild_plugin.run_and_read
+              (Printf.sprintf "./chaml.native --enable generalize-match --enable caml-types tests/bad/%s > /dev/null 2>&1" file) in
+            false
+          with Failure _ ->
+            true)
+          &&
+          (try
+            let _ = Ocamlbuild_plugin.run_and_read
+              (Printf.sprintf "ocamlc -i tests/bad/%s > /dev/null 2>&1" file) in
+            false
+          with Failure _ ->
+            true)
+        in
+        if all_failed then
+          test_pass file
+        else
+          test_fail file
+      end;
+      true
+    with End_of_file ->
+      false
+    do
+      ()
+    done;
+    Unix.closedir dir;
+  in
   test1 ();
   print_newline ();
   test2 ();
   print_newline ();
   test2' ();
+  (* print_newline ();
+  test3 (); *)
   print_newline ();
-  test3 ();
+  test4 ();
+  print_newline ();
   let open Bash in
   Printf.printf
     "--- %s --- %s ---\n"
