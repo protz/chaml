@@ -113,11 +113,7 @@ module Identifiers: sig
 
   (** This module will be useful many times from now on. It allows one to map
       identifiers to type variables, unification variables, etc. *)
-  module IdentMap: module type of Jmap.Make(struct
-    type t = ident
-    let compare _ _ = assert false
-  end)
-
+  module IdentMap: Jmap.S with type key = ident
 
   (** Generate globally unique names. *)
   val fresh_name: ?prefix:string -> unit -> string

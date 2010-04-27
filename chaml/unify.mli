@@ -69,11 +69,7 @@ and unifier_scheme = {
 type unifier_instance = unifier_var list ref
 
 (** This is for your convenience when dealing with hash tables of unifier vars *)
-module Uhashtbl: module type of Jhashtbl.Make(struct
-    type t = descriptor
-    let equal = assert false
-    let hash _ = assert false
-  end)
+module Uhashtbl: Jhashtbl.S with type key = descriptor
 
 (** The unifier actually provides the base solver with the necessary stubs to
     create pre-allocated constraints and terms. We need to expose all the

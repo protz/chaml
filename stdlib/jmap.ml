@@ -17,6 +17,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module type S = sig
+  include Map.S
+
+  (** Get a list of all keys in a map. *)
+  val keys : 'a t -> key list
+
+  (** [union m1 m2] keeps the values from [m1] *)
+  val union : 'a t -> 'a t -> 'a t
+
+  (** [inter m1 m2] keeps the values from [m1] *)
+  val inter : 'a t -> 'a t -> 'a t
+
+  (** [minus m1 m2] returns [m1] minus all the elements that are also in [m2],
+      that is, m1 \ (m1 ∩ m2) *)
+  val minus : 'a t -> 'a t -> 'a t
+
+  (** [xor m1 m2] is ([m1] ∪ [m2]) \ ([m1] ∩ [m2]) *)
+  val xor : 'a t -> 'a t -> 'a t
+
+  (** [to_list] translates the map to a list. *)
+  val to_list : 'a t -> (key * 'a) list
+end
+
 module Make = functor (Ord: Map.OrderedType) -> struct
 
   module Map = Map.Make(Ord)

@@ -28,12 +28,12 @@ val find_opt : ('a, 'b) Hashtbl.t -> 'a -> 'b option
     associated to a value [val] in [tbl]. *)
 val map_list : ('a, 'b) Hashtbl.t -> ('a -> 'b -> 'c) -> 'c list
 
+module type S = sig
+  include Hashtbl.S
+
+  val find_opt : 'a t -> key -> 'a option
+  val map_list : 'a t -> (key -> 'a -> 'b) -> 'b list
+end
+
 (** Functional interface. Also includes the regular [Hashtbl] for convenience. *)
-module Make :
-  functor (H : Hashtbl.HashedType) ->
-    sig
-      module Hashtbl: module type of Hashtbl.Make(H)
-      include module type of Hashtbl
-      val find_opt : 'a t -> key -> 'a option
-      val map_list : 'a t -> (key -> 'a -> 'b) -> 'b list
-    end
+module Make (H : Hashtbl.HashedType): S with type key = H.t

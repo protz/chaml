@@ -16,6 +16,24 @@
 (*  along with this program.  If not, see <http://www.gnu.org/licenses/>.    *)
 (*                                                                           *)
 (*****************************************************************************)
+ 
+let find_opt tbl key =
+  if Hashtbl.mem tbl key then
+    Some (Hashtbl.find tbl key)
+  else
+    None
+
+let map_list tbl f =
+  let acc = ref [] in
+  Hashtbl.iter (fun k v -> acc := (f k v) :: !acc) tbl;
+  !acc
+
+module type S = sig
+  include Hashtbl.S
+
+  val find_opt : 'a t -> key -> 'a option
+  val map_list : 'a t -> (key -> 'a -> 'b) -> 'b list
+end
 
 module Make (H: Hashtbl.HashedType) = struct
 
@@ -34,16 +52,4 @@ module Make (H: Hashtbl.HashedType) = struct
     !acc
 
 end
- 
-let find_opt tbl key =
-  if Hashtbl.mem tbl key then
-    Some (Hashtbl.find tbl key)
-  else
-    None
-
-let map_list tbl f =
-  let acc = ref [] in
-  Hashtbl.iter (fun k v -> acc := (f k v) :: !acc) tbl;
-  !acc
-
 

@@ -19,9 +19,8 @@
 
 (** Various missing functions from the [Map] module. *)
 
-module Make: functor (Ord : Map.OrderedType) -> sig
-  module Map: module type of Map.Make(Ord)
-  include module type of Map
+module type S = sig
+  include Map.S
 
   (** Get a list of all keys in a map. *)
   val keys : 'a t -> key list
@@ -42,3 +41,5 @@ module Make: functor (Ord : Map.OrderedType) -> sig
   (** [to_list] translates the map to a list. *)
   val to_list : 'a t -> (key * 'a) list
 end
+
+module Make (Ord : Map.OrderedType): S with type key = Ord.t
