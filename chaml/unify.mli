@@ -158,20 +158,17 @@ val string_of_scheme: ?debug:unit -> ?caml_types:bool ->
     scheme's unification variable. *)
 val fresh_copy: unifier_env -> unifier_scheme -> unifier_scheme * unifier_var list
 
-(** When the constraint generator requests a variable, the {!Algebra.SOLVER} answers with
-    what is said to be a "not ready" variable. We cannot use a variable in the
-    solver and the unifier if it's not ready. There is a mark on variable to
+(** When the constraint generator requests a variable, the {!Algebra.SOLVER} answers
+    with what is said to be a "not ready" variable. We cannot use a variable in
+    the solver and the unifier if it's not ready. There is a mark on variable to
     tell if they have been made ready or not, so you should always call this
     function before accessing a variable that's been created by the constraint
-    generator.
-    *)
+    generator. *)
 val ensure_ready: unifier_env -> unifier_var -> unit
 
 (** This function transforms a type term (let's say, T = [`Cons ("->", uvar1,
     uvar2)]) into a proper unification variable which is equated with term T. It
-    implements explicit sharing by hashconsing constructors (two subsequent
-    calls with the same constructor will return the same variable). It also
-    makes sure all variables are ready before returning. *)
+    also makes sure all variables are ready before returning. *)
 val uvar_of_term: unifier_env -> unifier_var type_term -> unifier_var
 
 (** The main function, called by the solver to unify terms. *)

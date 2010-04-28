@@ -228,13 +228,14 @@ let fresh_unifier_var ?term ?prefix ?name unifier_env =
 
 (* Create a fresh copy of a scheme for instanciation *)
 let fresh_copy unifier_env { scheme_var = scheme_uvar } =
-  let mapping = Uhashtbl.create 16 in
+  let mapping = Uhashtbl.create 64 in
   let rec fresh_copy uvar =
     let repr = UnionFind.find uvar in
-    match Uhashtbl.find_opt mapping repr with
-      | Some uvar' ->
-           uvar'
-      | None ->
+    (* This is slightly faster than Uhashtbl.find_opt *)
+    try
+      Uhashtbl.find mapping repr
+    with
+      | Not_found ->
           begin match repr.term with
             | None ->
                 if repr.rank = (-1) then begin
@@ -283,23 +284,11 @@ let ensure_ready unifier_env uvar =
     repr.ready <- true;
   end
 
-(* What we have is bare unifier vars that don't have a proper rank, etc. So if
- * we haven't seen them yet, we set their rank properly, and we add them to the
- * environment's hash table.
- *
- * BEWARE BEWARE: the following nasty sequence of events can happen:
- * - uvar_of_term uvar
- * - unify uvar with something else
- * - uvar's hash changes
- * - uvar_of_term uvar
- *
- * We cannot use the full variable as the key for the Hashtbl. We cannot use its
- * repr either. So we must use the name (what a pity!). We might have a
- * uniquely-generated (Oo.id (object end)) later on but for now on that'll be ok
- * (have a look at fresh_name in Algebra to convince yourself the names are
- * globally unique). *)
+(* This function does two things: first, it makes sure the variable is ready.
+ * Then, it replaces type_constructors by unifier_vars whose term is that
+ * constructor.
+ *)
 let rec uvar_of_term: unifier_env -> unifier_var type_term -> unifier_var =
-  let known_terms = Hashtbl.create 64 in
   fun unifier_env type_term ->
     let rec uvar_of_term tterm =
       match tterm with
@@ -308,9 +297,7 @@ let rec uvar_of_term: unifier_env -> unifier_var type_term -> unifier_var =
             uvar
         | `Cons (cons, args) ->
             let term = `Cons (cons, List.map uvar_of_term args) in
-            let uvar = fresh_unifier_var ~term unifier_env in
-            Hashtbl.add known_terms tterm uvar;
-            uvar
+            fresh_unifier_var ~term unifier_env
     in
     uvar_of_term type_term
 
