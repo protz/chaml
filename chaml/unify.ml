@@ -181,7 +181,7 @@ let inspect_scheme: ?debug:unit -> unifier_var -> unifier_var list * unifier_var
             r
       end
     in
-    Uhashtbl.map_list young_vars (fun k v -> v), inspect_uvar uvar
+    Uhashtbl.map_list young_vars (fun _k v -> v), inspect_uvar uvar
 
 let debug_var_printer = `Custom (fun uvar -> (UnionFind.find uvar).name)
 let regular_var_printer = `Auto (fun uvar -> (UnionFind.find uvar).name)
@@ -191,7 +191,7 @@ let rec uvar_name: Buffer.t -> unifier_var -> unit =
   fun buf uvar -> match UnionFind.find uvar with
     | { name = s; term = None; _ } ->
         Printf.bprintf buf "%s" s
-    | { name = s; term = Some cons; _ } ->
+    | { term = Some _; _ } ->
         Buffer.add_string buf
           (string_of_type ~string_of_key:debug_var_printer (snd (inspect_scheme ~debug:() uvar)))
 

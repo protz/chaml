@@ -62,7 +62,7 @@ let run_dfs ~occurs_check young_vars =
       | None ->
           assert (repr.rank >= 0);
           repr.rank
-      | Some (`Cons (cons_name, cons_args)) ->
+      | Some (`Cons (_cons_name, cons_args)) ->
           (* Bottom-up *)
           let ranks = List.map (dont_loop repr.rank) cons_args in
           let max_rank = Jlist.max ranks in
@@ -162,11 +162,13 @@ let solve =
          * allows us to create a fresh pool which will contain all the
          * existentially quantified variables in it. *)
         let sub_env = step_env unifier_env in
-        let vars, konstraint, var_map = scheme in
+        let _vars, konstraint, var_map = scheme in
         (* Make sure we register the variables that haven't been initialized yet
-         * into the sub environment's pool, that's where they belong. *)
+         * into the sub environment's pool, that's where they belong. NB: _vars
+         * above is a subset of the whole var_map, so that's normal we don't
+         * do anything with these. *)
         IdentMap.iter
-          (fun ident (`Var uvar, scheme) ->
+          (fun _ident (`Var uvar, scheme) ->
              ensure_ready sub_env uvar;
              ensure_ready sub_env scheme.scheme_var;
              unify_or_raise sub_env scheme.scheme_var uvar;
@@ -204,7 +206,7 @@ let solve =
               Bash.color 208 "[InPool] %d: %s\n" rank (String.concat ", " members)))
             ();
         in
-        let debug_scheme buf (scheme, ident) =
+        let _debug_scheme buf (scheme, ident) =
           let scheme_str = string_of_scheme
             ~debug:()
             (string_of_ident ident)
@@ -227,7 +229,9 @@ let solve =
           (current_rank sub_env); *)
 
         (* Filter out duplicates. This isn't necessary but still this should
-         * speed things up. *)
+         * speed things up. We maintain the invariant that each descriptor has
+         * at least one unifier_var that points towards it either in a scheme or
+         * in a pool. *)
         let pool_vars =
           let mark = Mark.fresh () in
           let t_list = ref [] in
@@ -268,17 +272,17 @@ let solve =
           )
           pool_vars;
 
-        (* Fill in the schemes that have been pre-allocated by the constraint
-         * generator. The variables are ready, that was done at the beginning. *)
-        let assign_scheme: ident -> unifier_scheme = fun ident ->
-          let (`Var uvar), scheme = IdentMap.find ident var_map in
-          Error.debug "%a" debug_scheme (scheme, ident);
-          scheme
-        in
+        (* The schemes have already been allocated when generating a CamlX term,
+         * However, the [var_map] is a mapping from identifiers to
+         * [(uvar, scheme)]
+         * where uvar represents the pre-allocated variable and scheme the
+         * pre-allocated scheme for that variable. They have been unified at the
+         * beginning of [solve_branch].
+         * *)
+        (* Error.debug "%a" debug_scheme (scheme, ident); *)
         IdentMap.fold
-          (fun ident type_var -> IdentMap.add ident (assign_scheme ident))
-          (var_map: (unifier_var type_var * unifier_scheme) IdentMap.t :> (unifier_var type_term * unifier_scheme) IdentMap.t)
-          new_map
+          (fun ident (`Var _uvar, scheme) new_map -> IdentMap.add ident scheme new_map)
+          var_map new_map
       in
       let new_map =
         List.fold_left solve_branch (scheme_of_ident unifier_env) schemes
@@ -289,11 +293,6 @@ let solve =
   let initial_env = fresh_env () in
   try
     let knowledge = analyze initial_env konstraint in
-    (* Hashtbl.iter
-      (fun k v -> Error.debug "[Rank] %s: %d\n"
-                    (UnionFind.find v).name
-                    (UnionFind.find v).rank)
-      knowledge.uvar_of_term; *)
     let kv = IdentMap.to_list (scheme_of_ident knowledge) in
     let kv = List.filter (fun ((_, pos), _) -> not pos.Location.loc_ghost) kv in
     let kv = List.sort (fun ((_, pos), _) ((_, pos'), _) -> compare pos pos') kv in

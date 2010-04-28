@@ -135,7 +135,7 @@ module Identifiers = struct
    * type variables in the scheme. *)
   module IdentMap = Jmap.Make (struct
     type t = ident
-    let compare (x, pos1) (y, pos2) =
+    let compare (x, _pos1) (y, _pos2) =
       match x, y with
         | Ident a, Ident b -> String.compare a b
         | _ -> assert false

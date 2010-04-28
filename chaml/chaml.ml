@@ -175,10 +175,8 @@ let _ =
           ()
     end;
     (* Translate to the core language *)
-    let core_ast = Translator.translate hterm in
-    ignore (core_ast);
-    (* if !arg_print_typed_ast then begin
-      print_string (TypedAstPrinter.string_of_typed_ast typed_ast);
-      flush stdout;
-    end; *)
+    if !arg_print_typed_ast then begin
+      let core_ast = Translator.translate hterm in
+      print_string (Translator.string_of_t core_ast)
+    end;
   end
