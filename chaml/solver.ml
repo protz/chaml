@@ -216,10 +216,10 @@ let solve =
         (* --- End Debug --- *)
 
         (* Solve the constraint in the scheme. *)
-        let _sub_unifier_env =
+        let sub_unifier_env =
           analyze sub_env konstraint
         in
-        let sub_pool = current_pool _sub_unifier_env in
+        let sub_pool = current_pool sub_unifier_env in
         let pool_vars = sub_pool.Pool.members in
         (* Printf.printf
           "%d variables in pool %d\n"
@@ -229,17 +229,25 @@ let solve =
         (* Filter out duplicates. This isn't necessary but still this should
          * speed things up. *)
         let pool_vars =
-          Jlist.remove_duplicates
-            ~hash_func:(fun x -> Hashtbl.hash (UnionFind.find x).name)
-            ~equal_func:UnionFind.equivalent
-            pool_vars
+          let mark = Mark.fresh () in
+          let t_list = ref [] in
+          List.iter
+            (fun x -> 
+              let repr = UnionFind.find x in
+              if not (Mark.same repr.mark mark) then begin
+                t_list := x :: !t_list;
+                repr.mark <- mark;
+              end;
+            )
+          pool_vars;
+          !t_list
         in
         let rank x = (UnionFind.find x).rank in
         let pool_vars = List.sort (fun a b -> rank a - rank b) pool_vars in
 
         (* This is rank propagation. See lemma 10.6.7 in ATTAPL. This is needed. *)
         debug_inpool pool_vars;
-        let prev_ranks = List.map (fun x -> (UnionFind.find x).rank) pool_vars in
+        let prev_ranks = List.map rank pool_vars in
         let occurs_check = not opt_recursive_types in
         run_dfs ~occurs_check pool_vars;
         debug_inpool ~prev_ranks pool_vars;

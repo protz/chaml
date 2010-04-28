@@ -31,6 +31,7 @@ type descriptor = {
   name: string;
   mutable rank: int;
   mutable ready: bool;
+  mutable mark: Mark.t;
 }
 
 and unifier_var = descriptor UnionFind.point
@@ -51,12 +52,13 @@ module BaseSolver = struct
   type instance = unifier_instance
 
   let new_var name =
-    UnionFind.fresh { name; rank = -1; term = None; ready = false }
+    UnionFind.fresh { name; rank = -1; term = None; ready = false; mark = Mark.none }
 
   let new_scheme () = {
     scheme_var =
       UnionFind.fresh
-        { name = fresh_name ~prefix:"scheme" (); rank = -1; term = None; ready = false }
+        { name = fresh_name ~prefix:"scheme" ();
+          rank = -1; term = None; ready = false; mark = Mark.none }
   }
 
   let new_instance () = ref []
@@ -222,7 +224,7 @@ let fresh_unifier_var ?term ?prefix ?name unifier_env =
       | Some name ->
           name
   in
-  let uvar = UnionFind.fresh { term; name; rank; ready = true } in
+  let uvar = UnionFind.fresh { term; name; rank; ready = true; mark = Mark.none } in
   Pool.add current_pool uvar;
   uvar
 

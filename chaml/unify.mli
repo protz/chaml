@@ -44,6 +44,7 @@ type descriptor = {
   name: string;
   mutable rank: int;
   mutable ready: bool;
+  mutable mark: Mark.t;
 }
 
 (** The type of unificator variables. They are often called [uvar] in the code.

@@ -11,7 +11,7 @@ Translator Algebra
 }
 
 {2 Helper modules}
-{!modules: TypePrinter Bash Error UnionFind InfiniteArray
+{!modules: TypePrinter Bash Error UnionFind InfiniteArray Mark
 }
 
 {2 Standard library}
