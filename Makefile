@@ -18,11 +18,12 @@ profiling:
 
 debug:
 	./yacchack.sh
-	ocamlbuild -tag warn_A -tag warn_e -tag warn_z -tag debug \
+	ocamlbuild -tag debug \
 	  $(BUILDFLAGS) -tag use_unix chaml/chaml.byte
 	OCAMLRUNPARAM=b=1 ./chaml.byte \
 		--print-constraint --enable pretty-printing --enable debug\
 		--disable default-bindings\
+		--enable recursive-types\
 		test.ml
 	./noyacchack.sh
 

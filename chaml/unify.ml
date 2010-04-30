@@ -40,6 +40,7 @@ and unifier_term = [
 ]
 and unifier_scheme = {
   mutable scheme_var: unifier_var;
+  mutable young_vars: unifier_var list;
 }
 
 type unifier_instance = unifier_var list ref
@@ -58,7 +59,8 @@ module BaseSolver = struct
     scheme_var =
       UnionFind.fresh
         { name = fresh_name ~prefix:"scheme" ();
-          rank = -1; term = None; ready = false; mark = Mark.none }
+        rank = -1; term = None; ready = false; mark = Mark.none };
+    young_vars = [];
   }
 
   let new_instance () = ref []
@@ -138,10 +140,9 @@ let step_env env =
  * parameter is used when printing a unification variable whose internal name we
  * want to display (to track unification progress). Do not use it if you want to
  * see a "real" type. *)
-let inspect_scheme: ?debug:unit -> unifier_var -> unifier_var list * unifier_var inspected_var =
+let inspect_scheme: ?debug:unit -> unifier_var -> unifier_var inspected_var =
   fun ?debug uvar ->
     let seen = Uhashtbl.create 16 in
-    let young_vars = Uhashtbl.create 16 in
     let rec inspect_uvar: unifier_var -> unifier_var inspected_var =
     fun uvar ->
       let repr = UnionFind.find uvar in
@@ -149,7 +150,6 @@ let inspect_scheme: ?debug:unit -> unifier_var -> unifier_var list * unifier_var
         | Some None ->
             let key = uvar in
             Uhashtbl.replace seen repr (Some key);
-            Uhashtbl.replace young_vars repr uvar;
             `Var key
         | Some (Some key) ->
             `Var key
@@ -162,7 +162,6 @@ let inspect_scheme: ?debug:unit -> unifier_var -> unifier_var list * unifier_var
                 | Some (`Cons (type_cons, cons_args)) ->
                     `Cons (type_cons, List.map inspect_uvar cons_args)
                 | None ->
-                    Uhashtbl.replace young_vars repr uvar;
                     `Var uvar
             in
             let r = begin match Uhashtbl.find_opt seen repr with
@@ -181,7 +180,7 @@ let inspect_scheme: ?debug:unit -> unifier_var -> unifier_var list * unifier_var
             r
       end
     in
-    Uhashtbl.map_list young_vars (fun _k v -> v), inspect_uvar uvar
+    inspect_uvar uvar
 
 let debug_var_printer = `Custom (fun uvar -> (UnionFind.find uvar).name)
 let regular_var_printer = `Auto (fun uvar -> (UnionFind.find uvar).name)
@@ -193,24 +192,23 @@ let rec uvar_name: Buffer.t -> unifier_var -> unit =
         Printf.bprintf buf "%s" s
     | { term = Some _; _ } ->
         Buffer.add_string buf
-          (string_of_type ~string_of_key:debug_var_printer (snd (inspect_scheme ~debug:() uvar)))
+          (string_of_type ~string_of_key:debug_var_printer (inspect_scheme ~debug:() uvar))
 
 (* For error messages *)
-let string_of_uvar ?debug ?young_vars:opt_young_vars ?caml_types uvar =
+let string_of_uvar ?debug ?young_vars ?caml_types uvar =
   let string_of_key = if Option.unit_bool debug then debug_var_printer else regular_var_printer in
-  let young_vars, inspected_var = inspect_scheme ?debug uvar in
-  let young_vars = Option.map (fun () -> young_vars) opt_young_vars in
+  let inspected_var = inspect_scheme ?debug uvar in
   string_of_type ?string_of_key ?caml_types ?young_vars inspected_var
 
 (* For error messages. Same distinction, see typePrinter.mli *)
 let string_of_uvars ?caml_types uvars =
-  let _young_vars, inspected_vars = List.split (List.map inspect_scheme uvars) in
+  let inspected_vars = List.map inspect_scheme uvars in
   string_of_types ~string_of_key:regular_var_printer ?caml_types inspected_vars
 
 (* For printing type schemes *)
 let string_of_scheme ?debug ?caml_types ident scheme =
-  let { scheme_var; } = scheme in
-  Printf.sprintf "val %s: %s" ident (string_of_uvar ?debug ~young_vars:() ?caml_types scheme_var)
+  let { scheme_var; young_vars } = scheme in
+  Printf.sprintf "val %s: %s" ident (string_of_uvar ?debug ~young_vars ?caml_types scheme_var)
 
 (* Create a fresh variable and add it to the current pool *)
 let fresh_unifier_var ?term ?prefix ?name unifier_env =
@@ -271,7 +269,7 @@ let fresh_copy unifier_env { scheme_var = scheme_uvar } =
     Buffer.add_string buf (String.concat ", " pairs)
   in
   Error.debug "[UCopy] Mapping: %a\n" print_pairs ();
-  { scheme_var = fresh_copy scheme_uvar }, young_vars
+  { scheme_var = fresh_copy scheme_uvar; young_vars }
 
 (* This actually sets up the rank properly and adds the variable in the current
  * pool if this hasn't been done already. Extremely useful when the solver
