@@ -57,7 +57,7 @@ module Make(S: Algebra.SOLVER) = struct
 
     let module Types = struct
       type lambda_pattern = (S.instance, S.scheme) CamlX.pattern
-      type lambda_expression = (S.instance, S.scheme) CamlX.expression
+      type lambda_expression = (S.instance, S.scheme, S.var) CamlX.expression
 
       type constraint_pattern = {
         p_constraint: type_constraint;
@@ -303,7 +303,7 @@ module Make(S: Algebra.SOLVER) = struct
             List.split (fst (List.fold_left run ([], IdentMap.empty) pat_expr_list)) in
           {
             e_constraint = `Let (constraints, c2);
-            expr =  `Let (pat_expr, expr_e2);
+            expr =  `Let (pat_expr, ref [], expr_e2);
           }
       | Pexp_match (e1, pat_expr_list) ->
           if opt_generalize_match then

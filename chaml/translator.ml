@@ -30,7 +30,7 @@ type type_term = [
 
 type type_instance = f_type_var list
 type type_scheme = type_term
-type expression = (type_instance, type_scheme) CamlX.expression
+type expression = (type_instance, type_scheme, f_type_var) CamlX.expression
 type pattern = (type_instance, type_scheme) CamlX.pattern
 type t = expression
 
@@ -103,10 +103,10 @@ let type_term_of_uvar env uvar =
   type_term_of_uvar uvar 
 
 let translate =
-  let rec translate_expr: env -> (unifier_instance, unifier_scheme) CamlX.expression -> expression = 
+  let rec translate_expr: env -> (unifier_instance, unifier_scheme, unifier_var) CamlX.expression -> expression = 
     fun env uexpr ->
     match uexpr with
-      | `Let (pat_expr_list, e2) ->
+      | `Let (pat_expr_list, introduced_vars, e2) ->
           let pat_expr_list, new_env =
             List.fold_left
               (fun (acc, future_env) (upat, uexpr) ->
@@ -119,7 +119,13 @@ let translate =
           in
           let pat_expr_list = List.rev pat_expr_list in
           let fexpr = translate_expr new_env e2 in
-          `Let (pat_expr_list, fexpr)
+          let introduced_vars = List.map
+            (fun uvar ->
+              StringMap.find (UnionFind.find uvar).name env.fvar_of_uvar
+            )
+            !introduced_vars
+          in
+          `Let (pat_expr_list, ref introduced_vars, fexpr)
 
       | `Lambda pat_expr_list ->
           let pat_expr_list = List.map

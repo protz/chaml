@@ -27,5 +27,5 @@ open Algebra.Identifiers
 
 type t
 
-val translate: (unifier_instance, unifier_scheme) CamlX.expression -> t
+val translate: (unifier_instance, unifier_scheme, unifier_var) CamlX.expression -> t
 val string_of_t: t -> string

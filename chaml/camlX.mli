@@ -26,13 +26,16 @@
 
 open Algebra.Identifiers
 
-type ('instance, 'scheme) expression = [
-  | `Let of (('instance, 'scheme) pattern * ('instance, 'scheme) expression) list * ('instance, 'scheme) expression 
+type ('instance, 'scheme, 'var) expression = [
+  | `Let of
+        (('instance, 'scheme) pattern * ('instance, 'scheme, 'var) expression) list
+      * 'var list ref
+      * ('instance, 'scheme, 'var) expression 
   | `Instance of ident * 'instance
-  | `App of ('instance, 'scheme) expression * ('instance, 'scheme) expression list (** Maybe we can simplify this later on (do we really want it?) *)
-  | `Lambda of (('instance, 'scheme) pattern * ('instance, 'scheme) expression) list (** This will be converted later on to a simple form that uses `Match. *)
-  | `Match of ('instance, 'scheme) expression * (('instance, 'scheme) pattern * ('instance, 'scheme) expression) list
-  | `Tuple of ('instance, 'scheme) expression list
+  | `App of ('instance, 'scheme, 'var) expression * ('instance, 'scheme, 'var) expression list (** Maybe we can simplify this later on (do we really want it?) *)
+  | `Lambda of (('instance, 'scheme) pattern * ('instance, 'scheme, 'var) expression) list (** This will be converted later on to a simple form that uses `Match. *)
+  | `Match of ('instance, 'scheme, 'var) expression * (('instance, 'scheme) pattern * ('instance, 'scheme, 'var) expression) list
+  | `Tuple of ('instance, 'scheme, 'var) expression list
   | `Const of [
       | `Char of char
       | `Int of int

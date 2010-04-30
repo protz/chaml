@@ -45,29 +45,6 @@ and unifier_scheme = {
 
 type unifier_instance = unifier_var list ref
 
-(* Now we can define cleanly the {!Algebra.SOLVER}. *)
-
-module BaseSolver = struct
-  type var = unifier_var
-  type scheme = unifier_scheme
-  type instance = unifier_instance
-
-  let new_var name =
-    UnionFind.fresh { name; rank = -1; term = None; ready = false; mark = Mark.none }
-
-  let new_scheme () = {
-    scheme_var =
-      UnionFind.fresh
-        { name = fresh_name ~prefix:"scheme" ();
-        rank = -1; term = None; ready = false; mark = Mark.none };
-    young_vars = [];
-  }
-
-  let new_instance () = ref []
-
-  let string_of_var uvar = (UnionFind.find uvar).name
-end
-
 module Uhashtbl = Jhashtbl.Make(struct
     type t = descriptor
     let equal = (==)
@@ -97,6 +74,29 @@ module Pool = struct
     rank = t.rank + 1;
     members = [];
   }
+end
+
+(* Now we can define cleanly the {!Algebra.SOLVER}. *)
+
+module BaseSolver = struct
+  type var = unifier_var
+  type scheme = unifier_scheme
+  type instance = unifier_instance
+
+  let new_var name =
+    UnionFind.fresh { name; rank = -1; term = None; ready = false; mark = Mark.none }
+
+  let new_scheme () = {
+    scheme_var =
+      UnionFind.fresh
+        { name = fresh_name ~prefix:"scheme" ();
+        rank = -1; term = None; ready = false; mark = Mark.none };
+    young_vars = [];
+  }
+
+  let new_instance () = ref []
+
+  let string_of_var uvar = (UnionFind.find uvar).name
 end
 
 (* This is used by the solver to pass information down the recursive calls.
