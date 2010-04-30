@@ -25,8 +25,8 @@ type colors = { green : int; red : int; blue : int; }
 (** They have been chosen arbitrarily out of the 256-color set available. *)
 val colors : colors
 
-(** Output some colored text. Use it like [Printf.sprintf]. *)
-val color : int -> ('a, unit, string, string) format4 -> 'a
+(** Output some colored text. Use it like [Jstring.bsprintf]. *)
+val color : int -> ('a, Buffer.t, unit, string) format4 -> 'a
 
 (** The terminal's width. *)
 val twidth : int

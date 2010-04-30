@@ -20,8 +20,10 @@
 type colors = { green: int; red: int; blue: int; }
 let colors = { green = 119; red = 203; blue = 81; }
 
-let color c =
-  Printf.kprintf (Printf.sprintf "\x1b[38;5;%dm%s\x1b[38;5;15m" c)
+let color c fmt =
+  Printf.kbprintf
+    (fun buf -> Printf.sprintf "\x1b[38;5;%dm%s\x1b[38;5;15m" c (Buffer.contents buf))
+    (Buffer.create 16) fmt
 
 let underline eta =
   Printf.kprintf (Printf.sprintf "\x1b[4m%s\x1b[0m") eta

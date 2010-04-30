@@ -91,6 +91,9 @@ module TypeCons: sig
   (** A convenient wrapper to quickly access the unit constructor. *)
   val type_cons_unit : [> `Cons of type_cons * 'a list ]
 
+  (** The bottom type is a internal type, not to be used by others! *)
+  val type_cons_bottom : [> `Cons of type_cons * 'a list ]
+
 end
 
 (** Once again, putting this in a separate module is not necessary strictly
