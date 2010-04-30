@@ -286,12 +286,13 @@ let solve =
                 Uhashtbl.replace reachable repr uvar;
                 Uhashtbl.remove introduced_vars repr
             | Some (`Cons (_cons_name, cons_args))->
-                if not (Uhashtbl.mem seen repr) then begin
-                  Uhashtbl.add seen repr uvar;
-                  List.iter compute_reachable cons_args
-                end else begin
-                  Uhashtbl.replace reachable repr uvar;
-                end
+                match Uhashtbl.find_opt seen repr with
+                | None ->
+                    Uhashtbl.add seen repr uvar;
+                    List.iter compute_reachable cons_args;
+                    Uhashtbl.remove seen repr
+                | Some uvar ->
+                  Uhashtbl.replace reachable repr uvar
           in
           compute_reachable uvar;
           Uhashtbl.map_list reachable (fun _k v -> v)
@@ -307,8 +308,8 @@ let solve =
         (* Error.debug "%a" debug_scheme (scheme, ident); *)
         IdentMap.fold
           (fun ident (`Var _uvar, scheme) new_map ->
-            Error.debug "%a" debug_scheme (scheme, ident);
             scheme.young_vars <- compute_reachable scheme.scheme_var;
+            Error.debug "%a" debug_scheme (scheme, ident);
             IdentMap.add ident scheme new_map)
           var_map new_map
       in
