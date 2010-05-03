@@ -118,7 +118,7 @@ let get_pool env i =
 
 let current_pool env = get_pool env env.current_pool
 let current_rank env = (current_pool env).Pool.rank
-let scheme_of_ident unifier_env = unifier_env.scheme_of_ident
+let get_scheme_of_ident unifier_env = unifier_env.scheme_of_ident
 let set_scheme_of_ident unifier_env scheme_of_ident = { unifier_env with scheme_of_ident }
 let fresh_env () = {
     current_pool = 0;

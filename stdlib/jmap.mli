@@ -40,6 +40,9 @@ module type S = sig
 
   (** [to_list] translates the map to a list. *)
   val to_list : 'a t -> (key * 'a) list
+
+  (** same as [Map.find] but returns a 'a option *)
+  val find_opt: key -> 'a t -> 'a option
 end
 
 module Make (Ord : Map.OrderedType): S with type key = Ord.t

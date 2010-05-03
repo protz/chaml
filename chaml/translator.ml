@@ -30,8 +30,8 @@ type type_term = [
 
 type type_instance = f_type_var list
 type type_scheme = type_term
-type expression = (type_instance, type_scheme, f_type_var) CamlX.expression
-type pattern = (type_instance, type_scheme) CamlX.pattern
+type expression = (type_instance, type_scheme option, f_type_var) CamlX.expression
+type pattern = (type_instance, type_scheme option) CamlX.pattern
 type t = expression
 
 module DeBruijn = struct
@@ -57,36 +57,13 @@ let lift_add env uvar =
   let new_map =
     StringMap.add (UnionFind.find uvar).name { index = 1 } new_map
   in
+  Error.debug "[TLiftAdd] Adding %a\n" uvar_name uvar;
   { fvar_of_uvar = new_map }
 
 let union { fvar_of_uvar = map1 } { fvar_of_uvar = map2 } =
   { fvar_of_uvar = StringMap.union map1 map2 }
 
 (* The core functions *)
-
-(* We don't keep a list of universally quantified variables for each scheme, so
- * it's up to us to walk down the scheme and find all variables with rank -1.
- * *)
-let type_vars_of_scheme scheme =
-  let young_vars = Uhashtbl.create 16 in
-  let seen = Uhashtbl.create 16 in
-  let rec walk uvar =
-    let repr = UnionFind.find uvar in
-    match Uhashtbl.find_opt seen repr with
-    | Some _ ->
-        ()
-    | None ->
-        match repr.term with
-        | None ->
-            if repr.rank = (-1) then
-              Uhashtbl.add young_vars repr uvar;
-        | Some (`Cons (_cons_name, cons_args)) ->
-            Uhashtbl.add seen repr uvar;
-            if repr.rank = (-1) then
-              List.iter walk cons_args;
-  in
-  walk scheme;
-  Uhashtbl.map_list young_vars (fun _k v -> v)
 
 (* Once all the right variables are in the environment, we simply transcribe a
  * scheme into the right fscheme structure (it's a type_term) *)
@@ -107,30 +84,32 @@ let translate =
     fun env uexpr ->
     match uexpr with
       | `Let (pat_expr_list, introduced_vars, e2) ->
-          let pat_expr_list, new_env =
-            List.fold_left
-              (fun (acc, future_env) (upat, uexpr) ->
-                let new_env, fpat = translate_pat ~introduce_vars:true env upat in
+          Error.debug "[TLet] %d vars in this scheme\n" (List.length !introduced_vars);
+          let new_env = List.fold_left lift_add env !introduced_vars in
+          let pat_expr_list =
+            List.map
+              (fun (upat, uexpr) ->
+                (* We don't assign schemes, so we don't need the fresh variables
+                 * *)
+                let fpat = translate_pat env ~assign_schemes:false upat in
+                (* But when we type e1, we need those new type variables *)
                 let fexpr = translate_expr new_env uexpr in
-                (fpat, fexpr) :: acc, union new_env future_env
+                (fpat, fexpr)
               )
-              ([], env)
               pat_expr_list
           in
-          let pat_expr_list = List.rev pat_expr_list in
-          let fexpr = translate_expr new_env e2 in
-          let introduced_vars = List.map
-            (fun uvar ->
-              StringMap.find (UnionFind.find uvar).name env.fvar_of_uvar
-            )
-            !introduced_vars
+          let new_vars =
+            List.map
+              (fun uvar -> StringMap.find (UnionFind.find uvar).name new_env.fvar_of_uvar)
+              !introduced_vars
           in
-          `Let (pat_expr_list, ref introduced_vars, fexpr)
+          let fexpr = translate_expr new_env e2 in
+          `Let (pat_expr_list, ref new_vars, fexpr)
 
       | `Lambda pat_expr_list ->
-          let pat_expr_list = List.map
+           let pat_expr_list = List.map
             (fun (upat, uexpr) ->
-              let _same_env, fpat = translate_pat ~introduce_vars:false env upat in
+              let fpat = translate_pat env ~assign_schemes:true upat in
               let fexpr = translate_expr env uexpr in
               fpat, fexpr
             )
@@ -139,12 +118,13 @@ let translate =
           `Lambda pat_expr_list
 
       | `Instance (ident, instance) ->
-          let instance =
+          (* let instance =
             List.map
               (fun x -> StringMap.find (UnionFind.find x).name env.fvar_of_uvar)
               !instance
           in
-          `Instance (ident, instance)
+          `Instance (ident, instance) *)
+          failwith "Instance not implemented"
 
       | `App (_e1, _args) ->
           failwith "App not implemented"
@@ -158,41 +138,28 @@ let translate =
       | `Const _ as r ->
           r
 
-  (* [translate_pat] is the function that introduces new Λ-bindings in the
-   * environment. It returns a new environment where all type variables have
-   * been shifted as needed and the map updated to point to the right indices. *)
-  and translate_pat: env -> introduce_vars:bool -> (unifier_instance, unifier_scheme) CamlX.pattern -> env * pattern =
-    fun env ~introduce_vars upat ->
+  (* [translate_pat] just generates patterns as needed. It doesn't try to
+   * assign schemes to variables if those are on the left-hand side of a pattern. *)
+  and translate_pat: env -> assign_schemes:bool -> (unifier_instance, unifier_scheme) CamlX.pattern -> pattern =
+    fun env ~assign_schemes upat ->
     match upat with
       | `Any as r ->
-          env, r
+          r
 
       | `Tuple patterns ->
-          assert (not introduce_vars);
-          let patterns =
-            List.map
-              (fun upat ->
-                let _same_env, fpat = translate_pat env ~introduce_vars:false upat in
-                fpat
-              )
-              patterns
-          in
-          env, `Tuple patterns
+          `Tuple (List.map (translate_pat env ~assign_schemes) patterns)
 
-      | `Or (_p1, _p2) ->
-          failwith "Or not implemented"
-          (* `Or (translate_pat p1, translate_pat p2) *)
+      | `Or (p1, p2) ->
+          `Or (translate_pat env ~assign_schemes p1, translate_pat env ~assign_schemes p2)
 
       | `Var (ident, { scheme_var = scheme }) ->
-          if introduce_vars then
-            let vars = type_vars_of_scheme scheme in
-            let new_env = List.fold_left lift_add env vars in
-            let new_type = type_term_of_uvar new_env scheme in
-            let new_type = List.fold_left (fun acc _x -> `Forall acc) new_type vars in
-            new_env, `Var (ident, new_type)
-          else
-            let new_type = type_term_of_uvar env scheme in
-            env, `Var (ident, new_type)
+          let scheme =
+            if assign_schemes then
+              Some (type_term_of_uvar env scheme)
+            else
+              None
+          in
+          `Var (ident, scheme)
   in
   translate_expr { fvar_of_uvar = StringMap.empty }
 

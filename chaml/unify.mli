@@ -127,7 +127,7 @@ val current_rank: unifier_env -> int
 val step_env: unifier_env -> unifier_env
 
 (** Get the current mapping of schemes to identifiers *)
-val scheme_of_ident: unifier_env -> unifier_scheme IdentMap.t
+val get_scheme_of_ident: unifier_env -> unifier_scheme IdentMap.t
 
 (** Set it *)
 val set_scheme_of_ident: unifier_env -> unifier_scheme IdentMap.t -> unifier_env

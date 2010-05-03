@@ -72,9 +72,9 @@ module Options = struct
         ("recursive-types",
           (false, "Allow equirecursive types"));
         ("default-bindings",
-          (true, "Include default bindings for arithmetic operations (+, *...)"));
+          (true, "Include default bindings for arithmetic operations (+, *, ...)"));
         ("caml-types",
-          (false, "Print OCaml-style 'a types instead of unicode greeks"));
+          (false, "Print OCaml-style 'a types instead of unicode greek characters"));
         ("debug",
           (false, "Output debug information"));
         ("pretty-printing",
@@ -115,16 +115,18 @@ let _ =
   let usage = String.concat ""
                 ["ChaML: a type-checker for OCaml programs.\n";
                  "Usage: "; Sys.argv.(0); " [OPTIONS] FILE\n";
-                 "Available options:\n";
-                 Options.descriptions] in
+                 "\nAvailable features:\n\n";
+                 Options.descriptions;
+                 "Available options:\n"
+                ] in
   Arg.parse
     [
       "--print-ast", Arg.Set arg_print_ast, "print the AST as parsed by the OCaml frontend";
       "--print-constraint", Arg.Set arg_print_constraint, "print the constraint in a format mini can parse";
       "--dont-print-types", Arg.Clear arg_print_types, "don't print the inferred types, à la ocamlc -i";
       "--print-typed-ast", Arg.Set arg_print_typed_ast, "print the AST annotated with the types found by the solver";
-      "--enable", Arg.String (add_opt true), "enable one of the options above";
-      "--disable", Arg.String (add_opt false), "disable one of the options above";
+      "--enable", Arg.String (add_opt true), "enable one of the features above";
+      "--disable", Arg.String (add_opt false), "disable one of the features above";
     ]
     (fun f -> if !arg_filename = "" then arg_filename := f else print_endline "*** More than one file given, keeping the first one.")
     usage;

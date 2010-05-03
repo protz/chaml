@@ -27,6 +27,13 @@ debug:
 		test.ml
 	./noyacchack.sh
 
+debug_ast:
+	./yacchack.sh
+	ocamlbuild -tag debug \
+	  $(BUILDFLAGS) -tag use_unix chaml/chaml.byte
+	OCAMLRUNPARAM=b=1 ./chaml.byte --print-typed-ast --enable debug test.ml
+	./noyacchack.sh
+
 tests:
 	./yacchack.sh
 	#ocamlbuild $(BUILDFLAGS) -I chaml -menhir "menhir --trace" tests/run_tests.byte chaml/chaml.native

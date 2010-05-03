@@ -22,7 +22,7 @@
     these into F types with De Bruijn indices. *)
 
 (** The constraint generator generates a constraint as well as a {!expression}
-    that represents a well-typed AST when the solving has been done. *)
+    that represents a well-typed AST when the solving is done. *)
 
 open Algebra.Identifiers
 

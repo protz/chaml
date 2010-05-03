@@ -38,6 +38,9 @@ module type S = sig
 
   (** [to_list] translates the map to a list. *)
   val to_list : 'a t -> (key * 'a) list
+
+  (** same as [Map.find] but returns a 'a option *)
+  val find_opt: key -> 'a t -> 'a option
 end
 
 module Make = functor (Ord: Map.OrderedType) -> struct
@@ -67,4 +70,10 @@ module Make = functor (Ord: Map.OrderedType) -> struct
   let to_list m1 =
     Map.fold (fun k v acc -> (k,v) :: acc) m1 []
 
+  let find_opt k m =
+    try
+      Some (Map.find k m)
+    with
+      Not_found ->
+        None
 end

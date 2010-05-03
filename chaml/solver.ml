@@ -118,10 +118,10 @@ let solve =
            * quantified inside that scheme *)
           ensure_ready unifier_env uvar;
           let scheme =
-            try
-              IdentMap.find ident (scheme_of_ident unifier_env)
-            with
-              Not_found ->
+            match IdentMap.find_opt ident (get_scheme_of_ident unifier_env) with
+              | Some v ->
+                v
+              | None ->
                 raise_error (UnboundIdentifier ident)
           in
           let ident_s = string_of_ident ident in
@@ -257,7 +257,16 @@ let solve =
         debug_inpool ~prev_ranks pool_vars;
 
         (* Young variables are marked as belonging to a scheme, they are
-         * generalized. Old variables are sent back to their pools. *)
+         * generalized. Old variables are sent back to their pools.
+         *
+         * We need to compute a list of variables that need to be quantified in
+         * a scheme. For instance, some variables might be unreachable and we
+         * don't schemes such as ∀ α. int. We first fill the [unreachable_vars]
+         * hash table with all the variables that are universally bound in this
+         * pool. Afterwards, we do a DFS that removes all the variables it can
+         * reach starting from each identifier from unreachable_vars. What
+         * remains in [unreachable_vars] is the universally quantified variables
+         * that will never be instanciated, so we unify these with ⊥ (bottom). *)
         let current_rank = current_rank sub_env in
         let unreachable_vars = Uhashtbl.create 64 in
         List.iter
@@ -278,7 +287,9 @@ let solve =
 
         (* This computes all the variables that can be reached from a given
          * entry point, and returns them sorted according to the infix order,
-         * that is, the first time we hit them while running our DFS search. *)
+         * that is, the first time we hit them while running our DFS search.
+         * This allows us to agree on an ordering for later, when we instanciate
+         * the scheme in the type-checker. *)
         let compute_reachable uvar =
           let reachable = Uhashtbl.create 32 in
           let index = ref 0 in
@@ -288,7 +299,6 @@ let solve =
             let repr = UnionFind.find uvar in
             match repr.term with
             | None ->
-                (* Doesn't mean it was there before *)
                 if not (Uhashtbl.mem reachable repr) then
                   Uhashtbl.add reachable repr (uvar, (++)index);
                 Uhashtbl.remove unreachable_vars repr
@@ -312,13 +322,10 @@ let solve =
         in
 
         (* The schemes have already been allocated when generating a CamlX term,
-         * However, the [var_map] is a mapping from identifiers to
-         * [(uvar, scheme)]
-         * where uvar represents the pre-allocated variable and scheme the
-         * pre-allocated scheme for that variable. They have been unified at the
-         * beginning of [solve_branch].
-         * *)
-        (* Error.debug "%a" debug_scheme (scheme, ident); *)
+         * However, the [var_map] is a mapping from identifiers to [(uvar,
+         * scheme)] where uvar represents the pre-allocated variable and scheme
+         * the pre-allocated scheme for that variable. They have been unified at
+         * the beginning of [solve_branch]. *)
         let final_map = IdentMap.fold
           (fun ident (`Var _uvar, scheme) new_map ->
             scheme.young_vars <- compute_reachable scheme.scheme_var;
@@ -342,7 +349,7 @@ let solve =
 
       in
       let new_map =
-        List.fold_left solve_branch (scheme_of_ident unifier_env) schemes
+        List.fold_left solve_branch (get_scheme_of_ident unifier_env) schemes
       in
       let new_env = set_scheme_of_ident unifier_env new_map in
       analyze new_env c
@@ -350,7 +357,7 @@ let solve =
   let initial_env = fresh_env () in
   try
     let knowledge = analyze initial_env konstraint in
-    let kv = IdentMap.to_list (scheme_of_ident knowledge) in
+    let kv = IdentMap.to_list (get_scheme_of_ident knowledge) in
     let kv = List.filter (fun ((_, pos), _) -> not pos.Location.loc_ghost) kv in
     let kv = List.sort (fun ((_, pos), _) ((_, pos'), _) -> compare pos pos') kv in
     let print_kv (ident, scheme) =
