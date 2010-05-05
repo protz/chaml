@@ -290,6 +290,7 @@ let solve =
          * that is, the first time we hit them while running our DFS search.
          * This allows us to agree on an ordering for later, when we instanciate
          * the scheme in the type-checker. *)
+        (* XXX USE THE MARK XXX *)
         let compute_reachable uvar =
           let reachable = Uhashtbl.create 32 in
           let index = ref 0 in

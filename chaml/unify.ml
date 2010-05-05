@@ -281,7 +281,7 @@ let ensure_ready unifier_env uvar =
     repr.rank <- current_rank unifier_env;
     let open Pool in
     (current_pool unifier_env).members <- (uvar :: (current_pool unifier_env).members);
-    repr.ready <- true;
+    repr.ready <- true
   end
 
 (* This function does two things: first, it makes sure the variable is ready.

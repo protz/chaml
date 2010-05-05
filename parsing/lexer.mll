@@ -10,7 +10,7 @@
 (*                                                                     *)
 (***********************************************************************)
 
-(* $Id: lexer.mll 9512 2010-01-07 15:15:07Z doligez $ *)
+(* $Id: lexer.mll 10250 2010-04-08 03:58:41Z garrigue $ *)
 
 (* The lexer definition *)
 
@@ -380,6 +380,7 @@ rule token = parse
   | ">]" { GREATERRBRACKET }
   | "}"  { RBRACE }
   | ">}" { GREATERRBRACE }
+  | "!"  { BANG }
 
   | "!=" { INFIXOP0 "!=" }
   | "+"  { PLUS }
@@ -387,7 +388,7 @@ rule token = parse
   | "-"  { MINUS }
   | "-." { MINUSDOT }
 
-  | "!" symbolchar *
+  | "!" symbolchar +
             { PREFIXOP(Lexing.lexeme lexbuf) }
   | ['~' '?'] symbolchar +
             { PREFIXOP(Lexing.lexeme lexbuf) }
@@ -490,7 +491,8 @@ and string = parse
         end
       }
   | newline
-      { Location.prerr_warning (Location.curr lexbuf) Warnings.Eol_in_string;
+      { if not (in_comment ()) then
+          Location.prerr_warning (Location.curr lexbuf) Warnings.Eol_in_string;
         update_loc lexbuf None 1 false 0;
         let s = Lexing.lexeme lexbuf in
         for i = 0 to String.length s - 1 do

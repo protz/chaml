@@ -10,7 +10,7 @@
 (*                                                                     *)
 (***********************************************************************)
 
-(* $Id: printast.ml 10227 2010-04-02 12:53:33Z xleroy $ *)
+(* $Id: printast.ml 10263 2010-04-17 14:45:12Z garrigue $ *)
 
 open Asttypes;;
 open Format;;
@@ -63,6 +63,12 @@ let fmt_virtual_flag f x =
   match x with
   | Virtual -> fprintf f "Virtual";
   | Concrete -> fprintf f "Concrete";
+;;
+
+let fmt_override_flag f x =
+  match x with
+  | Override -> fprintf f "Override";
+  | Fresh -> fprintf f "Fresh";
 ;;
 
 let fmt_rec_flag f x =
@@ -453,25 +459,25 @@ and class_structure i ppf (p, l) =
 
 and class_field i ppf x =
   match x with
-  | Pcf_inher (ce, so) ->
-      line i ppf "Pcf_inher\n";
+  | Pcf_inher (ovf, ce, so) ->
+      line i ppf "Pcf_inher %a\n" fmt_override_flag ovf;
       class_expr (i+1) ppf ce;
       option (i+1) string ppf so;
   | Pcf_valvirt (s, mf, ct, loc) ->
-      line i ppf
-        "Pcf_valvirt \"%s\" %a %a\n" s fmt_mutable_flag mf fmt_location loc;
+      line i ppf "Pcf_valvirt \"%s\" %a %a\n"
+        s fmt_mutable_flag mf fmt_location loc;
       core_type (i+1) ppf ct;
-  | Pcf_val (s, mf, e, loc) ->
-      line i ppf
-        "Pcf_val \"%s\" %a %a\n" s fmt_mutable_flag mf fmt_location loc;
+  | Pcf_val (s, mf, ovf, e, loc) ->
+      line i ppf "Pcf_val \"%s\" %a %a %a\n"
+        s fmt_mutable_flag mf fmt_override_flag ovf fmt_location loc;
       expression (i+1) ppf e;
   | Pcf_virt (s, pf, ct, loc) ->
-      line i ppf
-        "Pcf_virt \"%s\" %a %a\n" s fmt_private_flag pf fmt_location loc;
+      line i ppf "Pcf_virt \"%s\" %a %a\n"
+        s fmt_private_flag pf fmt_location loc;
       core_type (i+1) ppf ct;
-  | Pcf_meth (s, pf, e, loc) ->
-      line i ppf
-        "Pcf_meth \"%s\" %a %a\n" s fmt_private_flag pf fmt_location loc;
+  | Pcf_meth (s, pf, ovf, e, loc) ->
+      line i ppf "Pcf_meth \"%s\" %a %a %a\n"
+        s fmt_private_flag pf fmt_override_flag ovf fmt_location loc;
       expression (i+1) ppf e;
   | Pcf_cstr (ct1, ct2, loc) ->
       line i ppf "Pcf_cstr %a\n" fmt_location loc;
@@ -561,7 +567,11 @@ and with_constraint i ppf x =
   | Pwith_type (td) ->
       line i ppf "Pwith_type\n";
       type_declaration (i+1) ppf td;
+  | Pwith_typesubst (td) ->
+      line i ppf "Pwith_typesubst\n";
+      type_declaration (i+1) ppf td;
   | Pwith_module (li) -> line i ppf "Pwith_module %a\n" fmt_longident li;
+  | Pwith_modsubst (li) -> line i ppf "Pwith_modsubst %a\n" fmt_longident li;
 
 and module_expr i ppf x =
   line i ppf "module_expr %a\n" fmt_location x.pmod_loc;
