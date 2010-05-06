@@ -41,6 +41,9 @@ module Make(S: Algebra.SOLVER) = struct
     let prefix = Option.map (String.make 1) letter in
     `Var (S.new_var (fresh_name ?prefix ()))
 
+  let new_scheme (`Var uvar) =
+    S.new_scheme_for_var uvar
+
   let random_ident_name () = Filename.basename (Filename.temp_file "" "")
 
   (* Returns c_1 and (c_2 and ( ... and c_n)) *)
@@ -107,7 +110,7 @@ module Make(S: Algebra.SOLVER) = struct
             }
         | Ppat_var v ->
             let var = ident v ppat_loc in
-            let solver_scheme = S.new_scheme () in
+            let solver_scheme = new_scheme x in
             let var_map = IdentMap.add var (x, solver_scheme) IdentMap.empty in
             {
               p_constraint = `True;
@@ -349,7 +352,7 @@ module Make(S: Algebra.SOLVER) = struct
             let constraints, pat_exprs =
               List.split (List.map generate_branch pat_expr_list)
             in
-            let solver_scheme = S.new_scheme () in
+            let solver_scheme = new_scheme x1 in
             let map = IdentMap.add ident1 (x1, solver_scheme) IdentMap.empty in
             let scheme = [x1], constr_e1, map in
             (* XXX the fake ident we introduce is not kept in the lambda
@@ -445,7 +448,7 @@ module Make(S: Algebra.SOLVER) = struct
               type_cons_arrow type_cons_int (type_cons_arrow type_cons_int type_cons_int)
             in
             let pos = Location.none in
-            let solver_scheme = S.new_scheme () in
+            let solver_scheme = new_scheme plus_var in
             let plus_map = IdentMap.add (ident "+" pos) (plus_var, solver_scheme) IdentMap.empty in
             [plus_var], `Equals (plus_var, plus_type), plus_map
           in
@@ -455,7 +458,7 @@ module Make(S: Algebra.SOLVER) = struct
               type_cons_arrow type_cons_int (type_cons_arrow type_cons_int type_cons_int)
             in
             let pos = Location.none in
-            let solver_scheme = S.new_scheme () in
+            let solver_scheme = new_scheme mult_var in
             let mult_map = IdentMap.add (ident "*" pos) (mult_var, solver_scheme) IdentMap.empty in
             [mult_var], `Equals (mult_var, mult_type), mult_map
           in

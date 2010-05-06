@@ -37,7 +37,7 @@ module type SOLVER = sig
   type instance
 
   val new_var: string -> var
-  val new_scheme: unit -> scheme
+  val new_scheme_for_var: var -> scheme
   val new_instance: unit -> instance
 
   (** Names are guaranteed to be unique. So you can consider this as a key for

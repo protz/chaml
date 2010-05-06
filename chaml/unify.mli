@@ -85,7 +85,7 @@ module BaseSolver: sig
   type instance = unifier_instance
 
   val new_var: string -> var
-  val new_scheme: unit -> scheme
+  val new_scheme_for_var: var -> scheme
   val new_instance: unit -> instance
 
   val string_of_var: var -> string

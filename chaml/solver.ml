@@ -42,12 +42,12 @@ let string_of_error = function
       "Recursive types detected. Please use --enable recursive-types if \
        intended\n"
   | MalformedConstraint ->
-      "The generated constraint has no ending\n"
+      "The generated constraint has no ending. Who are you?\n"
 
 let unify_or_raise unifier_env uvar1 uvar2 =
   match (unify unifier_env uvar1 uvar2) with
   | `Ok -> ();
-  | `Error e -> raise (Error (UnifyError e))
+  | `Error e -> raise_error (UnifyError e)
 
 (* This function runs a DFS when we exit the left branch of a [`Let]. It takes
  * care of:
@@ -112,7 +112,6 @@ let solve =
       | `True ->
           Error.debug "[STrue] Returning from True\n";
       | `Equals (`Var uvar1, t2) ->
-          ensure_ready unifier_env uvar1;
           let uvar2 = uvar_of_term unifier_env t2 in
           Error.debug "[SEquals] %a = %a\n" uvar_name uvar1 uvar_name uvar2;
           unify_or_raise unifier_env uvar1 uvar2;
@@ -121,7 +120,6 @@ let solve =
            * scheme is basically what came out of solving the left branch of the
            * let. young_vars is all the young variables that are possibly
            * quantified inside that scheme *)
-          ensure_ready unifier_env uvar;
           let scheme =
             match IdentMap.find_opt ident (get_scheme_of_ident unifier_env) with
               | Some v ->
@@ -166,18 +164,7 @@ let solve =
          * allows us to create a fresh pool which will contain all the
          * existentially quantified variables in it. *)
         let sub_env = step_env unifier_env in
-        let _vars, konstraint, var_map = scheme in
-        (* Make sure we register the variables that haven't been initialized yet
-         * into the sub environment's pool, that's where they belong. NB: _vars
-         * above is a subset of the whole var_map, so that's normal we don't
-         * do anything with these. *)
-        IdentMap.iter
-          (fun _ident (`Var uvar, scheme) ->
-             ensure_ready sub_env uvar;
-             ensure_ready sub_env scheme.scheme_var;
-             unify_or_raise sub_env scheme.scheme_var uvar;
-          )
-          var_map;
+        let vars, konstraint, var_map = scheme in
 
         (* --- Debug --- *)
         Error.debug "%a" (fun buf () ->
@@ -220,6 +207,10 @@ let solve =
           Buffer.add_string buf str
         in
         (* --- End Debug --- *)
+
+        (* Make sure we register the variables that haven't been initialized yet
+         * into the sub environment's pool. *)
+        List.iter (fun (`Var uvar) -> ensure_ready sub_env uvar) vars;
 
         (* Solve the constraint in the scheme. *)
         analyze sub_env konstraint;

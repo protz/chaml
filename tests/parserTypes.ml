@@ -23,7 +23,7 @@ module BaseSolver = struct
   type instance = unit
 
   let new_var _ = assert false
-  let new_scheme _ = assert false
+  let new_scheme_for_var _ = assert false
   let new_instance _ = assert false
 
   let string_of_var s = s

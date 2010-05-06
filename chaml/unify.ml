@@ -86,13 +86,10 @@ module BaseSolver = struct
   let new_var name =
     UnionFind.fresh { name; rank = -1; term = None; ready = false; mark = Mark.none }
 
-  let new_scheme () = {
-    scheme_var =
-      UnionFind.fresh
-        { name = fresh_name ~prefix:"scheme" ();
-        rank = -1; term = None; ready = false; mark = Mark.none };
-    young_vars = [];
-  }
+  let new_scheme_for_var scheme_var = {
+      scheme_var;
+      young_vars = [];
+    }
 
   let new_instance () = ref []
 
@@ -158,7 +155,7 @@ let inspect_scheme: ?debug:unit -> unifier_var -> unifier_var inspected_var =
             `Var key
         | None ->
             if (not (Option.unit_bool debug)) then
-              assert (repr.rank = (-1));
+              assert (repr.rank = (-1) || (Error.debug "%s\n" repr.name; false));
             Uhashtbl.add seen repr None;
             let type_term =
               match repr.term with
@@ -274,12 +271,12 @@ let fresh_copy unifier_env { scheme_var = scheme_uvar; young_vars } =
  * that are not ready yet. *)
 let ensure_ready unifier_env uvar =
   let repr = UnionFind.find uvar in
-  if not repr.ready then begin
-    repr.rank <- current_rank unifier_env;
-    let open Pool in
-    (current_pool unifier_env).members <- (uvar :: (current_pool unifier_env).members);
-    repr.ready <- true
-  end
+  assert (not repr.ready);
+  Error.debug "[UReady] Making %a ready\n" uvar_name uvar;
+  repr.rank <- current_rank unifier_env;
+  let open Pool in
+  (current_pool unifier_env).members <- (uvar :: (current_pool unifier_env).members);
+  repr.ready <- true
 
 (* This function does two things: first, it makes sure the variable is ready.
  * Then, it replaces type_constructors by unifier_vars whose term is that
@@ -290,7 +287,6 @@ let rec uvar_of_term: unifier_env -> unifier_var type_term -> unifier_var =
     let rec uvar_of_term tterm =
       match tterm with
         | `Var uvar ->
-            ensure_ready unifier_env uvar;
             uvar
         | `Cons (cons, args) ->
             let term = `Cons (cons, List.map uvar_of_term args) in
