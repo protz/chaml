@@ -190,6 +190,8 @@ module Make(S: Algebra.SOLVER) = struct
     and generate_constraint_expression: S.var type_var -> expression -> constraint_expression =
       fun t { pexp_desc; pexp_loc } ->
       match pexp_desc with
+      | Pexp_done ->
+          { e_constraint = `Done; expr = `Const `Unit }
       | Pexp_ident (Longident.Lident x) ->
           let solver_instance = S.new_instance () in
           let ident = ident x pexp_loc in
@@ -461,7 +463,7 @@ module Make(S: Algebra.SOLVER) = struct
         in
         let topmost_expression =
           let finish = {
-              pexp_desc = Pexp_constant (Asttypes.Const_int 42);
+              pexp_desc = Pexp_done;
               pexp_loc = Location.none
             }
           in

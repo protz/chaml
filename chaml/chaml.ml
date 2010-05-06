@@ -157,9 +157,9 @@ let _ =
     if !arg_print_constraint then begin
       let pretty_printing = Options.get_opt "pretty-printing" in
       let str =
-        (Constraint.PrettyPrinter.string_of_constraint ~pretty_printing konstraint) in
-      String.blit "dump   " 0 str (String.length str - 7) 7;
-      print_string (str^"\n");
+        Constraint.PrettyPrinter.string_of_constraint ~pretty_printing konstraint
+      in
+      print_endline str;
       flush stdout
     end;
     (* Constraint solving *)

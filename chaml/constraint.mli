@@ -52,6 +52,7 @@ module Make: functor (S: Algebra.SOLVER) -> sig
     *)
   and type_constraint = [
       `True
+    | `Done
     | `Conj of type_constraint * type_constraint
     | `Exists of S.var type_var list * type_constraint
     | `Equals of S.var type_var * S.var type_term

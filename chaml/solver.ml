@@ -27,6 +27,7 @@ open Algebra.Core
 type error =
   | UnifyError of Unify.error
   | UnboundIdentifier of ident
+  | MalformedConstraint
   | CyclicType
 
 exception Error of error
@@ -40,6 +41,8 @@ let string_of_error = function
   | CyclicType ->
       "Recursive types detected. Please use --enable recursive-types if \
        intended\n"
+  | MalformedConstraint ->
+      "The generated constraint has no ending\n"
 
 let unify_or_raise unifier_env uvar1 uvar2 =
   match (unify unifier_env uvar1 uvar2) with
@@ -93,24 +96,26 @@ let run_dfs ~occurs_check young_vars =
   in
   List.iter f young_vars
 
+exception Done of unifier_scheme IdentMap.t
+
 let solve =
   fun ~caml_types:opt_caml_types
     ~print_types:opt_print_types
     ~recursive_types:opt_recursive_types
     konstraint ->
 
-  let rec analyze: unifier_env -> type_constraint -> unifier_env =
+  let rec analyze: unifier_env -> type_constraint -> unit =
     fun unifier_env type_constraint ->
     match type_constraint with
+      | `Done ->
+          raise (Done (get_scheme_of_ident unifier_env))
       | `True ->
           Error.debug "[STrue] Returning from True\n";
-          unifier_env
       | `Equals (`Var uvar1, t2) ->
           ensure_ready unifier_env uvar1;
           let uvar2 = uvar_of_term unifier_env t2 in
           Error.debug "[SEquals] %a = %a\n" uvar_name uvar1 uvar_name uvar2;
           unify_or_raise unifier_env uvar1 uvar2;
-          unifier_env
       | `Instance (ident, `Var uvar, solver_instance) ->
           (* For instance: ident = f (with let f x = x), and t = int -> int
            * scheme is basically what came out of solving the left branch of the
@@ -132,11 +137,10 @@ let solve =
               "[SInstance] Taking an instance of %s: %a\n" ident_s uvar_name instance;
           unify_or_raise unifier_env instance uvar;
           solver_instance := young_vars;
-          unifier_env
       | `Conj (c1, c2) ->
           (* Do *NOT* forward _unifier_env! Identifiers in c1's scope must not
            * go through c2's scope, this would be fatal. *)
-          let _unifier_env = analyze unifier_env c2 in
+          analyze unifier_env c2;
           analyze unifier_env c1
       | `Exists (xis, c) ->
           (* This makes sure we add the existentially defined variables as
@@ -149,7 +153,7 @@ let solve =
           schedule_schemes unifier_env schemes c2
   (* This one only implements scheduling and merging multiple simultaneous let
    * definitions. This roughly corresponds to S-SOLVE-LET. *)
-  and schedule_schemes: unifier_env -> type_scheme list -> type_constraint -> unifier_env =
+  and schedule_schemes: unifier_env -> type_scheme list -> type_constraint -> unit =
     fun unifier_env schemes c ->
       (* This auxiliary function
        * - solves the constraint
@@ -218,10 +222,8 @@ let solve =
         (* --- End Debug --- *)
 
         (* Solve the constraint in the scheme. *)
-        let sub_unifier_env =
-          analyze sub_env konstraint
-        in
-        let sub_pool = current_pool sub_unifier_env in
+        analyze sub_env konstraint;
+        let sub_pool = sub_pool unifier_env in
         let pool_vars = sub_pool.Pool.members in
         (* Printf.printf
           "%d variables in pool %d\n"
@@ -357,18 +359,21 @@ let solve =
   in
   let initial_env = fresh_env () in
   try
-    let knowledge = analyze initial_env konstraint in
-    let kv = IdentMap.to_list (get_scheme_of_ident knowledge) in
-    let kv = List.filter (fun ((_, pos), _) -> not pos.Location.loc_ghost) kv in
-    let kv = List.sort (fun ((_, pos), _) ((_, pos'), _) -> compare pos pos') kv in
-    let print_kv (ident, scheme) =
-      let ident = string_of_ident ident in
-      let s = string_of_scheme ~caml_types:opt_caml_types ident scheme in
-      print_endline s
-    in
-    flush stderr;
-    if opt_print_types then
-      List.iter print_kv kv;
-    `Ok
+    analyze initial_env konstraint;
+    raise (Error MalformedConstraint)
   with
-    Error e -> `Error e
+    | Done knowledge ->
+        let kv = IdentMap.to_list knowledge in
+        let kv = List.filter (fun ((_, pos), _) -> not pos.Location.loc_ghost) kv in
+        let kv = List.sort (fun ((_, pos), _) ((_, pos'), _) -> compare pos pos') kv in
+        let print_kv (ident, scheme) =
+          let ident = string_of_ident ident in
+          let s = string_of_scheme ~caml_types:opt_caml_types ident scheme in
+          print_endline s
+        in
+        flush stderr;
+        if opt_print_types then
+          List.iter print_kv kv;
+        `Ok
+    | Error e ->
+        `Error e

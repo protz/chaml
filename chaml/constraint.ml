@@ -30,6 +30,7 @@ module Make (S: Algebra.SOLVER) = struct
 
   and type_constraint = [
       `True
+    | `Done
     | `Conj of type_constraint * type_constraint
     | `Exists of S.var type_var list * type_constraint
     | `Equals of S.var type_var * S.var type_term
@@ -75,12 +76,16 @@ module Make (S: Algebra.SOLVER) = struct
     let string_of_type_var = function
       | `Var s -> (S.string_of_var s)
 
-    let string_of_constraint ~pretty_printing:opt_pretty_printing konstraint =
+    let string_of_constraint
+        ~pretty_printing:opt_pretty_printing
+        (konstraint: type_constraint) =
       let inc i = " " ^ i in
       let space_before_type_var = fun x -> " " ^ (string_of_type_var x) in
       let rec string_of_constraint pp_env = fun i -> function
         | `True ->
             "true"
+        | `Done ->
+            "dump"
         | `Conj (`True, c)
         | `Conj (c, `True)
         | `Conj (c, `Conj (`True, `True))

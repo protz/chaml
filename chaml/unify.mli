@@ -117,6 +117,10 @@ type unifier_env
 (** If you need a specific pool.... *)
 val get_pool: unifier_env -> int -> Pool.t
 
+(** If you need a sub-pool, call this function. The one above asserts that the
+    pool is in the current authorized range. *)
+val sub_pool: unifier_env -> Pool.t
+
 (** This is just a wrapper to get the current pool. *)
 val current_pool: unifier_env -> Pool.t
 

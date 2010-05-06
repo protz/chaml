@@ -116,6 +116,9 @@ let get_pool env i =
   assert (i <= env.current_pool && i >= 0);
   InfiniteArray.get env.pools i
 
+let sub_pool env =
+  InfiniteArray.get env.pools (env.current_pool + 1)
+
 let current_pool env = get_pool env env.current_pool
 let current_rank env = (current_pool env).Pool.rank
 let get_scheme_of_ident unifier_env = unifier_env.scheme_of_ident
@@ -210,6 +213,14 @@ let string_of_scheme ?debug ?caml_types ident scheme =
   let { scheme_var; young_vars } = scheme in
   Printf.sprintf "val %s: %s" ident (string_of_uvar ?debug ~young_vars ?caml_types scheme_var)
 
+(* Small debugging helper *)
+let debug_pairs buf mapping =
+  let pairs = Uhashtbl.map_list
+    mapping
+    (fun k v -> let n = k.name in Jstring.bsprintf "%s: %a" n uvar_name v)
+  in
+  Buffer.add_string buf (String.concat ", " pairs)
+
 (* Create a fresh variable and add it to the current pool *)
 let fresh_unifier_var ?term ?prefix ?name unifier_env =
   let current_pool = current_pool unifier_env in
@@ -227,7 +238,7 @@ let fresh_unifier_var ?term ?prefix ?name unifier_env =
   uvar
 
 (* Create a fresh copy of a scheme for instanciation *)
-let fresh_copy unifier_env { scheme_var = scheme_uvar } =
+let fresh_copy unifier_env { scheme_var = scheme_uvar; young_vars } =
   let mapping = Uhashtbl.create 64 in
   let rec fresh_copy uvar =
     let repr = UnionFind.find uvar in
@@ -236,39 +247,25 @@ let fresh_copy unifier_env { scheme_var = scheme_uvar } =
       Uhashtbl.find mapping repr
     with
       | Not_found ->
-          begin match repr.term with
-            | None ->
-                if repr.rank = (-1) then begin
-                  let new_uvar = fresh_unifier_var unifier_env in
-                  Uhashtbl.add mapping repr new_uvar;
-                  new_uvar
-                end else begin
-                  uvar
-                end
-            | Some (`Cons (cons_name, cons_args)) ->
-                if repr.rank = (-1) then begin
-                  let new_uvar = fresh_unifier_var unifier_env in
-                  let new_repr = UnionFind.find new_uvar in
-                  Uhashtbl.add mapping repr new_uvar;
-                  let cons_args' = List.map fresh_copy cons_args in
-                  let term = Some (`Cons (cons_name, cons_args')) in
-                  new_repr.term <- term;
-                  new_uvar
-                end else begin
-                  uvar
-                end
-          end
+          if repr.rank = (-1) then
+            match repr.term with
+              | None ->
+                    let new_uvar = fresh_unifier_var unifier_env in
+                    Uhashtbl.add mapping repr new_uvar;
+                    new_uvar
+              | Some (`Cons (cons_name, cons_args)) ->
+                    let new_uvar = fresh_unifier_var unifier_env in
+                    let new_repr = UnionFind.find new_uvar in
+                    Uhashtbl.add mapping repr new_uvar;
+                    let cons_args' = List.map fresh_copy cons_args in
+                    let term = Some (`Cons (cons_name, cons_args')) in
+                    new_repr.term <- term;
+                    new_uvar
+          else
+            uvar
   in
-  let young_vars = Uhashtbl.map_list mapping (fun k v -> if k.term = None then Some v else None) in
-  let young_vars = Jlist.filter_some young_vars in
-  let print_pairs buf () =
-    let pairs = Uhashtbl.map_list
-      mapping
-      (fun k v -> let n = k.name in Jstring.bsprintf "%s: %a" n uvar_name v)
-    in
-    Buffer.add_string buf (String.concat ", " pairs)
-  in
-  Error.debug "[UCopy] Mapping: %a\n" print_pairs ();
+  let young_vars = List.map fresh_copy young_vars in
+  Error.debug "[UCopy] Mapping: %a\n" debug_pairs mapping;
   { scheme_var = fresh_copy scheme_uvar; young_vars }
 
 (* This actually sets up the rank properly and adds the variable in the current
