@@ -43,7 +43,6 @@ type descriptor = {
   mutable term: unifier_term option;
   name: string;
   mutable rank: int;
-  mutable ready: bool;
   mutable mark: Mark.t;
 }
 

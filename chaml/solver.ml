@@ -96,6 +96,45 @@ let run_dfs ~occurs_check young_vars =
   in
   List.iter f young_vars
 
+(* Some useful debug helpers *)
+let debug_which_schemes buf var_map =
+  let idents = IdentMap.keys var_map in
+  let idents = List.map string_of_ident idents in
+  let idents = String.concat ", " idents in
+  Buffer.add_string buf (Bash.color 219 "[SLeft] Solving scheme for %s\n" idents)
+
+let debug_inpool buf (prev_ranks, l, sub_env) =
+  let rank = current_rank sub_env in
+  let members = match prev_ranks with
+    | None ->
+        List.map
+          (fun x ->
+             let repr = (UnionFind.find x) in
+               Printf.sprintf "%s(%d)" repr.name repr.rank)
+          l
+    | Some ranks ->
+        List.map2
+          (fun var old_rank ->
+            let repr = (UnionFind.find var) in
+            if old_rank <> repr.rank then
+              Bash.color 42 "%s(%d)" repr.name repr.rank
+            else
+              Printf.sprintf "%s(%d)" repr.name repr.rank)
+          l ranks
+  in
+  let str = Bash.color 208 "[InPool] %d: %s\n" rank (String.concat ", " members) in
+  Buffer.add_string buf str
+
+let debug_scheme buf (scheme, ident) =
+  let scheme_str = string_of_scheme
+    ~debug:()
+    (string_of_ident ident)
+    scheme
+  in
+  let str = Bash.color 185 "[SScheme] Got %s\n" scheme_str in
+  Buffer.add_string buf str
+
+
 exception Done of unifier_scheme IdentMap.t
 
 let solve =
@@ -165,48 +204,7 @@ let solve =
          * existentially quantified variables in it. *)
         let sub_env = step_env unifier_env in
         let vars, konstraint, var_map = scheme in
-
-        (* --- Debug --- *)
-        Error.debug "%a" (fun buf () ->
-          let idents = IdentMap.keys var_map in
-          let idents = List.map string_of_ident idents in
-          let idents = String.concat ", " idents in
-          Buffer.add_string buf (Bash.color 219 "[SLeft] Solving scheme for %s\n" idents);
-        ) ();
-        let debug_inpool ?prev_ranks l =
-          let rank = current_rank sub_env in
-          let members = match prev_ranks with
-            | None ->
-                List.map
-                  (fun x ->
-                     let repr = (UnionFind.find x) in
-                       Printf.sprintf "%s(%d)" repr.name repr.rank)
-                  l
-            | Some ranks ->
-                List.map2
-                  (fun var old_rank ->
-                    let repr = (UnionFind.find var) in
-                    if old_rank <> repr.rank then
-                      Bash.color 42 "%s(%d)" repr.name repr.rank
-                    else
-                      Printf.sprintf "%s(%d)" repr.name repr.rank)
-                  l ranks
-          in
-          Error.debug "%a"
-            (fun buf () -> Buffer.add_string buf (
-              Bash.color 208 "[InPool] %d: %s\n" rank (String.concat ", " members)))
-            ();
-        in
-        let debug_scheme buf (scheme, ident) =
-          let scheme_str = string_of_scheme
-            ~debug:()
-            (string_of_ident ident)
-            scheme
-          in
-          let str = Bash.color 185 "[SScheme] Got %s\n" scheme_str in
-          Buffer.add_string buf str
-        in
-        (* --- End Debug --- *)
+        Error.debug "%a" debug_which_schemes var_map;
 
         (* Make sure we register the variables that haven't been initialized yet
          * into the sub environment's pool. *)
@@ -216,10 +214,6 @@ let solve =
         analyze sub_env konstraint;
         let sub_pool = sub_pool unifier_env in
         let pool_vars = sub_pool.Pool.members in
-        (* Printf.printf
-          "%d variables in pool %d\n"
-          (List.length young_vars)
-          (current_rank sub_env); *)
 
         (* Filter out duplicates. This isn't necessary but still this should
          * speed things up. We maintain the invariant that each descriptor has
@@ -243,11 +237,11 @@ let solve =
         let pool_vars = List.sort (fun a b -> rank a - rank b) pool_vars in
 
         (* This is rank propagation. See lemma 10.6.7 in ATTAPL. This is needed. *)
-        debug_inpool pool_vars;
+        Error.debug "%a" debug_inpool (None, pool_vars, sub_env);
         let prev_ranks = List.map rank pool_vars in
         let occurs_check = not opt_recursive_types in
         run_dfs ~occurs_check pool_vars;
-        debug_inpool ~prev_ranks pool_vars;
+        Error.debug "%a" debug_inpool (Some prev_ranks, pool_vars, sub_env);
 
         (* Young variables are marked as belonging to a scheme, they are
          * generalized. Old variables are sent back to their pools.

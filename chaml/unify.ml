@@ -26,11 +26,14 @@ open TypePrinter
 
 (* We first need to define those types. These are needed for the Basesolver. *)
 
+(* Special values for the rank:
+ * -1 -> universally quantified variable in a scheme
+ * -2 -> the variable isn't ready yet
+ * *)
 type descriptor = {
   mutable term: unifier_term option;
   name: string;
   mutable rank: int;
-  mutable ready: bool;
   mutable mark: Mark.t;
 }
 
@@ -84,7 +87,7 @@ module BaseSolver = struct
   type instance = unifier_instance
 
   let new_var name =
-    UnionFind.fresh { name; rank = -1; term = None; ready = false; mark = Mark.none }
+    UnionFind.fresh { name; rank = -2; term = None; mark = Mark.none }
 
   let new_scheme_for_var scheme_var = {
       scheme_var;
@@ -230,7 +233,7 @@ let fresh_unifier_var ?term ?prefix ?name unifier_env =
       | Some name ->
           name
   in
-  let uvar = UnionFind.fresh { term; name; rank; ready = true; mark = Mark.none } in
+  let uvar = UnionFind.fresh { term; name; rank; mark = Mark.none } in
   Pool.add current_pool uvar;
   uvar
 
@@ -265,18 +268,20 @@ let fresh_copy unifier_env { scheme_var = scheme_uvar; young_vars } =
   Error.debug "[UCopy] Mapping: %a\n" debug_pairs mapping;
   { scheme_var = fresh_copy scheme_uvar; young_vars }
 
+let is_not_ready repr = repr.rank = (-2)
+
 (* This actually sets up the rank properly and adds the variable in the current
  * pool if this hasn't been done already. Extremely useful when the solver
  * encounters variables that have been allocated by the constraint generator and
  * that are not ready yet. *)
 let ensure_ready unifier_env uvar =
   let repr = UnionFind.find uvar in
-  assert (not repr.ready);
+  assert (is_not_ready repr);
   Error.debug "[UReady] Making %a ready\n" uvar_name uvar;
   repr.rank <- current_rank unifier_env;
   let open Pool in
   (current_pool unifier_env).members <- (uvar :: (current_pool unifier_env).members);
-  repr.ready <- true
+  assert (not (is_not_ready repr))
 
 (* This function does two things: first, it makes sure the variable is ready.
  * Then, it replaces type_constructors by unifier_vars whose term is that
