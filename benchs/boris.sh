@@ -26,5 +26,6 @@ done;
 echo " ...done"
 gnuplot script.gnuplot
 eog timings.png
+cat timings
 rm -f boris.cm* boris*.ml
 rm -f timings.png timings

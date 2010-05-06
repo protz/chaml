@@ -94,7 +94,8 @@ let run_dfs ~occurs_check young_vars =
     ignore (dont_loop repr.rank uvar);
     assert (repr.rank >= 0)
   in
-  List.iter f young_vars
+  List.iter f young_vars;
+  seen
 
 (* Some useful debug helpers *)
 let debug_which_schemes buf var_map =
@@ -167,7 +168,7 @@ let solve =
                 raise_error (UnboundIdentifier ident)
           in
           let ident_s = string_of_ident ident in
-          let { scheme_var = instance; young_vars } =
+          let { scheme_var = instance }, young_vars =
             fresh_copy unifier_env scheme
           in
           Error.debug
@@ -240,8 +241,21 @@ let solve =
         Error.debug "%a" debug_inpool (None, pool_vars, sub_env);
         let prev_ranks = List.map rank pool_vars in
         let occurs_check = not opt_recursive_types in
-        run_dfs ~occurs_check pool_vars;
+        let reachable = run_dfs ~occurs_check pool_vars in
         Error.debug "%a" debug_inpool (Some prev_ranks, pool_vars, sub_env);
+
+        (* This step unifies unreachable variables (that is, that will
+         * never be instanciated), with the unhabited bottom type constructor.
+         * *)
+        let deal_with_unreachable uvar =
+          let repr = UnionFind.find uvar in
+          if (repr.term = None && not (Uhashtbl.mem reachable repr)) then begin
+            Error.debug "%s"
+              (Bash.color 144 "[Unreachable] %a\n" uvar_name uvar);
+            repr.term <- Some Algebra.TypeCons.type_cons_bottom;
+          end
+        in
+        List.iter deal_with_unreachable pool_vars;
 
         (* Young variables are marked as belonging to a scheme, they are
          * generalized. Old variables are sent back to their pools.
@@ -255,16 +269,13 @@ let solve =
          * remains in [unreachable_vars] is the universally quantified variables
          * that will never be instanciated, so we unify these with ⊥ (bottom). *)
         let current_rank = current_rank sub_env in
-        let unreachable_vars = Uhashtbl.create 64 in
         List.iter
           (fun uvar ->
             let repr = UnionFind.find uvar in
             assert (repr.rank <= current_rank);
             (* Is it a young variable? *)
             if repr.rank = current_rank then begin
-              repr.rank <- -1;
-              if repr.term = None then
-                Uhashtbl.add unreachable_vars repr uvar;
+              repr.rank <- -1
             end else begin
               let the_vars_pool = get_pool unifier_env repr.rank in
               Pool.add the_vars_pool uvar
@@ -272,68 +283,16 @@ let solve =
           )
           pool_vars;
 
-        (* This computes all the variables that can be reached from a given
-         * entry point, and returns them sorted according to the infix order,
-         * that is, the first time we hit them while running our DFS search.
-         * This allows us to agree on an ordering for later, when we instanciate
-         * the scheme in the type-checker. *)
-        (* XXX USE THE MARK XXX *)
-        let compute_reachable uvar =
-          let reachable = Uhashtbl.create 32 in
-          let index = ref 0 in
-          let (++) x = x := !x + 1; !x in
-          let seen = Uhashtbl.create 32 in
-          let rec compute_reachable uvar =
-            let repr = UnionFind.find uvar in
-            match repr.term with
-            | None ->
-                if not (Uhashtbl.mem reachable repr) then
-                  Uhashtbl.add reachable repr (uvar, (++)index);
-                Uhashtbl.remove unreachable_vars repr
-            | Some (`Cons (_cons_name, cons_args))->
-                match Uhashtbl.find_opt seen repr with
-                | None ->
-                    Uhashtbl.add seen repr uvar;
-                    List.iter compute_reachable cons_args;
-                    Uhashtbl.remove seen repr
-                | Some uvar ->
-                  if not (Uhashtbl.mem reachable repr) then
-                    Uhashtbl.add reachable repr (uvar, (++)index);
-          in
-          compute_reachable uvar;
-          List.map
-            fst
-            (List.sort
-              (fun (_, a) (_, b) -> a - b)
-              (Uhashtbl.map_list reachable (fun _k v -> v))
-            )
-        in
-
         (* The schemes have already been allocated when generating a CamlX term,
          * However, the [var_map] is a mapping from identifiers to [(uvar,
          * scheme)] where uvar represents the pre-allocated variable and scheme
          * the pre-allocated scheme for that variable. They have been unified at
          * the beginning of [solve_branch]. *)
-        let final_map = IdentMap.fold
+        IdentMap.fold
           (fun ident (`Var _uvar, scheme) new_map ->
-            scheme.young_vars <- compute_reachable scheme.scheme_var;
             Error.debug "%a" debug_scheme (scheme, ident);
             IdentMap.add ident scheme new_map)
           var_map new_map
-        in
-
-        (* The last step is to unify unreachable variables (that is, that will
-         * never be instanciated), with the unhabited bottom type constructor.
-         * *)
-        let deal_with_unreachable repr uvar =
-          Error.debug "%s"
-            (Bash.color 144 "[Unreachable] %a\n" uvar_name uvar);
-          assert (repr.term = None);
-          repr.term <- Some Algebra.TypeCons.type_cons_bottom;
-        in
-        Uhashtbl.iter deal_with_unreachable unreachable_vars;
-
-        final_map
 
       in
       let new_map =

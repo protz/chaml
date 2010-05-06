@@ -43,7 +43,6 @@ and unifier_term = [
 ]
 and unifier_scheme = {
   mutable scheme_var: unifier_var;
-  mutable young_vars: unifier_var list;
 }
 
 type unifier_instance = unifier_var list ref
@@ -91,7 +90,6 @@ module BaseSolver = struct
 
   let new_scheme_for_var scheme_var = {
       scheme_var;
-      young_vars = [];
     }
 
   let new_instance () = ref []
@@ -198,9 +196,10 @@ let rec uvar_name: Buffer.t -> unifier_var -> unit =
           (string_of_type ~string_of_key:debug_var_printer (inspect_scheme ~debug:() uvar))
 
 (* For error messages *)
-let string_of_uvar ?debug ?young_vars ?caml_types uvar =
+let string_of_uvar ?debug ?caml_types uvar =
   let string_of_key = if Option.unit_bool debug then debug_var_printer else regular_var_printer in
   let inspected_var = inspect_scheme ?debug uvar in
+  let young_vars = match debug with Some () -> None | None -> Some () in
   string_of_type ?string_of_key ?caml_types ?young_vars inspected_var
 
 (* For error messages. Same distinction, see typePrinter.mli *)
@@ -210,8 +209,8 @@ let string_of_uvars ?caml_types uvars =
 
 (* For printing type schemes *)
 let string_of_scheme ?debug ?caml_types ident scheme =
-  let { scheme_var; young_vars } = scheme in
-  Printf.sprintf "val %s: %s" ident (string_of_uvar ?debug ~young_vars ?caml_types scheme_var)
+  let { scheme_var } = scheme in
+  Printf.sprintf "val %s: %s" ident (string_of_uvar ?debug ?caml_types scheme_var)
 
 (* Small debugging helper *)
 let debug_pairs buf mapping =
@@ -238,7 +237,7 @@ let fresh_unifier_var ?term ?prefix ?name unifier_env =
   uvar
 
 (* Create a fresh copy of a scheme for instanciation *)
-let fresh_copy unifier_env { scheme_var = scheme_uvar; young_vars } =
+let fresh_copy unifier_env { scheme_var = scheme_uvar } =
   let mapping = Uhashtbl.create 64 in
   let rec fresh_copy uvar =
     let repr = UnionFind.find uvar in
@@ -264,9 +263,9 @@ let fresh_copy unifier_env { scheme_var = scheme_uvar; young_vars } =
           else
             uvar
   in
-  let young_vars = List.map fresh_copy young_vars in
   Error.debug "[UCopy] Mapping: %a\n" debug_pairs mapping;
-  { scheme_var = fresh_copy scheme_uvar; young_vars }
+  let young_vars = Uhashtbl.map_list mapping (fun _repr uvar -> uvar) in
+  { scheme_var = fresh_copy scheme_uvar }, young_vars
 
 let is_not_ready repr = repr.rank = (-2)
 

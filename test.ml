@@ -1,3 +1,3 @@
-let v4 =
-  let a, b = 1, 2 in
-  a
+let f, g =
+  let id x = x in
+  id, 2
