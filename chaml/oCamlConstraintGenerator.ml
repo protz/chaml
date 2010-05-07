@@ -110,6 +110,9 @@ module Make(S: Algebra.SOLVER) = struct
   let new_scheme (`Var uvar) =
     S.new_scheme_for_var uvar
 
+  let new_pscheme (`Var uvar) =
+    S.new_pscheme_for_var uvar
+
   let random_ident_name () = Filename.basename (Filename.temp_file "" "")
 
   (* Returns c_1 and (c_2 and ( ... and c_n)) *)
@@ -526,7 +529,7 @@ module Make(S: Algebra.SOLVER) = struct
         let konstraint = `Exists (introduced_vars, `Conj (c1, c1')) in
         {
           scheme = [x], konstraint, var_map, None;
-          pat_expr = pat, S.new_pscheme (), expr;
+          pat_expr = pat, new_pscheme x, expr;
         }
     in
 

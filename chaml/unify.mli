@@ -93,7 +93,7 @@ module BaseSolver: sig
 
   val new_var: string -> var
   val new_scheme_for_var: var -> scheme
-  val new_pscheme: unit -> pscheme
+  val new_pscheme_for_var: var -> pscheme
   val new_instance: unit -> instance
 
   val string_of_var: var -> string

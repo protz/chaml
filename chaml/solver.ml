@@ -204,7 +204,7 @@ let solve =
          * allows us to create a fresh pool which will contain all the
          * existentially quantified variables in it. *)
         let sub_env = step_env unifier_env in
-        let vars, konstraint, var_map, _ = scheme in
+        let vars, konstraint, var_map, _pscheme = scheme in
         Error.debug "%a" debug_which_schemes var_map;
 
         (* Make sure we register the variables that haven't been initialized yet

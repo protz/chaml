@@ -21,9 +21,11 @@ module BaseSolver = struct
   type var = string
   type scheme = unit
   type instance = unit
+  type pscheme = unit
 
   let new_var _ = assert false
   let new_scheme_for_var _ = assert false
+  let new_pscheme_for_var _ = assert false
   let new_instance _ = assert false
 
   let string_of_var s = s

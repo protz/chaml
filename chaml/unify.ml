@@ -104,8 +104,8 @@ module BaseSolver = struct
       scheme_var;
     }
 
-  let new_pscheme () = {
-    p_uvar = new_var (fresh_name ~prefix:"pscheme" ());
+  let new_pscheme_for_var p_uvar = {
+    p_uvar;
     p_young_vars = [];
   }
 
@@ -158,8 +158,9 @@ let step_env env =
  * parameter is used when printing a unification variable whose internal name we
  * want to display (to track unification progress). Do not use it if you want to
  * see a "real" type. *)
-let inspect_scheme: ?debug:unit -> unifier_var -> unifier_var inspected_var =
-  fun ?debug uvar ->
+let inspect_scheme:
+  ?debug:unit -> ?error_msg:unit -> unifier_var -> unifier_var inspected_var =
+  fun ?debug ?error_msg uvar ->
     let seen = Uhashtbl.create 16 in
     let rec inspect_uvar: unifier_var -> unifier_var inspected_var =
     fun uvar ->
@@ -172,7 +173,7 @@ let inspect_scheme: ?debug:unit -> unifier_var -> unifier_var inspected_var =
         | Some (Some key) ->
             `Var key
         | None ->
-            if (not (Option.unit_bool debug)) then
+            if (not (Option.unit_bool debug || Option.unit_bool error_msg)) then
               assert (repr.rank = (-1) || (Error.debug "%s\n" repr.name; false));
             Uhashtbl.add seen repr None;
             let type_term =
@@ -221,7 +222,7 @@ let string_of_uvar ?debug ?caml_types uvar =
 
 (* For error messages. Same distinction, see typePrinter.mli *)
 let string_of_uvars ?caml_types uvars =
-  let inspected_vars = List.map inspect_scheme uvars in
+  let inspected_vars = List.map (inspect_scheme ~error_msg:()) uvars in
   string_of_types ~string_of_key:regular_var_printer ?caml_types inspected_vars
 
 (* For printing type schemes *)

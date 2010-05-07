@@ -143,7 +143,7 @@ let translate =
           `Or (translate_pat env ~assign_schemes p1, translate_pat env ~assign_schemes p2)
 
       | `Var (ident, { scheme_var = scheme }) ->
-          let scheme =
+          let _scheme =
             if assign_schemes then
               Some (type_term_of_uvar env scheme)
             else
