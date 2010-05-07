@@ -31,8 +31,9 @@ open TypePrinter
  * -2 -> the variable isn't ready yet
  * *)
 type descriptor = {
-  mutable term: unifier_term option;
   name: string;
+  id: int;
+  mutable term: unifier_term option;
   mutable rank: int;
   mutable mark: Mark.t;
 }
@@ -50,7 +51,7 @@ type unifier_instance = unifier_var list ref
 module Uhashtbl = Jhashtbl.Make(struct
     type t = descriptor
     let equal = (==)
-    let hash d = Hashtbl.hash d.name
+    let hash d = Hashtbl.hash d.id
   end)
 
 (* A pool contains all the variables with a given rank. *)
@@ -86,7 +87,13 @@ module BaseSolver = struct
   type instance = unifier_instance
 
   let new_var name =
-    UnionFind.fresh { name; rank = -2; term = None; mark = Mark.none }
+    UnionFind.fresh
+      { name;
+        rank = -2;
+        term = None;
+        mark = Mark.none;
+        id = Oo.id (object end)
+      }
 
   let new_scheme_for_var scheme_var = {
       scheme_var;
@@ -232,7 +239,8 @@ let fresh_unifier_var ?term ?prefix ?name unifier_env =
       | Some name ->
           name
   in
-  let uvar = UnionFind.fresh { term; name; rank; mark = Mark.none } in
+  let id = Oo.id (object end) in
+  let uvar = UnionFind.fresh { term; name; rank; mark = Mark.none; id; } in
   Pool.add current_pool uvar;
   uvar
 

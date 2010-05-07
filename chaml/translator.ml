@@ -117,7 +117,7 @@ let translate =
           in
           `Lambda pat_expr_list
 
-      | `Instance (ident, instance) ->
+      | `Instance (_ident, _instance) ->
           (* let instance =
             List.map
               (fun x -> StringMap.find (UnionFind.find x).name env.fvar_of_uvar)

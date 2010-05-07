@@ -40,8 +40,9 @@ val string_of_error: error -> string
 (** This is the descriptor used by [UnionFind]. This is what you get when you do
     [UnionFind.find uvar] where [uvar] is a [unifier_var]. *)
 type descriptor = {
+  name: string; (** For debugging *)
+  id: int; (** This is a globally unique identifier *)
   mutable term: unifier_term option;
-  name: string;
   mutable rank: int;
   mutable mark: Mark.t;
 }
