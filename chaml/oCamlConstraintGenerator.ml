@@ -62,13 +62,29 @@ module Make(S: Algebra.SOLVER) = struct
     | AlgebraError e ->
         Algebra.Core.string_of_error e
 
-  (* Instead of returning 4-uples each time, the main functions
-   * (generate_constraint_pattern, generate_constraint_expression...) return
-   * records. *)
+  (* Small helpers functions that don't belong to the main logic. *)
+  let dont_bind_several_times pexp_loc map new_map =
+    let inter = IdentMap.inter map new_map in
+    if (not (IdentMap.is_empty inter)) then begin
+      let bad_ident = List.hd (IdentMap.keys inter) in
+      let bad_ident = string_of_ident bad_ident in
+      raise_error (VariableBoundSeveralTimes (bad_ident, pexp_loc));
+    end
 
+  let bind_both_sides ppat_loc map1 map2 =
+    let xor_map = IdentMap.xor map1 map2 in
+    if not (IdentMap.is_empty xor_map) then begin
+      let bad_ident = string_of_ident (List.hd (IdentMap.keys xor_map)) in
+      raise_error (VariableMustOccurBothSides (bad_ident, ppat_loc))
+    end
+
+  (* Convenience shortcuts *)
   type lambda_pattern = (S.instance, S.scheme) CamlX.pattern
   type lambda_expression = (S.instance, S.scheme, S.var) CamlX.expression
 
+  (* Instead of returning 4-uples each time, the main functions
+   * generate_constraint_pattern, generate_constraint_expression... return
+   * records. *)
   type constraint_pattern = {
     p_constraint: type_constraint;
     pat: lambda_pattern;
@@ -87,7 +103,6 @@ module Make(S: Algebra.SOLVER) = struct
   }
 
   (* These are just convenient helpers *)
-
   let fresh_type_var ?letter () =
     let prefix = Option.map (String.make 1) letter in
     `Var (S.new_var (fresh_name ?prefix ()))
@@ -164,11 +179,7 @@ module Make(S: Algebra.SOLVER) = struct
           let pattern_constraint = constr_conj (List.map (fun (x, _, _, _) -> x) patterns) in
           let pattern_map = List.fold_left
             (fun known_map sub_map ->
-              let inter_map = IdentMap.inter known_map sub_map in
-              if not (IdentMap.is_empty inter_map) then begin
-                let bad_ident = string_of_ident (List.hd (IdentMap.keys inter_map)) in
-                raise_error (VariableBoundSeveralTimes (bad_ident, ppat_loc))
-              end;
+              dont_bind_several_times ppat_loc known_map sub_map;
               IdentMap.union known_map sub_map
             )
             IdentMap.empty
@@ -192,11 +203,7 @@ module Make(S: Algebra.SOLVER) = struct
           let { p_constraint = c2; var_map = map2; introduced_vars = vars2; pat = lp2 } =
             generate_constraint_pattern x pat2
           in
-          let xor_map = IdentMap.xor map1 map2 in
-          if not (IdentMap.is_empty xor_map) then begin
-            let bad_ident = string_of_ident (List.hd (IdentMap.keys xor_map)) in
-            raise_error (VariableMustOccurBothSides (bad_ident, ppat_loc))
-          end;
+          bind_both_sides ppat_loc map1 map2;
           (* If identifier i is bound to type variable x1 on the left and x2
            * on the right, this just generates the constraint "x1 = x2" *)
           let constraints =
@@ -328,12 +335,7 @@ module Make(S: Algebra.SOLVER) = struct
               generate_constraint_pat_expr pat_expr
             in
             let _, _, new_map = scheme in
-            let inter = IdentMap.inter map new_map in
-            if (not (IdentMap.is_empty inter)) then begin
-              let bad_ident = List.hd (IdentMap.keys inter) in
-              let bad_ident = string_of_ident bad_ident in
-              raise_error (VariableBoundSeveralTimes (bad_ident, pexp_loc));
-            end;
+            dont_bind_several_times pexp_loc map new_map;
             let union = IdentMap.union map new_map in
             (scheme, pat_expr) :: acc, union
           in
