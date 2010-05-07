@@ -23,14 +23,19 @@ let exit_error fmt = Printf.kprintf (fun e -> output_string stderr e; exit 255) 
 let debug_enabled = ref false
 let enable_debug () = debug_enabled := true
 
+let debug_level = ref 0
+let dinc () = debug_level := !debug_level + 1
+let ddec () = debug_level := !debug_level - 1
+let write_indent oc = output_string oc (String.make !debug_level ' ')
+
 let debug fmt =
   if !debug_enabled then
-    Jstring.bfprintf stderr fmt
+    (write_indent stderr; Jstring.bfprintf stderr fmt)
   else
     Jstring.biprintf fmt
 
 let debug_simple fmt =
   if !debug_enabled then
-    Jstring.bfprintf stderr "%s" fmt
+    (write_indent stderr; Jstring.bfprintf stderr "%s" fmt)
   else
     Jstring.biprintf "%s" fmt

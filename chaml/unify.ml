@@ -295,7 +295,7 @@ let is_not_ready repr = repr.rank = (-2)
 let ensure_ready unifier_env uvar =
   let repr = UnionFind.find uvar in
   assert (is_not_ready repr);
-  Error.debug "[UReady] Making %a ready\n" uvar_name uvar;
+  (* Error.debug "[UReady] Making %a ready\n" uvar_name uvar; *)
   repr.rank <- current_rank unifier_env;
   let open Pool in
   (current_pool unifier_env).members <- (uvar :: (current_pool unifier_env).members);

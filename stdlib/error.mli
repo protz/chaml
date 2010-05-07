@@ -35,3 +35,9 @@ val debug : ('a, Buffer.t, unit, unit) format4 -> 'a
 
 (** Report some debugging information. Use it like [print_string] *)
 val debug_simple : string -> unit
+
+(** Increment the debug indentation *)
+val dinc: unit -> unit
+
+(** Decrement the debug indentation *)
+val ddec: unit -> unit

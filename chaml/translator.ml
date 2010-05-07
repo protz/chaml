@@ -83,12 +83,14 @@ let translate =
       | `Let (pat_expr_list, e2) ->
           let pat_expr_list =
             List.map
-              (fun (upat, _pscheme, uexpr) ->
-                (* We don't assign schemes, so we don't need the fresh variables
-                 * *)
+              (fun (upat, pscheme, uexpr) ->
                 let fpat = translate_pat env ~assign_schemes:false upat in
                 (* But when we type e1, we need those new type variables *)
-                let fexpr = translate_expr env uexpr in
+                let new_env = List.fold_left lift_add env pscheme.p_young_vars in
+                Error.debug
+                  "[TScheme] %d variables in this pattern\n"
+                  (List.length pscheme.p_young_vars);
+                let fexpr = translate_expr new_env uexpr in
                 (fpat, `Identity, fexpr)
               )
               pat_expr_list

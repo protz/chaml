@@ -204,7 +204,7 @@ let solve =
          * allows us to create a fresh pool which will contain all the
          * existentially quantified variables in it. *)
         let sub_env = step_env unifier_env in
-        let vars, konstraint, var_map, _pscheme = scheme in
+        let vars, konstraint, var_map, pscheme = scheme in
         Error.debug "%a" debug_which_schemes var_map;
 
         (* Make sure we register the variables that haven't been initialized yet
@@ -212,7 +212,9 @@ let solve =
         List.iter (fun (`Var uvar) -> ensure_ready sub_env uvar) vars;
 
         (* Solve the constraint in the scheme. *)
+        Error.dinc ();
         analyze sub_env konstraint;
+        Error.ddec ();
         let sub_pool = sub_pool unifier_env in
         let pool_vars = sub_pool.Pool.members in
 
@@ -269,19 +271,31 @@ let solve =
          * remains in [unreachable_vars] is the universally quantified variables
          * that will never be instanciated, so we unify these with ⊥ (bottom). *)
         let current_rank = current_rank sub_env in
-        List.iter
+        let young_vars = List.filter
           (fun uvar ->
             let repr = UnionFind.find uvar in
             assert (repr.rank <= current_rank);
             (* Is it a young variable? *)
             if repr.rank = current_rank then begin
-              repr.rank <- -1
+              repr.rank <- -1;
+              repr.term = None
             end else begin
               let the_vars_pool = get_pool unifier_env repr.rank in
-              Pool.add the_vars_pool uvar
+              Pool.add the_vars_pool uvar;
+              false
             end
           )
-          pool_vars;
+          pool_vars
+        in
+        begin match pscheme with
+          | None ->
+              assert (List.length young_vars = 0)
+          | Some pscheme ->
+              Error.debug
+                "[SPscheme] Putting %d vars in the pattern scheme\n"
+                (List.length young_vars);
+              pscheme.p_young_vars <- young_vars
+        end;
 
         (* The schemes have already been allocated when generating a CamlX term,
          * However, the [var_map] is a mapping from identifiers to [(uvar,

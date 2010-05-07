@@ -382,8 +382,12 @@ module Make(S: Algebra.SOLVER) = struct
               let { e_constraint = c2; expr } =
                 generate_constraint_expression t expr
               in
+              (* This is just a placeholder and will be discarded later on as we
+               * don't plan on type-checking generalized match. It is here just to
+               * avoid breaking the testcase. *)
+              let pscheme = new_pscheme y in
               let let_constr: type_constraint =
-                `Let ([y :: introduced_vars, c, var_map, None], c2)
+                `Let ([y :: introduced_vars, c, var_map, Some pscheme], c2)
               in
               let_constr, (pat, expr)
             in
@@ -391,8 +395,10 @@ module Make(S: Algebra.SOLVER) = struct
               List.split (List.map generate_branch pat_expr_list)
             in
             let solver_scheme = new_scheme x1 in
+            (* Same remark, this is just a placeholder too. *)
+            let solver_pscheme = new_pscheme x1 in
             let map = IdentMap.add ident1 (x1, solver_scheme) IdentMap.empty in
-            let scheme = [x1], constr_e1, map, None in
+            let scheme = [x1], constr_e1, map, Some solver_pscheme in
             (* XXX the fake ident we introduce is not kept in the lambda
              * tree we generate. Anyway, it's not like we have any hope of
              * type-checking generalized match. *)
@@ -485,8 +491,9 @@ module Make(S: Algebra.SOLVER) = struct
             in
             let pos = Location.none in
             let solver_scheme = new_scheme plus_var in
+            let solver_pscheme = new_pscheme plus_var in
             let plus_map = IdentMap.add (ident "+" pos) (plus_var, solver_scheme) IdentMap.empty in
-            [plus_var], `Equals (plus_var, plus_type), plus_map, None
+            [plus_var], `Equals (plus_var, plus_type), plus_map, Some solver_pscheme
           in
           let mult_scheme =
             let mult_var = fresh_type_var ~letter:'z' () in
@@ -495,8 +502,9 @@ module Make(S: Algebra.SOLVER) = struct
             in
             let pos = Location.none in
             let solver_scheme = new_scheme mult_var in
+            let solver_pscheme = new_pscheme mult_var in
             let mult_map = IdentMap.add (ident "*" pos) (mult_var, solver_scheme) IdentMap.empty in
-            [mult_var], `Equals (mult_var, mult_type), mult_map, None
+            [mult_var], `Equals (mult_var, mult_type), mult_map, Some solver_pscheme
           in
           [plus_scheme; mult_scheme]
         in
@@ -526,10 +534,11 @@ module Make(S: Algebra.SOLVER) = struct
         let { e_constraint = c1'; expr } =
           generate_constraint_expression x expr
         in
+        let pscheme = new_pscheme x in
         let konstraint = `Exists (introduced_vars, `Conj (c1, c1')) in
         {
-          scheme = [x], konstraint, var_map, None;
-          pat_expr = pat, new_pscheme x, expr;
+          scheme = [x], konstraint, var_map, Some pscheme;
+          pat_expr = pat, pscheme, expr;
         }
     in
 
