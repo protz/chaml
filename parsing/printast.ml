@@ -328,6 +328,8 @@ and expression i ppf x =
   | Pexp_open (m, e) ->
       line i ppf "Pexp_open \"%a\"\n" fmt_longident m;
       expression i ppf e
+  | Pexp_done ->
+      assert false
 
 and value_description i ppf x =
   line i ppf "value_description\n";
