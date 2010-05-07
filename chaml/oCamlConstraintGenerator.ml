@@ -28,6 +28,7 @@ module Make(S: Algebra.SOLVER) = struct
   open Algebra.TypeCons
   open Algebra.Identifiers
 
+  (* This is error handling. Add new errors here *)
   type error =
     | NotImplemented of string * Location.t
     | VariableBoundSeveralTimes of string * Location.t
@@ -36,6 +37,56 @@ module Make(S: Algebra.SOLVER) = struct
 
   exception Error of error
   let raise_error e = raise (Error e)
+
+  let string_of_error =
+    let print_loc () { Location.loc_start; Location.loc_end; Location.loc_ghost } =
+      let open Lexing in
+      assert (not loc_ghost);
+      let { pos_fname; pos_lnum; pos_bol; _ } = loc_start in
+      let { pos_bol = pos_end; _ } = loc_end in
+      Printf.sprintf "File %s, line %d, characters %d-%d"
+        pos_fname pos_lnum pos_bol pos_end
+    in function
+    | NotImplemented (r, loc) ->
+        Printf.sprintf
+          "%a: the following OCaml feature is not implemented: %s\n"
+          print_loc loc r
+    | VariableBoundSeveralTimes (v, loc) ->
+        Printf.sprintf
+          "%a: variable %s is bound several times in the matching\n"
+          print_loc loc v
+    | VariableMustOccurBothSides (v, loc) ->
+        Printf.sprintf
+          "%a: variable %s must occur on both sides of this pattern\n"
+          print_loc loc v
+    | AlgebraError e ->
+        Algebra.Core.string_of_error e
+
+  (* Instead of returning 4-uples each time, the main functions
+   * (generate_constraint_pattern, generate_constraint_expression...) return
+   * records. *)
+
+  type lambda_pattern = (S.instance, S.scheme) CamlX.pattern
+  type lambda_expression = (S.instance, S.scheme, S.var) CamlX.expression
+
+  type constraint_pattern = {
+    p_constraint: type_constraint;
+    pat: lambda_pattern;
+    var_map: (S.var type_var * S.scheme) IdentMap.t;
+    introduced_vars: S.var type_var list;
+  }
+
+  type constraint_expression = {
+    e_constraint: type_constraint;
+    expr: lambda_expression;
+  }
+
+  type constraint_pat_expr = {
+    scheme: type_scheme;
+    pat_expr: lambda_pattern * lambda_expression;
+  }
+
+  (* These are just convenient helpers *)
 
   let fresh_type_var ?letter () =
     let prefix = Option.map (String.make 1) letter in
@@ -53,49 +104,30 @@ module Make(S: Algebra.SOLVER) = struct
     | _ ->
         assert false
 
+  (* We nest functions that way so that all the options that are passed to
+   * generate_constraint are available to generate_constraint_pattern,
+   * generate_constraint_expression and others... *)
   let generate_constraint =
     fun ~generalize_match:opt_generalize_match
         ~default_bindings:opt_default_bindings
         structure ->
 
-    let module Types = struct
-      type lambda_pattern = (S.instance, S.scheme) CamlX.pattern
-      type lambda_expression = (S.instance, S.scheme, S.var) CamlX.expression
-
-      type constraint_pattern = {
-        p_constraint: type_constraint;
-        pat: lambda_pattern;
-        var_map: (S.var type_var * S.scheme) IdentMap.t;
-        introduced_vars: S.var type_var list;
-      }
-
-      type constraint_expression = {
-        e_constraint: type_constraint;
-        expr: lambda_expression;
-      }
-
-      type constraint_pat_expr = {
-        scheme: type_scheme;
-        pat_expr: lambda_pattern * lambda_expression;
-      }
-    end in
-    let open Types in
-
     (* Parsetree.pattern
      *
-     * We are given a type var that's supposed to match the given pattern. What we
-     * return is a type constraint and a map from identifiers to the corresponding
-     * type variables. For instance, generate_constraint_pattern X (a*b) returns
-     * \exists Y Z. [ X = Y * Z and a < X and b < Y ] and { a => Y; b => Z }
+     * We are given a type var that's supposed to match the given pattern. What
+     * we return is a type constraint and a map from identifiers to the
+     * corresponding type variables. For instance, generate_constraint_pattern X
+     * (a*b) returns \exists Y Z. [ X = Y * Z and a < X and b < Y ] and { a =>
+     * Y; b => Z }
      *
      * We also return the list of all the variables that have been generated and
-     * must be bound existentially for this pattern. The let - binding that encloses
-     * us will generate the `Exists constraint for us.
+     * must be bound existentially for this pattern. The let - binding that
+     * encloses us will generate the `Exists constraint for us.
      *
      * NB: one might be tempted to think that the map's keys and the list of
-     * existentially bound variables are equal. This is not necessarily true, as we
-     * might generate intermediate existential variables that are not bound to a
-     * specific identifier.
+     * existentially bound variables are equal. This is not necessarily true, as
+     * we might generate intermediate existential variables that are not bound
+     * to a specific identifier.
      *
      * *)
     let rec generate_constraint_pattern: S.var type_var -> pattern -> constraint_pattern =
@@ -186,8 +218,9 @@ module Make(S: Algebra.SOLVER) = struct
     (* Parsetree.expression
      *
      * - TODO figure out what label and the expression option are for in
-     * Pexp_function then do things accordingly. label is probably when the argument
-     * is labeled. What is the expression option for?
+     * Pexp_function then do things accordingly. label is probably when the
+     * argument is labeled. What is the expression option for? -> Probably a
+     * default value for ?blah arguments.
      *
      * *)
     and generate_constraint_expression: S.var type_var -> expression -> constraint_expression =
@@ -409,17 +442,15 @@ module Make(S: Algebra.SOLVER) = struct
      * - Pstr_value is for let x = ...
      * - Pstr_eval is for let _ = ...
      *
-     * For let x = ..., we use a fresh type variable T. After constraint resolution
-     * is finished, the constraint on T will be the type of the top-level binding we
-     * were looking for. The outermost var_map contains the bindings that end up in
-     * the environment. A single let-binding can bind multiple variables if the
-     * left-hand side is a pattern.
+     * For let x = ..., we use a fresh type variable T. After constraint
+     * resolution is finished, the constraint on T will be the type of the
+     * top-level binding we were looking for. The outermost var_map contains the
+     * bindings that end up in the environment. A single let-binding can bind
+     * multiple variables if the left-hand side is a pattern.
      *
-     * The fact that pat_expr_list is a list is because of let ... and ... that are
-     * defined simultaneously. We allow that through the type_scheme list in `Let
-     * type.
-     *
-     * For top-level definitions, the variables end up free in the environment.
+     * The fact that pat_expr_list is a list is because of let ... and ... that
+     * are defined simultaneously. We allow that through the type_scheme list in
+     * `Let type.
      *
      * *)
     and generate_constraint_structure: structure -> constraint_expression =
@@ -505,29 +536,5 @@ module Make(S: Algebra.SOLVER) = struct
     with
       | Error e -> `Error e
       | Algebra.Core.Error e -> `Error (AlgebraError e)
-
-  let string_of_error =
-    let print_loc () { Location.loc_start; Location.loc_end; Location.loc_ghost } =
-      let open Lexing in
-      assert (not loc_ghost);
-      let { pos_fname; pos_lnum; pos_bol; _ } = loc_start in
-      let { pos_bol = pos_end; _ } = loc_end in
-      Printf.sprintf "File %s, line %d, characters %d-%d"
-        pos_fname pos_lnum pos_bol pos_end
-    in function
-    | NotImplemented (r, loc) ->
-        Printf.sprintf
-          "%a: the following OCaml feature is not implemented: %s\n"
-          print_loc loc r
-    | VariableBoundSeveralTimes (v, loc) ->
-        Printf.sprintf
-          "%a: variable %s is bound several times in the matching\n"
-          print_loc loc v
-    | VariableMustOccurBothSides (v, loc) ->
-        Printf.sprintf
-          "%a: variable %s must occur on both sides of this pattern\n"
-          print_loc loc v
-    | AlgebraError e ->
-        Algebra.Core.string_of_error e
 
 end
