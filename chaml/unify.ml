@@ -47,6 +47,10 @@ and unifier_scheme = {
 }
 
 type unifier_instance = unifier_var list ref
+type unifier_pscheme = {
+  mutable p_uvar: unifier_var;
+  mutable p_young_vars: unifier_var list;
+}
 
 module Uhashtbl = Jhashtbl.Make(struct
     type t = descriptor
@@ -85,6 +89,7 @@ module BaseSolver = struct
   type var = unifier_var
   type scheme = unifier_scheme
   type instance = unifier_instance
+  type pscheme = unifier_pscheme
 
   let new_var name =
     UnionFind.fresh
@@ -98,6 +103,11 @@ module BaseSolver = struct
   let new_scheme_for_var scheme_var = {
       scheme_var;
     }
+
+  let new_pscheme () = {
+    p_uvar = new_var (fresh_name ~prefix:"pscheme" ());
+    p_young_vars = [];
+  }
 
   let new_instance () = ref []
 

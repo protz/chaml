@@ -69,6 +69,13 @@ and unifier_scheme = {
 (** Useful to know what's in the constraint-generated term. *)
 type unifier_instance = unifier_var list ref
 
+(** To describe the scheme of a full pattern. This is used later on by the
+ * translator to build coercions. *)
+type unifier_pscheme = {
+  mutable p_uvar: unifier_var;
+  mutable p_young_vars: unifier_var list;
+}
+
 (** This is for your convenience when dealing with hash tables of unifier vars *)
 module Uhashtbl: Jhashtbl.S with type key = descriptor
 
@@ -82,9 +89,11 @@ module BaseSolver: sig
   type var = unifier_var
   type scheme = unifier_scheme
   type instance = unifier_instance
+  type pscheme = unifier_pscheme
 
   val new_var: string -> var
   val new_scheme_for_var: var -> scheme
+  val new_pscheme: unit -> pscheme
   val new_instance: unit -> instance
 
   val string_of_var: var -> string

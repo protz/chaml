@@ -19,8 +19,8 @@
 
 open Algebra.Identifiers
 open Unify
+open CamlX
 
-type f_type_var = { index: int; }
 type type_var = f_type_var Algebra.Core.type_var
 type type_term = [
     type_var
@@ -28,11 +28,8 @@ type type_term = [
   | `Forall of type_term
 ]
 
-type type_instance = f_type_var list
 type type_scheme = type_term
-type expression = (type_instance, type_scheme option, f_type_var) CamlX.expression
-type pattern = (type_instance, type_scheme option) CamlX.pattern
-type t = expression
+type t = f_expression
 
 module DeBruijn = struct
   let lift: int -> type_term -> type_term =
@@ -80,31 +77,24 @@ let type_term_of_uvar env uvar =
   type_term_of_uvar uvar 
 
 let translate =
-  let rec translate_expr: env -> (unifier_instance, unifier_scheme, unifier_var) CamlX.expression -> expression = 
+  let rec translate_expr: env -> CamlX.Make(BaseSolver).expression -> f_expression = 
     fun env uexpr ->
     match uexpr with
-      | `Let (pat_expr_list, introduced_vars, e2) ->
-          Error.debug "[TLet] %d vars in this scheme\n" (List.length !introduced_vars);
-          let new_env = List.fold_left lift_add env !introduced_vars in
+      | `Let (pat_expr_list, e2) ->
           let pat_expr_list =
             List.map
-              (fun (upat, uexpr) ->
+              (fun (upat, _pscheme, uexpr) ->
                 (* We don't assign schemes, so we don't need the fresh variables
                  * *)
                 let fpat = translate_pat env ~assign_schemes:false upat in
                 (* But when we type e1, we need those new type variables *)
-                let fexpr = translate_expr new_env uexpr in
-                (fpat, fexpr)
+                let fexpr = translate_expr env uexpr in
+                (fpat, `Identity, fexpr)
               )
               pat_expr_list
           in
-          let new_vars =
-            List.map
-              (fun uvar -> StringMap.find (UnionFind.find uvar).name new_env.fvar_of_uvar)
-              !introduced_vars
-          in
-          let fexpr = translate_expr new_env e2 in
-          `Let (pat_expr_list, ref new_vars, fexpr)
+          let fexpr = translate_expr env e2 in
+          `Let (pat_expr_list, fexpr)
 
       | `Lambda pat_expr_list ->
            let pat_expr_list = List.map
@@ -140,7 +130,7 @@ let translate =
 
   (* [translate_pat] just generates patterns as needed. It doesn't try to
    * assign schemes to variables if those are on the left-hand side of a pattern. *)
-  and translate_pat: env -> assign_schemes:bool -> (unifier_instance, unifier_scheme) CamlX.pattern -> pattern =
+  and translate_pat: env -> assign_schemes:bool -> CamlX.Make(BaseSolver).pattern -> f_pattern =
     fun env ~assign_schemes upat ->
     match upat with
       | `Any as r ->
@@ -159,7 +149,7 @@ let translate =
             else
               None
           in
-          `Var (ident, scheme)
+          `Var ident
   in
   translate_expr { fvar_of_uvar = StringMap.empty }
 

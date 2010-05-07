@@ -33,11 +33,17 @@
     abstraction otherwise the dependencies would be really messy. *)
 module type SOLVER = sig
   type var
+  (** The [scheme] is attached to a single variable in a pattern. This allows us
+   * to print the type of all the bound identifiers. *)
   type scheme
+  (** The [pscheme] describes the scheme of a whole pattern, with quantified
+   * variables included *)
+  type pscheme
   type instance
 
   val new_var: string -> var
   val new_scheme_for_var: var -> scheme
+  val new_pscheme: unit -> pscheme
   val new_instance: unit -> instance
 
   (** Names are guaranteed to be unique. So you can consider this as a key for

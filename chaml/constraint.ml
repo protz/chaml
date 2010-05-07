@@ -27,6 +27,7 @@ module Make (S: Algebra.SOLVER) = struct
       S.var type_var list
     * type_constraint
     * (S.var type_var * S.scheme) IdentMap.t
+    * S.pscheme option
 
   and type_constraint = [
       `True
@@ -81,7 +82,8 @@ module Make (S: Algebra.SOLVER) = struct
         (konstraint: type_constraint) =
       let inc i = " " ^ i in
       let space_before_type_var = fun x -> " " ^ (string_of_type_var x) in
-      let rec string_of_constraint pp_env = fun i -> function
+      let rec string_of_constraint: pp_env -> string -> type_constraint -> string =
+        fun pp_env i -> function
         | `True ->
             "true"
         | `Done ->
@@ -120,7 +122,7 @@ module Make (S: Algebra.SOLVER) = struct
             String.concat "" ("let\n" :: i' :: schemes :: ["\n"; i; "in\n"; i; c])
       and string_of_type_scheme pp_env i s =
         let open Jstring in
-        let xs, c, var_map = s in
+        let xs, c, var_map, _ = s in
         let buf = Buf.create () in
         if List.length xs > 0 then begin
           let xs = List.map space_before_type_var xs in

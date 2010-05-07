@@ -79,27 +79,27 @@ module Make(S: Algebra.SOLVER) = struct
     end
 
   (* Convenience shortcuts *)
-  type lambda_pattern = (S.instance, S.scheme) CamlX.pattern
-  type lambda_expression = (S.instance, S.scheme, S.var) CamlX.expression
+  type camlx_pattern = CamlX.Make(S).pattern
+  type camlx_expression = CamlX.Make(S).expression
 
   (* Instead of returning 4-uples each time, the main functions
    * generate_constraint_pattern, generate_constraint_expression... return
    * records. *)
   type constraint_pattern = {
     p_constraint: type_constraint;
-    pat: lambda_pattern;
+    pat: camlx_pattern;
     var_map: (S.var type_var * S.scheme) IdentMap.t;
     introduced_vars: S.var type_var list;
   }
 
   type constraint_expression = {
     e_constraint: type_constraint;
-    expr: lambda_expression;
+    expr: camlx_expression;
   }
 
   type constraint_pat_expr = {
     scheme: type_scheme;
-    pat_expr: lambda_pattern * lambda_expression;
+    pat_expr: camlx_pattern * S.pscheme * camlx_expression;
   }
 
   (* These are just convenient helpers *)
@@ -273,7 +273,7 @@ module Make(S: Algebra.SOLVER) = struct
             in
             (* [[ t: X2 ]] *)
             let { e_constraint = c2; expr } = generate_constraint_expression x2 expr in
-            let let_constr = `Let ([[], c1, var_map], c2) in
+            let let_constr = `Let ([[], c1, var_map, None], c2) in
             (* This allows to properly scope the variables that are inner to
              * each pattern. x1 and x2 are a level higher since they are shared
              * accross patterns. This wouldn't change much as the variables are
@@ -334,7 +334,7 @@ module Make(S: Algebra.SOLVER) = struct
             let { scheme; pat_expr; } =
               generate_constraint_pat_expr pat_expr
             in
-            let _, _, new_map = scheme in
+            let _, _, new_map, _ = scheme in
             dont_bind_several_times pexp_loc map new_map;
             let union = IdentMap.union map new_map in
             (scheme, pat_expr) :: acc, union
@@ -343,7 +343,7 @@ module Make(S: Algebra.SOLVER) = struct
             List.split (fst (List.fold_left run ([], IdentMap.empty) pat_expr_list)) in
           {
             e_constraint = `Let (constraints, c2);
-            expr =  `Let (pat_expr, ref [], expr_e2);
+            expr =  `Let (pat_expr, expr_e2);
           }
       | Pexp_match (e1, pat_expr_list) ->
           if opt_generalize_match then
@@ -380,7 +380,7 @@ module Make(S: Algebra.SOLVER) = struct
                 generate_constraint_expression t expr
               in
               let let_constr: type_constraint =
-                `Let ([y :: introduced_vars, c, var_map], c2)
+                `Let ([y :: introduced_vars, c, var_map, None], c2)
               in
               let_constr, (pat, expr)
             in
@@ -389,7 +389,7 @@ module Make(S: Algebra.SOLVER) = struct
             in
             let solver_scheme = new_scheme x1 in
             let map = IdentMap.add ident1 (x1, solver_scheme) IdentMap.empty in
-            let scheme = [x1], constr_e1, map in
+            let scheme = [x1], constr_e1, map, None in
             (* XXX the fake ident we introduce is not kept in the lambda
              * tree we generate. Anyway, it's not like we have any hope of
              * type-checking generalized match. *)
@@ -410,7 +410,7 @@ module Make(S: Algebra.SOLVER) = struct
                 generate_constraint_expression t expr
               in
               (* This rule doesn't generalize, ocaml-style. *)
-              let let_constr: type_constraint = `Let ([[], c1, var_map], c2) in
+              let let_constr = `Let ([[], c1, var_map, None], c2) in
               `Exists (introduced_vars, let_constr), (pat, expr)
             in
             let constraints, pat_exprs = 
@@ -483,7 +483,7 @@ module Make(S: Algebra.SOLVER) = struct
             let pos = Location.none in
             let solver_scheme = new_scheme plus_var in
             let plus_map = IdentMap.add (ident "+" pos) (plus_var, solver_scheme) IdentMap.empty in
-            [plus_var], `Equals (plus_var, plus_type), plus_map
+            [plus_var], `Equals (plus_var, plus_type), plus_map, None
           in
           let mult_scheme =
             let mult_var = fresh_type_var ~letter:'z' () in
@@ -493,7 +493,7 @@ module Make(S: Algebra.SOLVER) = struct
             let pos = Location.none in
             let solver_scheme = new_scheme mult_var in
             let mult_map = IdentMap.add (ident "*" pos) (mult_var, solver_scheme) IdentMap.empty in
-            [mult_var], `Equals (mult_var, mult_type), mult_map
+            [mult_var], `Equals (mult_var, mult_type), mult_map, None
           in
           [plus_scheme; mult_scheme]
         in
@@ -513,7 +513,7 @@ module Make(S: Algebra.SOLVER) = struct
         else
           constraint_expression
 
-    (* Useful for let pattern = expression ... *)
+    (* This is only used by Pexp_let case. Still, it's a nice standalone block. *)
     and generate_constraint_pat_expr: pattern * expression -> constraint_pat_expr =
       fun (pat, expr) ->
         let x = fresh_type_var ~letter:'x' () in
@@ -525,8 +525,8 @@ module Make(S: Algebra.SOLVER) = struct
         in
         let konstraint = `Exists (introduced_vars, `Conj (c1, c1')) in
         {
-          scheme = [x], konstraint, var_map;
-          pat_expr = pat, expr;
+          scheme = [x], konstraint, var_map, None;
+          pat_expr = pat, S.new_pscheme (), expr;
         }
     in
 

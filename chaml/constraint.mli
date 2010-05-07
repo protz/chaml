@@ -35,11 +35,18 @@ module Make: functor (S: Algebra.SOLVER) -> sig
       generate_constraint_pattern will have to bind several identifiers to type
       variables. This is why we use a IdentMap. (Think of [let x, y = ...] for
       instance.)
+
+      The [pscheme] is a solver structure that describes the whole scheme of the
+      pattern. It is used by the translator later on. However, it only makes
+      sense if there are variables to be generalized. So the invariant here is:
+      When the solver sees [None] for the [S.pscheme option], then no variables
+      were generalized in this `Let.
     *)
   type type_scheme =
       S.var type_var list
     * type_constraint
     * (S.var type_var * S.scheme) IdentMap.t
+    * S.pscheme option
 
   (** The definition of a constraint. [`Dump] is not really useful, we could use
       [`True], but left for the sake of compatibility with mini.
