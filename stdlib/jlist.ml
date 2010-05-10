@@ -73,3 +73,12 @@ let max l = List.fold_left max min_int l
 let filter_some l =
   let l = List.filter (fun x -> x <> None) l in
   List.map Option.extract l
+
+let make i elt =
+  let rec make acc i =
+    if i > 0 then
+      make (elt :: acc) (i - 1)
+    else
+      acc
+  in
+  make [] i

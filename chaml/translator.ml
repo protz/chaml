@@ -89,6 +89,7 @@ let translate =
               (fun (upat, pscheme, uexpr) ->
                 (* The patterns are translated in the current environment *)
                 let fpat = translate_pat env ~assign_schemes:false upat in
+                let fcoerc = translate_coerc env fpat pscheme in 
                 (* Then we move to the rigt of let p1 = e1, this is where we
                  * introduce the new type variables *)
                 let new_env = List.fold_left lift_add env pscheme.p_young_vars in
@@ -96,7 +97,7 @@ let translate =
                   "[TScheme] %d variables in this pattern\n"
                   (List.length pscheme.p_young_vars);
                 let fexpr = translate_expr new_env uexpr in
-                (fpat, `Identity, fexpr)
+                (fpat, fcoerc, (List.length pscheme.p_young_vars), fexpr)
               )
               pat_expr_list
           in
@@ -156,7 +157,33 @@ let translate =
               None
           in
           `Var ident
+
+  (* [translate_coercion] walks down the pattern scheme and the pattern in
+   * parallel, and returns a list of coercions needed to properly type this
+   * pattern *)
+  and translate_coerc: env -> f_pattern -> unifier_pscheme -> f_coercion =
+    fun env pat { p_uvar = uvar; p_young_vars = young_vars } ->
+      let type_cons_tuple i =
+        let fake_list = Jlist.make i () in
+        let `Cons (cons_name, _) = Algebra.TypeCons.type_cons_tuple fake_list in
+        cons_name
+      in
+      let repr = UnionFind.find uvar in
+      match pat, repr with
+      | `Tuple patterns, { term = Some (`Cons (cons_name, cons_args)) }
+        when cons_name = type_cons_tuple (List.length patterns) ->
+          (* Let's move all the variables inside the branches *)
+          let gen pat uvar =
+            translate_coerc env pat { p_uvar = uvar; p_young_vars = young_vars }
+          in
+          (* We have the first coercion *)
+          let c = `TupleCovariant (List.map2 gen patterns cons_args) in
+          (* Explain that we inject all the variables inside the branches *)
+          List.fold_right (fun _ c -> `ForallInTuple c) young_vars c
+      | _ ->
+          `Identity
   in
+
   translate_expr { fvar_of_uvar = IntMap.empty }
 
 let concat f l =
@@ -167,10 +194,13 @@ let rec doc_of_expr: f_expression -> Pprint.document =
   let open Pprint in
   function
     | `Let (pat_expr_list, e2) ->
-        let gen (pat, coercion, expr) =
+        let gen (pat, _coercion, nlambdas, expr) =
           let pdoc = doc_of_pat pat in
           let edoc = doc_of_expr expr in
-          pdoc ^^ space ^^ equals ^^ (nest 2 (break1 ^^ edoc))
+          let lambdas = String.concat "" (Jlist.make nlambdas "Λ") in
+          let lambdas = fancystring lambdas nlambdas in
+          pdoc ^^ space ^^ equals ^^ space ^^ lambdas ^^ dot ^^
+          (nest 2 (break1 ^^ edoc))
         in
         let pat_expr_list = List.map gen pat_expr_list in
         let pat_expr_list = concat
@@ -201,7 +231,7 @@ let rec doc_of_expr: f_expression -> Pprint.document =
           let edoc = doc_of_expr expr in
           (string "fun") ^^ space ^^ pdoc ^^ space ^^ minus ^^ rangle ^^ space ^^ edoc
 
-    | `Instance (ident, instance) ->
+    | `Instance (ident, _instance) ->
         string (string_of_ident ident)
 
     | `App (e1, args) ->
@@ -211,7 +241,14 @@ let rec doc_of_expr: f_expression -> Pprint.document =
         failwith "Match pretty-printing not implemented"
 
     | `Tuple (exprs) ->
-        let edocs = List.map doc_of_expr exprs in
+        (* XXX compute operator priorities cleanly here *)
+        let paren_if_needed = function
+          | `Lambda _ as l ->
+              lparen ^^ (doc_of_expr l) ^^ rparen
+          | x ->
+              doc_of_expr x
+        in
+        let edocs = List.map paren_if_needed exprs in
         let edoc = concat (fun x y -> x ^^ comma ^^ space ^^ y) edocs in
         lparen ^^ edoc ^^ rparen
 

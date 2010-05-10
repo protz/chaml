@@ -58,7 +58,7 @@ type f_type_var = { index: int; }
 type f_instance = f_type_var list
 
 type f_expression = [
-  | `Let of (f_pattern * f_coercion * f_expression) list * f_expression 
+  | `Let of (f_pattern * f_coercion * int * f_expression) list * f_expression 
   | `Instance of ident * f_instance
   | `App of f_expression * f_expression list (** Maybe we can simplify this later on (do we really want it?) *)
   | `Lambda of (f_pattern * f_expression) list (** This will be converted later on to a simple form that uses `Match. *)
@@ -81,7 +81,8 @@ and f_const = [
 ]
 and f_coercion = [
   | `ForallInTuple of f_coercion
-  | `TupleCovariant of f_coercion
+  | `TupleCovariant of f_coercion list
   | `ForallElim of f_coercion
+  | `ForallIntro of f_coercion
   | `Identity
 ]
