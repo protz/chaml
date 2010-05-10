@@ -39,26 +39,29 @@ module DeBruijn = struct
     fun _ _ -> assert false
 end
 
-module StringMap = Jmap.Make(String)
+module IntMap = Jmap.Make(struct
+  type t = int
+  let compare = compare
+end)
 
 (* Various helpers to work with environments *)
 
 type env = {
-  fvar_of_uvar: f_type_var StringMap.t;
+  fvar_of_uvar: f_type_var IntMap.t;
 }
 
 let lift_add env uvar =
   let new_map =
-    StringMap.map (fun x -> { index = x.index + 1 }) env.fvar_of_uvar
+    IntMap.map (fun x -> { index = x.index + 1 }) env.fvar_of_uvar
   in
   let new_map =
-    StringMap.add (UnionFind.find uvar).name { index = 1 } new_map
+    IntMap.add (UnionFind.find uvar).id { index = 1 } new_map
   in
   Error.debug "[TLiftAdd] Adding %a\n" uvar_name uvar;
   { fvar_of_uvar = new_map }
 
 let union { fvar_of_uvar = map1 } { fvar_of_uvar = map2 } =
-  { fvar_of_uvar = StringMap.union map1 map2 }
+  { fvar_of_uvar = IntMap.union map1 map2 }
 
 (* The core functions *)
 
@@ -69,7 +72,7 @@ let type_term_of_uvar env uvar =
     let repr = UnionFind.find uvar in
     match repr.term with
     | None ->
-        let fvar = StringMap.find repr.name env.fvar_of_uvar in
+        let fvar = IntMap.find repr.id env.fvar_of_uvar in
         `Var fvar
     | Some (`Cons (cons_name, cons_args)) ->
         `Cons (cons_name, List.map type_term_of_uvar cons_args)
@@ -84,8 +87,10 @@ let translate =
           let pat_expr_list =
             List.map
               (fun (upat, pscheme, uexpr) ->
+                (* The patterns are translated in the current environment *)
                 let fpat = translate_pat env ~assign_schemes:false upat in
-                (* But when we type e1, we need those new type variables *)
+                (* Then we move to the rigt of let p1 = e1, this is where we
+                 * introduce the new type variables *)
                 let new_env = List.fold_left lift_add env pscheme.p_young_vars in
                 Error.debug
                   "[TScheme] %d variables in this pattern\n"
@@ -109,17 +114,16 @@ let translate =
           in
           `Lambda pat_expr_list
 
-      | `Instance (_ident, _instance) ->
-          (* let instance =
+      | `Instance (ident, instance) ->
+          let instance =
             List.map
-              (fun x -> StringMap.find (UnionFind.find x).name env.fvar_of_uvar)
+              (fun x -> IntMap.find (UnionFind.find x).id env.fvar_of_uvar)
               !instance
           in
-          `Instance (ident, instance) *)
-          failwith "Instance not implemented"
+          `Instance (ident, instance)
 
-      | `App (_e1, _args) ->
-          failwith "App not implemented"
+      | `App (e1, args) ->
+          `App (translate_expr env e1, List.map (translate_expr env) args)
 
       | `Match (_e1, _pat_expr_list) ->
           failwith "Match not implemented"
@@ -153,7 +157,102 @@ let translate =
           in
           `Var ident
   in
-  translate_expr { fvar_of_uvar = StringMap.empty }
+  translate_expr { fvar_of_uvar = IntMap.empty }
 
-let string_of_t =
-  fun _ -> failwith "Not implemented"
+let concat f l =
+  List.fold_left f (List.hd l) (List.tl l)
+
+(* Pretty-printing stuff *)
+let rec doc_of_expr: f_expression -> Pprint.document = 
+  let open Pprint in
+  function
+    | `Let (pat_expr_list, e2) ->
+        let gen (pat, coercion, expr) =
+          let pdoc = doc_of_pat pat in
+          let edoc = doc_of_expr expr in
+          pdoc ^^ space ^^ equals ^^ (nest 2 (break1 ^^ edoc))
+        in
+        let pat_expr_list = List.map gen pat_expr_list in
+        let pat_expr_list = concat
+          (fun x y -> x ^^ break1 ^^ (string "and") ^^ y)
+          pat_expr_list
+        in
+        let e2 = doc_of_expr e2 in
+        (string "let") ^^ space ^^ pat_expr_list ^^ break1 ^^
+        (string "in") ^^ break1 ^^
+        e2
+
+    | `Lambda pat_expr_list ->
+        if (List.length pat_expr_list > 1) then
+          let gen (pat, expr) =
+            let pdoc = doc_of_pat pat in
+            let edoc = doc_of_expr expr in
+            bar ^^ space ^^ pdoc ^^ space ^^ minus ^^ rangle ^^ (nest 4 (break1 ^^ edoc))
+          in
+          let pat_expr_list = List.map gen pat_expr_list in
+          let pat_expr_list = concat
+            (fun x y -> x ^^ hardline ^^ y)
+            pat_expr_list
+          in
+          (string "function") ^^ (nest 2 (hardline ^^ pat_expr_list))
+        else
+          let pat, expr = List.hd pat_expr_list in
+          let pdoc = doc_of_pat pat in
+          let edoc = doc_of_expr expr in
+          (string "fun") ^^ space ^^ pdoc ^^ space ^^ minus ^^ rangle ^^ space ^^ edoc
+
+    | `Instance (ident, instance) ->
+        string (string_of_ident ident)
+
+    | `App (e1, args) ->
+        concat (fun x y -> x ^^ space ^^ y) (List.map doc_of_expr (e1 :: args))
+
+    | `Match (_e1, _pat_expr_list) ->
+        failwith "Match pretty-printing not implemented"
+
+    | `Tuple (exprs) ->
+        let edocs = List.map doc_of_expr exprs in
+        let edoc = concat (fun x y -> x ^^ comma ^^ space ^^ y) edocs in
+        lparen ^^ edoc ^^ rparen
+
+    | `Const c ->
+        doc_of_const c
+
+and doc_of_pat: f_pattern -> Pprint.document =
+  let open Pprint in
+  function
+    | `Any ->
+        underscore
+
+    | `Tuple patterns ->
+        let pdocs = List.map doc_of_pat patterns in
+        let pdoc = concat (fun x y -> x ^^ comma ^^ space ^^ y) pdocs in
+        lparen ^^ pdoc ^^ rparen
+
+    | `Or (p1, p2) ->
+        let pdoc1 = doc_of_pat p1 in
+        let pdoc2 = doc_of_pat p2 in
+        pdoc1 ^^ space ^^ bar ^^ space ^^ pdoc2
+
+    | `Var (ident) ->
+        string (string_of_ident ident)
+
+and doc_of_const: f_const -> Pprint.document =
+  let open Pprint in
+  function
+    | `Char c ->
+        string (String.make 1 c)
+    | `Int i ->
+        string (string_of_int i)
+    | `Float f ->
+        string f
+    | `String s ->
+        string s
+    | `Unit ->
+        string "()"
+
+let string_of_t expr =
+  let buf = Buffer.create 16 in
+  let doc = Pprint.(^^) (doc_of_expr expr) Pprint.hardline in
+  Pprint.Buffer.pretty 1.0 Bash.twidth buf doc;
+  Buffer.contents buf

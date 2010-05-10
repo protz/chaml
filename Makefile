@@ -1,5 +1,5 @@
 PATH := /home/yquem/cristal/protzenk/Code/mini-trunk/trunk/src/:$(PATH)
-BUILDFLAGS=-I stdlib -I utils -I parsing -cflag -strict-sequence
+BUILDFLAGS=-I stdlib -I utils -I parsing -I pprint -cflag -strict-sequence
 
 .PHONY: tests doc
 
@@ -31,7 +31,9 @@ debug_ast:
 	./yacchack.sh
 	ocamlbuild -tag debug \
 	  $(BUILDFLAGS) -tag use_unix chaml/chaml.byte
-	OCAMLRUNPARAM=b=1 ./chaml.byte --print-typed-ast --enable debug test.ml
+	OCAMLRUNPARAM=b=1 ./chaml.byte --print-typed-ast --enable debug \
+		--disable default-bindings\
+		test.ml
 	./noyacchack.sh
 
 tests:
@@ -54,7 +56,7 @@ count:
 
 build_graph:
 	ocamldoc -dot -I _build/chaml/ -I _build/parsing/ -I _build/stdlib/ \
-	  -I _build/tests/ -I _build/utils/ chaml/*.ml* -o graph.dot
+	  -I _build/tests/ -I _build/utils/ -I _build/pprint chaml/*.ml* -o graph.dot
 	dot -Tpng graph.dot > graph.png
 	convert graph.png -rotate 90 graph.png
 	rm -f graph.dot
@@ -70,12 +72,14 @@ DOCFILES = chaml/constraint.mli chaml/oCamlConstraintGenerator.mli\
 	   chaml/solver.mli chaml/camlX.mli chaml/infiniteArray.mli\
 	   chaml/algebra.mli chaml/unionFind.mli\
 	   chaml/typePrinter.mli chaml/translator.mli\
+	   pprint/pprint.mli\
 	   stdlib/*.mli #`find $(OCAMLLIBPATH) -maxdepth 1 -iname '*.mli' -and -not -iname 'condition.mli'`
 
 doc: build_graph
 	mkdir -p doc
 	ocamldoc -html -I _build/chaml/ -I _build/parsing/ -I _build/stdlib/ \
-	  -I _build/tests/ -I _build/utils/ -I `ocamlc -where` -d doc \
+	  -I _build/tests/ -I _build/utils/ -I _build/pprint \
+	  -I `ocamlc -where` -d doc \
 	  -intro doc/main $(DOCFILES)
 	sed -i 's/iso-8859-1/utf-8/g' doc/*.html
 	sed -i 's/<\/body>/<img src="..\/graph.png" \/><\/body>/' doc/index.html
