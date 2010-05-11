@@ -1,3 +1,3 @@
-let f, g =
-  let id x = x in
-  id ((fun x -> x), 2)
+let x, g, f =
+  let id (x, y, z) = (z, y, x) in
+  id ((fun x -> x), (fun y -> y),  3)

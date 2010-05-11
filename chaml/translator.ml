@@ -21,21 +21,14 @@ open Algebra.Identifiers
 open Unify
 open CamlX
 
-type type_var = f_type_var Algebra.Core.type_var
-type type_term = [
-    type_var
-  | `Cons of Algebra.TypeCons.type_cons * type_term list
-  | `Forall of type_term
-]
 
-type type_scheme = type_term
 type t = f_expression
 
 module DeBruijn = struct
-  let lift: int -> type_term -> type_term =
+  let lift: int -> f_type_term -> f_type_term =
     fun _ _ -> assert false
 
-  let subst: type_term -> f_type_var -> type_term =
+  let subst: f_type_term -> type_var -> f_type_term =
     fun _ _ -> assert false
 end
 
@@ -47,7 +40,7 @@ end)
 (* Various helpers to work with environments *)
 
 type env = {
-  fvar_of_uvar: f_type_var IntMap.t;
+  fvar_of_uvar: type_var IntMap.t;
 }
 
 let lift_add env uvar =
@@ -55,7 +48,7 @@ let lift_add env uvar =
     IntMap.map (fun x -> { index = x.index + 1 }) env.fvar_of_uvar
   in
   let new_map =
-    IntMap.add (UnionFind.find uvar).id { index = 1 } new_map
+    IntMap.add (UnionFind.find uvar).id { index = 0 } new_map
   in
   Error.debug "[TLiftAdd] Adding %a\n" uvar_name uvar;
   { fvar_of_uvar = new_map }
@@ -66,7 +59,7 @@ let union { fvar_of_uvar = map1 } { fvar_of_uvar = map2 } =
 (* The core functions *)
 
 (* Once all the right variables are in the environment, we simply transcribe a
- * scheme into the right fscheme structure (it's a type_term) *)
+ * scheme into the right fscheme structure (it's a f_type_term) *)
 let type_term_of_uvar env uvar =
   let rec type_term_of_uvar uvar =
     let repr = UnionFind.find uvar in
@@ -150,13 +143,13 @@ let translate =
           `Or (translate_pat env ~assign_schemes p1, translate_pat env ~assign_schemes p2)
 
       | `Var (ident, { scheme_var = scheme }) ->
-          let _scheme =
+          let scheme =
             if assign_schemes then
               Some (type_term_of_uvar env scheme)
             else
               None
           in
-          `Var ident
+          `Var (ident, scheme)
 
   (* [translate_coercion] walks down the pattern scheme and the pattern in
    * parallel, and returns a list of coercions needed to properly type this
@@ -189,17 +182,41 @@ let translate =
 let concat f l =
   List.fold_left f (List.hd l) (List.tl l)
 
+let string_of_type_term scheme =
+  let open TypePrinter in
+  let scheme =
+    (scheme: f_type_term :> type_var inspected_var)
+  in
+  let scheme = string_of_type
+    ~string_of_key:(`Custom (fun x -> string_of_int x.index))
+    scheme
+  in
+  scheme
+
+(* Just generate as many uppercase lambdas as needed *)
+let gen_lambdas n = 
+  let lambda = "Λ" in
+  let lambdas = String.concat "" (Jlist.make n lambda) in
+  let lambdas = Bash.color Bash.colors.Bash.blue "%s" lambdas in
+  let lambdas = Pprint.fancystring lambdas n in
+  lambdas
+
 (* Pretty-printing stuff *)
 let rec doc_of_expr: f_expression -> Pprint.document = 
   let open Pprint in
   function
     | `Let (pat_expr_list, e2) ->
-        let gen (pat, _coercion, nlambdas, expr) =
+        let gen (pat, coercion, nlambdas, expr) =
+          let open Bash in
           let pdoc = doc_of_pat pat in
           let edoc = doc_of_expr expr in
-          let lambdas = String.concat "" (Jlist.make nlambdas "Λ") in
-          let lambdas = fancystring lambdas nlambdas in
-          pdoc ^^ space ^^ equals ^^ space ^^ lambdas ^^ dot ^^
+          let cdoc = doc_of_coerc coercion in
+          let lb = string (color colors.green "[") in
+          let rb = string (color colors.green "]") in
+          let ldoc = gen_lambdas nlambdas in
+          pdoc ^^ space ^^ equals ^^ space ^^
+          lb ^^ cdoc ^^ rb ^^ space
+          ^^ ldoc ^^ dot ^^
           (nest 2 (break1 ^^ edoc))
         in
         let pat_expr_list = List.map gen pat_expr_list in
@@ -208,8 +225,10 @@ let rec doc_of_expr: f_expression -> Pprint.document =
           pat_expr_list
         in
         let e2 = doc_of_expr e2 in
-        (string "let") ^^ space ^^ pat_expr_list ^^ break1 ^^
-        (string "in") ^^ break1 ^^
+        let letdoc = fancystring (Bash.color 208 "let") 3 in
+        let indoc = fancystring (Bash.color 208 "in") 2 in
+        letdoc ^^ space ^^ pat_expr_list ^^ break1 ^^
+        indoc ^^ break1 ^^
         e2
 
     | `Lambda pat_expr_list ->
@@ -271,8 +290,18 @@ and doc_of_pat: f_pattern -> Pprint.document =
         let pdoc2 = doc_of_pat p2 in
         pdoc1 ^^ space ^^ bar ^^ space ^^ pdoc2
 
-    | `Var (ident) ->
-        string (string_of_ident ident)
+    | `Var (ident, (scheme: f_type_term option)) ->
+        match scheme with
+        | None ->
+            string (string_of_ident ident)
+        | Some scheme ->
+            let scheme = string_of_type_term scheme in
+            let scheme = fancystring
+              (Bash.color Bash.colors.Bash.red "%s" scheme)
+              (String.length scheme)
+            in
+            lparen ^^ (string (string_of_ident ident)) ^^ colon ^^ space
+            ^^ scheme ^^ rparen
 
 and doc_of_const: f_const -> Pprint.document =
   let open Pprint in
@@ -287,6 +316,29 @@ and doc_of_const: f_const -> Pprint.document =
         string s
     | `Unit ->
         string "()"
+
+and doc_of_coerc: f_coercion -> Pprint.document =
+  let open Pprint in
+  function
+    | `ForallInTuple c ->
+        let doc = doc_of_coerc c in
+        lparen ^^ (fancystring "∀/x" 3) ^^ rparen ^^ semi ^^ space ^^ doc
+
+    | `ForallElim (_c, _t) ->
+        failwith "Not implemented: `ForallElim\n"
+
+    | `TupleCovariant coercions ->
+        let coercions = List.map doc_of_coerc coercions in
+        let coercions = concat (fun x y -> x ^^ comma ^^ space ^^ y) coercions in
+        lparen ^^ star ^^ rparen ^^ lbracket ^^ coercions ^^ rbracket
+        ^^ semi ^^ space
+
+    | `ForallIntro c ->
+        let doc = doc_of_coerc c in
+        lparen ^^ (fancystring "∀intro;" 6) ^^ rparen ^^ semi ^^ space ^^ doc
+
+    | `Identity ->
+        empty
 
 let string_of_t expr =
   let buf = Buffer.create 16 in

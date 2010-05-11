@@ -54,8 +54,13 @@ module Make (S: Algebra.SOLVER): sig
 
 end
 
-type f_type_var = { index: int; }
-type f_instance = f_type_var list
+type type_var = { index: int; }
+type f_type_var = type_var Algebra.Core.type_var
+type f_type_term = [
+    f_type_var
+  | `Cons of Algebra.TypeCons.type_cons * f_type_term list
+]
+type f_instance = type_var list
 
 type f_expression = [
   | `Let of (f_pattern * f_coercion * int * f_expression) list * f_expression 
@@ -67,7 +72,7 @@ type f_expression = [
   | `Const of f_const
 ]
 and f_pattern = [
-  | `Var of ident
+  | `Var of ident * f_type_term option
   | `Tuple of f_pattern list
   | `Or of f_pattern * f_pattern
   | `Any
@@ -82,7 +87,7 @@ and f_const = [
 and f_coercion = [
   | `ForallInTuple of f_coercion
   | `TupleCovariant of f_coercion list
-  | `ForallElim of f_coercion
+  | `ForallElim of f_coercion * f_type_term
   | `ForallIntro of f_coercion
   | `Identity
 ]
