@@ -21,7 +21,6 @@ open Algebra.Identifiers
 open Unify
 open CamlX
 
-
 type t = f_expression
 
 module DeBruijn = struct
@@ -56,8 +55,6 @@ let lift_add env uvar =
 let union { fvar_of_uvar = map1 } { fvar_of_uvar = map2 } =
   { fvar_of_uvar = IntMap.union map1 map2 }
 
-(* The core functions *)
-
 (* Once all the right variables are in the environment, we simply transcribe a
  * scheme into the right fscheme structure (it's a f_type_term) *)
 let type_term_of_uvar env uvar =
@@ -72,6 +69,8 @@ let type_term_of_uvar env uvar =
   in
   type_term_of_uvar uvar 
 
+(* The core functions *)
+
 let translate =
   let rec translate_expr: env -> CamlX.Make(BaseSolver).expression -> f_expression = 
     fun env uexpr ->
@@ -82,15 +81,23 @@ let translate =
               (fun (upat, pscheme, uexpr) ->
                 (* The patterns are translated in the current environment *)
                 let fpat = translate_pat env ~assign_schemes:false upat in
+                (* When generating the coercion, we have the invariant that
+                 * variables are sorted according to the global order. That's
+                 * important for \forall elimination. *)
                 let fcoerc = translate_coerc env fpat pscheme in 
+                let young_vars = List.length pscheme.p_young_vars in
+                Error.debug "[TScheme] %d variables in this pattern\n" young_vars;
                 (* Then we move to the rigt of let p1 = e1, this is where we
                  * introduce the new type variables *)
                 let new_env = List.fold_left lift_add env pscheme.p_young_vars in
-                Error.debug
-                  "[TScheme] %d variables in this pattern\n"
-                  (List.length pscheme.p_young_vars);
+                let scheme = type_term_of_uvar new_env pscheme.p_uvar in
+                let clblock = {
+                  coercion = fcoerc;
+                  young_vars;
+                  type_term = scheme;
+                } in
                 let fexpr = translate_expr new_env uexpr in
-                (fpat, fcoerc, (List.length pscheme.p_young_vars), fexpr)
+                (fpat, clblock, fexpr)
               )
               pat_expr_list
           in
@@ -109,11 +116,11 @@ let translate =
           `Lambda pat_expr_list
 
       | `Instance (ident, instance) ->
-          let instance =
-            List.map
-              (fun x -> IntMap.find (UnionFind.find x).id env.fvar_of_uvar)
-              !instance
-          in
+          let instance = List.map (type_term_of_uvar env) !instance in
+          Error.debug
+            "[TInstance] Instanciating %s scheme with %d variables\n"
+            (string_of_ident ident)
+            (List.length instance);
           `Instance (ident, instance)
 
       | `App (e1, args) ->
@@ -173,6 +180,43 @@ let translate =
           let c = `TupleCovariant (List.map2 gen patterns cons_args) in
           (* Explain that we inject all the variables inside the branches *)
           List.fold_right (fun _ c -> `ForallInTuple c) young_vars c
+
+      | `Var (ident, None), _ ->
+          (* Are we still under \Lambdas? If not, then we've got a proper
+           * coercion. If we still have some \Lambdas, we must remove those that
+           * are useless. *)
+          if List.length young_vars = 0 then
+            `Identity
+          else
+            (* XXX this probably has a bad complexity *)
+            let seen = Uhashtbl.create 16 in
+            (* Mark all the variables quantified in this scheme *)
+            let rec walk uvar =
+              let repr = UnionFind.find uvar in
+              if not (Uhashtbl.mem seen repr) then begin
+                Uhashtbl.add seen repr ();
+                match repr.term with
+                  | None ->
+                      ()
+                  | Some (`Cons (_cons_name, cons_args)) ->
+                      List.iter walk cons_args
+              end
+            in
+            walk uvar;
+            (* Create the vector for elimination.
+             * None = leave as is, Some x = instanciate with x *)
+            let elim = List.map
+              (fun uvar ->
+                 let repr = UnionFind.find uvar in
+                 if not (Uhashtbl.mem seen repr) then
+                   Some (Algebra.TypeCons.type_cons_bottom)
+                 else
+                   None
+              )
+              young_vars
+            in
+            `ForallElim (`Identity, elim)
+                    
       | _ ->
           `Identity
   in
@@ -206,17 +250,20 @@ let rec doc_of_expr: f_expression -> Pprint.document =
   let open Pprint in
   function
     | `Let (pat_expr_list, e2) ->
-        let gen (pat, coercion, nlambdas, expr) =
+        let gen (pat, { coercion; young_vars = nlambdas; type_term = scheme }, expr) =
           let open Bash in
           let pdoc = doc_of_pat pat in
           let edoc = doc_of_expr expr in
           let cdoc = doc_of_coerc coercion in
-          let lb = string (color colors.green "[") in
-          let rb = string (color colors.green "]") in
+          let lb = fancystring (color colors.green "[") 1 in
+          let rb = fancystring (color colors.green "]") 1 in
+          let lb' = fancystring (color colors.blue "[") 1 in
+          let rb' = fancystring (color colors.blue "]") 1 in
           let ldoc = gen_lambdas nlambdas in
-          pdoc ^^ space ^^ equals ^^ space ^^
-          lb ^^ cdoc ^^ rb ^^ space
-          ^^ ldoc ^^ dot ^^
+          let scheme = string (string_of_type_term scheme) in
+          pdoc ^^ space ^^ equals ^^ (nest 2 (break1 ^^
+          lb ^^ cdoc ^^ rb ^^ break1
+          ^^ ldoc ^^ space ^^ lb' ^^ scheme ^^ rb' ^^ dot)) ^^
           (nest 2 (break1 ^^ edoc))
         in
         let pat_expr_list = List.map gen pat_expr_list in
@@ -250,8 +297,17 @@ let rec doc_of_expr: f_expression -> Pprint.document =
           let edoc = doc_of_expr expr in
           (string "fun") ^^ space ^^ pdoc ^^ space ^^ minus ^^ rangle ^^ space ^^ edoc
 
-    | `Instance (ident, _instance) ->
-        string (string_of_ident ident)
+    | `Instance (ident, instance) ->
+        let ident = string (string_of_ident ident) in
+        if List.length instance > 0 then
+          let instance = List.map (fun x -> string (string_of_type_term x)) instance in
+          let instance = concat (fun x y -> x ^^ comma ^^ space ^^ y) instance in
+          let open Bash in
+          let lb = fancystring (color colors.red "[") 1 in
+          let rb = fancystring (color colors.red "]") 1 in
+          ident ^^ space ^^ lb ^^ instance ^^ rb
+        else
+          ident
 
     | `App (e1, args) ->
         concat (fun x y -> x ^^ space ^^ y) (List.map doc_of_expr (e1 :: args))
@@ -313,7 +369,7 @@ and doc_of_const: f_const -> Pprint.document =
     | `Float f ->
         string f
     | `String s ->
-        string s
+        dquote ^^ (string s) ^^ dquote
     | `Unit ->
         string "()"
 
@@ -324,13 +380,27 @@ and doc_of_coerc: f_coercion -> Pprint.document =
         let doc = doc_of_coerc c in
         lparen ^^ (fancystring "∀/x" 3) ^^ rparen ^^ semi ^^ space ^^ doc
 
-    | `ForallElim (_c, _t) ->
-        failwith "Not implemented: `ForallElim\n"
+    | `ForallElim (c, args) ->
+        (* ForallElim is only generated if there's something to eliminate,
+         * otherwise translate_coerc gives Identity *)
+        let doc = doc_of_coerc c in
+        let args = List.map
+          (function
+            | None -> fancystring "•" 1
+            | Some t -> string (string_of_type_term t)
+          )
+          args
+        in
+        let args = concat (fun x y -> x ^^ comma ^^ space ^^ y) args in
+        lparen ^^ (fancystring "∀elim" 5) ^^
+        lbracket ^^ args ^^ rbracket ^^
+        rparen ^^ semi ^^ space ^^ doc
+        
 
     | `TupleCovariant coercions ->
         let coercions = List.map doc_of_coerc coercions in
         let coercions = concat (fun x y -> x ^^ comma ^^ space ^^ y) coercions in
-        lparen ^^ star ^^ rparen ^^ lbracket ^^ coercions ^^ rbracket
+        lparen ^^ (string "x") ^^ rparen ^^ lbracket ^^ coercions ^^ rbracket
         ^^ semi ^^ space
 
     | `ForallIntro c ->
@@ -338,7 +408,7 @@ and doc_of_coerc: f_coercion -> Pprint.document =
         lparen ^^ (fancystring "∀intro;" 6) ^^ rparen ^^ semi ^^ space ^^ doc
 
     | `Identity ->
-        empty
+        string "id"
 
 let string_of_t expr =
   let buf = Buffer.create 16 in

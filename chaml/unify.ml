@@ -282,9 +282,11 @@ let fresh_copy unifier_env { scheme_var = scheme_uvar } =
           else
             uvar
   in
+  let scheme_var = fresh_copy scheme_uvar in
   Error.debug "[UCopy] Mapping: %a\n" debug_pairs mapping;
-  let young_vars = Uhashtbl.map_list mapping (fun _repr uvar -> uvar) in
-  { scheme_var = fresh_copy scheme_uvar }, young_vars
+  let young_vars = Uhashtbl.map_list mapping (fun repr uvar -> if repr.term = None then Some uvar else None) in
+  let young_vars = Jlist.filter_some young_vars in
+  { scheme_var; }, young_vars
 
 let is_not_ready repr = repr.rank = (-2)
 

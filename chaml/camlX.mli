@@ -60,10 +60,10 @@ type f_type_term = [
     f_type_var
   | `Cons of Algebra.TypeCons.type_cons * f_type_term list
 ]
-type f_instance = type_var list
+type f_instance = f_type_term list
 
 type f_expression = [
-  | `Let of (f_pattern * f_coercion * int * f_expression) list * f_expression 
+  | `Let of (f_pattern * f_clblock * f_expression) list * f_expression 
   | `Instance of ident * f_instance
   | `App of f_expression * f_expression list (** Maybe we can simplify this later on (do we really want it?) *)
   | `Lambda of (f_pattern * f_expression) list (** This will be converted later on to a simple form that uses `Match. *)
@@ -87,7 +87,12 @@ and f_const = [
 and f_coercion = [
   | `ForallInTuple of f_coercion
   | `TupleCovariant of f_coercion list
-  | `ForallElim of f_coercion * f_type_term
+  | `ForallElim of f_coercion * f_type_term option list (** Invariant: there's as many items in this list as \Lambdas *)
   | `ForallIntro of f_coercion
   | `Identity
 ]
+and f_clblock = {
+  coercion: f_coercion;
+  young_vars: int;
+  type_term: f_type_term;
+}

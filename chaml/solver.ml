@@ -174,6 +174,8 @@ let solve =
           Error.debug
               "[SInstance] Taking an instance of %s: %a\n" ident_s uvar_name instance;
           unify_or_raise unifier_env instance uvar;
+          let c x y = (UnionFind.find x).id - (UnionFind.find y).id in
+          let young_vars = List.sort c young_vars in
           solver_instance := young_vars;
       | `Conj (c1, c2) ->
           (* Do *NOT* forward _unifier_env! Identifiers in c1's scope must not
@@ -294,6 +296,10 @@ let solve =
               Error.debug
                 "[SPscheme] Putting %d vars in the pattern scheme\n"
                 (List.length young_vars);
+              (* Maintain the invariant that these variables are sorted in the
+               * global order. *)
+              let c x y = (UnionFind.find x).id - (UnionFind.find y).id in
+              let young_vars = List.sort c young_vars in
               pscheme.p_young_vars <- young_vars
         end;
 

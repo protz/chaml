@@ -355,7 +355,13 @@ module Make(S: Algebra.SOLVER) = struct
              * constraint for each branch. Instead of copying the base
              * constraint into each branch, we use a `Let-binding and add an
              * instanciation constraint into each branch. This allows us to
-             * simplify the constraint beforehand and perform better. *)
+             * simplify the constraint beforehand and perform better.
+             *
+             * XXX this is not compatible with further steps, from translator.ml
+             * onwards. The instance we allocate is never used anywhere in the
+             * CamlX term, and the same goes for the pschemes. We use an
+             * identifier that doesn't appear back in the CamlX tree... A lot of
+             * work would be needed for this to translate into CamlX. XXX *)
             let print_var_name buf () =
               Buffer.add_string buf (PrettyPrinter.string_of_type_var t)
             in
