@@ -135,6 +135,11 @@ let debug_scheme buf (scheme, ident) =
   let str = Bash.color 185 "[SScheme] Got %s\n" scheme_str in
   Buffer.add_string buf str
 
+let sort_global young_vars =
+  let c x y = (UnionFind.find x).id - (UnionFind.find y).id in
+  let young_vars = List.sort c young_vars in
+  young_vars
+
 
 exception Done of unifier_scheme IdentMap.t
 
@@ -174,9 +179,7 @@ let solve =
           Error.debug
               "[SInstance] Taking an instance of %s: %a\n" ident_s uvar_name instance;
           unify_or_raise unifier_env instance uvar;
-          let c x y = (UnionFind.find x).id - (UnionFind.find y).id in
-          let young_vars = List.sort c young_vars in
-          solver_instance := young_vars;
+          solver_instance := sort_global young_vars;
       | `Conj (c1, c2) ->
           (* Do *NOT* forward _unifier_env! Identifiers in c1's scope must not
            * go through c2's scope, this would be fatal. *)
@@ -298,9 +301,7 @@ let solve =
                 (List.length young_vars);
               (* Maintain the invariant that these variables are sorted in the
                * global order. *)
-              let c x y = (UnionFind.find x).id - (UnionFind.find y).id in
-              let young_vars = List.sort c young_vars in
-              pscheme.p_young_vars <- young_vars
+              pscheme.p_young_vars <- sort_global young_vars
         end;
 
         (* The schemes have already been allocated when generating a CamlX term,

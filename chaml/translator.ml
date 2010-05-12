@@ -181,7 +181,7 @@ let translate =
           (* Explain that we inject all the variables inside the branches *)
           List.fold_right (fun _ c -> `ForallInTuple c) young_vars c
 
-      | `Var (ident, None), _ ->
+      | `Var (_, None), _ ->
           (* Are we still under \Lambdas? If not, then we've got a proper
            * coercion. If we still have some \Lambdas, we must remove those that
            * are useless. *)
@@ -218,7 +218,7 @@ let translate =
             `ForallElim (`Identity, elim)
                     
       | _ ->
-          `Identity
+          failwith "Only supporting coercions for tuples at the moment\n"
   in
 
   translate_expr { fvar_of_uvar = IntMap.empty }
@@ -239,10 +239,12 @@ let string_of_type_term scheme =
 
 (* Just generate as many uppercase lambdas as needed *)
 let gen_lambdas n = 
+  let open Bash in
+  let open Pprint in
   let lambda = "Λ" in
   let lambdas = String.concat "" (Jlist.make n lambda) in
-  let lambdas = Bash.color Bash.colors.Bash.blue "%s" lambdas in
-  let lambdas = Pprint.fancystring lambdas n in
+  let lambdas = color colors.blue "%s" lambdas in
+  let lambdas = fancystring lambdas n in
   lambdas
 
 (* Pretty-printing stuff *)
@@ -267,8 +269,9 @@ let rec doc_of_expr: f_expression -> Pprint.document =
           (nest 2 (break1 ^^ edoc))
         in
         let pat_expr_list = List.map gen pat_expr_list in
+        let anddoc = fancystring (Bash.color 208 "and") 3 in
         let pat_expr_list = concat
-          (fun x y -> x ^^ break1 ^^ (string "and") ^^ y)
+          (fun x y -> x ^^ break1 ^^ anddoc ^^ space ^^ y)
           pat_expr_list
         in
         let e2 = doc_of_expr e2 in
