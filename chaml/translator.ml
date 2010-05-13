@@ -250,10 +250,10 @@ let gen_lambdas n =
 (* Pretty-printing stuff *)
 let rec doc_of_expr: f_expression -> Pprint.document = 
   let open Pprint in
+  let open Bash in
   function
     | `Let (pat_expr_list, e2) ->
         let gen (pat, { coercion; young_vars = nlambdas; type_term = scheme }, expr) =
-          let open Bash in
           let pdoc = doc_of_pat pat in
           let edoc = doc_of_expr expr in
           let cdoc = doc_of_coerc coercion in
@@ -269,14 +269,14 @@ let rec doc_of_expr: f_expression -> Pprint.document =
           (nest 2 (break1 ^^ edoc))
         in
         let pat_expr_list = List.map gen pat_expr_list in
-        let anddoc = fancystring (Bash.color 208 "and") 3 in
+        let anddoc = fancystring (color 208 "and") 3 in
         let pat_expr_list = concat
           (fun x y -> x ^^ break1 ^^ anddoc ^^ space ^^ y)
           pat_expr_list
         in
         let e2 = doc_of_expr e2 in
-        let letdoc = fancystring (Bash.color 208 "let") 3 in
-        let indoc = fancystring (Bash.color 208 "in") 2 in
+        let letdoc = fancystring (color 208 "let") 3 in
+        let indoc = fancystring (color 208 "in") 2 in
         letdoc ^^ space ^^ pat_expr_list ^^ break1 ^^
         indoc ^^ break1 ^^
         e2
@@ -305,7 +305,6 @@ let rec doc_of_expr: f_expression -> Pprint.document =
         if List.length instance > 0 then
           let instance = List.map (fun x -> string (string_of_type_term x)) instance in
           let instance = concat (fun x y -> x ^^ comma ^^ space ^^ y) instance in
-          let open Bash in
           let lb = fancystring (color colors.red "[") 1 in
           let rb = fancystring (color colors.red "]") 1 in
           ident ^^ space ^^ lb ^^ instance ^^ rb
@@ -408,7 +407,7 @@ and doc_of_coerc: f_coercion -> Pprint.document =
 
     | `ForallIntro c ->
         let doc = doc_of_coerc c in
-        lparen ^^ (fancystring "∀intro;" 6) ^^ rparen ^^ semi ^^ space ^^ doc
+        lparen ^^ (fancystring "∀intro" 6) ^^ rparen ^^ semi ^^ space ^^ doc
 
     | `Identity ->
         string "id"
