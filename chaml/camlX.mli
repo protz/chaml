@@ -85,11 +85,13 @@ and f_const = [
   | `Unit (** This will eventually be removed when we have data types *)
 ]
 and f_coercion = [
-  | `ForallInTuple of f_coercion
-  | `TupleCovariant of f_coercion list
-  | `ForallElim of f_coercion * f_type_term option list (** Invariant: there's as many items in this list as \Lambdas *)
-  | `ForallIntro of f_coercion
-  | `Identity
+  | `Id (** The identity *)
+  | `Compose of f_coercion * f_coercion (** Chain two coercions *)
+  | `ForallIntro (** Introduce ∀ *)
+  | `ForallIntroC of f_coercion (** Introduce ∀ and apply a coercion under it *)
+  | `ForallElim of f_type_term (** Remove ∀ *)
+  | `CovarTuple of int * f_coercion (** If τ1 is a subtype of τ2, then ... * τ1 * ... is a subtype of ... * τ2 * ... *)
+  | `DistribTuple (** Distribute ∀ under, say, τ1 * τ2 *)
 ]
 and f_clblock = {
   coercion: f_coercion;

@@ -55,6 +55,9 @@ let lift_add env uvar =
 let union { fvar_of_uvar = map1 } { fvar_of_uvar = map2 } =
   { fvar_of_uvar = IntMap.union map1 map2 }
 
+let concat f l =
+  List.fold_left f (List.hd l) (List.tl l)
+
 (* Once all the right variables are in the environment, we simply transcribe a
  * scheme into the right fscheme structure (it's a f_type_term) *)
 let type_term_of_uvar env uvar =
@@ -173,20 +176,36 @@ let translate =
       | `Tuple patterns, { term = Some (`Cons (cons_name, cons_args)) }
         when cons_name = type_cons_tuple (List.length patterns) ->
           (* Let's move all the variables inside the branches *)
-          let gen pat uvar =
-            translate_coerc env pat { p_uvar = uvar; p_young_vars = young_vars }
+          let gen i pat uvar =
+            let c =
+              translate_coerc env pat { p_uvar = uvar; p_young_vars = young_vars }
+            in
+            `CovarTuple (i, c)
           in
           (* We have the first coercion *)
-          let c = `TupleCovariant (List.map2 gen patterns cons_args) in
+          let c =
+            concat (fun x y -> `Compose (x, y)) (Jlist.map2i gen patterns cons_args)
+          in
           (* Explain that we inject all the variables inside the branches *)
-          List.fold_right (fun _ c -> `ForallInTuple c) young_vars c
+          let rec fold uvars =
+            match uvars with
+            | [] ->
+                `Compose (`DistribTuple, `Id)
+            | _ :: tl ->
+                let c = fold tl in
+                let c1 = `ForallIntroC (
+                  `Compose (`ForallElim (`Var { index = 0 }), c))
+                in
+                `Compose (c1, `DistribTuple)
+          in
+          `Compose (fold young_vars, c)
 
       | `Var (_, None), _ ->
           (* Are we still under \Lambdas? If not, then we've got a proper
            * coercion. If we still have some \Lambdas, we must remove those that
            * are useless. *)
           if List.length young_vars = 0 then
-            `Identity
+            `Id
           else
             (* XXX this probably has a bad complexity *)
             let seen = Uhashtbl.create 16 in
@@ -205,26 +224,28 @@ let translate =
             walk uvar;
             (* Create the vector for elimination.
              * None = leave as is, Some x = instanciate with x *)
-            let elim = List.map
-              (fun uvar ->
+            let rec fold uvars =
+              match uvars with
+              | [] -> `Id
+              | uvar :: tl ->
                  let repr = UnionFind.find uvar in
                  if not (Uhashtbl.mem seen repr) then
-                   Some (Algebra.TypeCons.type_cons_bottom)
+                   `Compose (`ForallElim Algebra.TypeCons.type_cons_bottom, fold tl)
                  else
-                   None
-              )
-              young_vars
+                   match fold tl with
+                   | `Id -> `Id (* Don't uselessy rebind *)
+                   | c ->
+                       `ForallIntroC (
+                         `Compose (`ForallElim (`Var { index = 0 }), c)
+                       )
             in
-            `ForallElim (`Identity, elim)
+            fold young_vars
                     
       | _ ->
           failwith "Only supporting coercions for tuples at the moment\n"
   in
 
   translate_expr { fvar_of_uvar = IntMap.empty }
-
-let concat f l =
-  List.fold_left f (List.hd l) (List.tl l)
 
 let string_of_type_term scheme =
   let open TypePrinter in
@@ -257,16 +278,16 @@ let rec doc_of_expr: f_expression -> Pprint.document =
           let pdoc = doc_of_pat pat in
           let edoc = doc_of_expr expr in
           let cdoc = doc_of_coerc coercion in
-          let lb = fancystring (color colors.green "[") 1 in
+          let lb = fancystring (color colors.green "▸ [") 3 in
           let rb = fancystring (color colors.green "]") 1 in
           let lb' = fancystring (color colors.blue "[") 1 in
           let rb' = fancystring (color colors.blue "]") 1 in
           let ldoc = gen_lambdas nlambdas in
           let scheme = string (string_of_type_term scheme) in
           pdoc ^^ space ^^ equals ^^ (nest 2 (break1 ^^
-          lb ^^ cdoc ^^ rb ^^ break1
-          ^^ ldoc ^^ space ^^ lb' ^^ scheme ^^ rb' ^^ dot)) ^^
-          (nest 2 (break1 ^^ edoc))
+          ldoc ^^ space ^^ lb' ^^ scheme ^^ rb' ^^ dot)) ^^
+          (nest 2 (break1 ^^ edoc ^^
+            break1 ^^ lb ^^ cdoc ^^ rb))
         in
         let pat_expr_list = List.map gen pat_expr_list in
         let anddoc = fancystring (color 208 "and") 3 in
@@ -378,39 +399,32 @@ and doc_of_const: f_const -> Pprint.document =
 and doc_of_coerc: f_coercion -> Pprint.document =
   let open Pprint in
   function
-    | `ForallInTuple c ->
-        let doc = doc_of_coerc c in
-        lparen ^^ (fancystring "∀/x" 3) ^^ rparen ^^ semi ^^ space ^^ doc
-
-    | `ForallElim (c, args) ->
-        (* ForallElim is only generated if there's something to eliminate,
-         * otherwise translate_coerc gives Identity *)
-        let doc = doc_of_coerc c in
-        let args = List.map
-          (function
-            | None -> fancystring "•" 1
-            | Some t -> string (string_of_type_term t)
-          )
-          args
-        in
-        let args = concat (fun x y -> x ^^ comma ^^ space ^^ y) args in
-        lparen ^^ (fancystring "∀elim" 5) ^^
-        lbracket ^^ args ^^ rbracket ^^
-        rparen ^^ semi ^^ space ^^ doc
-        
-
-    | `TupleCovariant coercions ->
-        let coercions = List.map doc_of_coerc coercions in
-        let coercions = concat (fun x y -> x ^^ comma ^^ space ^^ y) coercions in
-        lparen ^^ (string "x") ^^ rparen ^^ lbracket ^^ coercions ^^ rbracket
-        ^^ semi ^^ space
-
-    | `ForallIntro c ->
-        let doc = doc_of_coerc c in
-        lparen ^^ (fancystring "∀intro" 6) ^^ rparen ^^ semi ^^ space ^^ doc
-
-    | `Identity ->
+    | `Id ->
         string "id"
+
+    | `Compose (c1, c2) ->
+       let c1 = doc_of_coerc c1 in
+       let c2 = doc_of_coerc c2 in
+       c1 ^^ semi ^^ space ^^ c2
+
+    | `ForallIntro ->
+        lparen ^^ (fancystring "∀" 1) ^^ rparen
+
+    | `ForallIntroC c ->
+        let c = doc_of_coerc c in
+        (fancystring "∀" 1) ^^ lbracket ^^ c ^^ rbracket
+
+    | `ForallElim arg ->
+        let arg = string (string_of_type_term arg) in
+        (fancystring "•" 1) ^^ lbracket ^^ arg ^^ rbracket 
+
+    | `CovarTuple (i, coercion) ->
+        let coercion = doc_of_coerc coercion in
+        let i = string (string_of_int i) in
+        (string "x") ^^ lbracket ^^ i ^^ rbracket ^^ lbracket ^^ coercion ^^ rbracket
+
+    | `DistribTuple ->
+        fancystring "∀→" 2
 
 let string_of_t expr =
   let buf = Buffer.create 16 in

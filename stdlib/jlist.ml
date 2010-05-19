@@ -82,3 +82,19 @@ let make i elt =
       acc
   in
   make [] i
+
+let map2i f l1 l2 =
+  let rec map2i acc i l1 l2 =
+    match l1, l2 with
+    | x :: xs, y :: ys ->
+        map2i
+          ((f i x y) :: acc)
+          (i + 1)
+          xs
+          ys
+    | [], [] ->
+        List.rev acc
+    | _ ->
+        raise (Failure "map2i")
+  in
+  map2i [] 0 l1 l2
