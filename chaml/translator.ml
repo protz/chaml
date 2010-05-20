@@ -21,8 +21,6 @@ open Algebra.Identifiers
 open Unify
 open CamlX
 
-type t = f_expression
-
 module DeBruijn = struct
   let lift: int -> f_type_term -> f_type_term =
     fun _ _ -> assert false
@@ -421,12 +419,12 @@ and doc_of_coerc: f_coercion -> Pprint.document =
     | `CovarTuple (i, coercion) ->
         let coercion = doc_of_coerc coercion in
         let i = string (string_of_int i) in
-        (string "x") ^^ lbracket ^^ i ^^ rbracket ^^ lbracket ^^ coercion ^^ rbracket
+        (string "p") ^^ lbracket ^^ i ^^ rbracket ^^ lbracket ^^ coercion ^^ rbracket
 
     | `DistribTuple ->
         fancystring "∀→" 2
 
-let string_of_t expr =
+let string_of_expr expr =
   let buf = Buffer.create 16 in
   let doc = Pprint.(^^) (doc_of_expr expr) Pprint.hardline in
   Pprint.Buffer.pretty 1.0 Bash.twidth buf doc;

@@ -178,8 +178,10 @@ let _ =
     end;
     (* Translate to the core language *)
     if !arg_print_typed_ast then begin
-      let core_ast = Translator.translate hterm in
+      let camlx_ast = Translator.translate hterm in
       flush stdout; flush stderr;
-      print_string (Translator.string_of_t core_ast)
+      print_string (Translator.string_of_expr camlx_ast);
+      let core_ast = Desugar.desugar camlx_ast in
+      ignore (core_ast)
     end;
   end

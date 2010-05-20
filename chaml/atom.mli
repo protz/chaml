@@ -17,13 +17,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This modules transforms the AST obtained from the constraint generator, that
-    contains {!Algebra.SOLVER} structures, into a regular AST built on System F
-    types. A future module named [Desugar] will transform this into simpler
-    constructs. *)
+type t
 
-open Unify
-open Algebra.Identifiers
+val fresh: Algebra.Identifiers.ident -> t
+val ident: t -> Algebra.Identifiers.ident
 
-val translate: CamlX.Make(Unify.BaseSolver).expression -> CamlX.f_expression
-val string_of_expr: CamlX.f_expression -> string
+val compare: t -> t -> int
+val equal: t -> t -> bool

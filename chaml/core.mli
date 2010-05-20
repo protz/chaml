@@ -17,13 +17,42 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This modules transforms the AST obtained from the constraint generator, that
-    contains {!Algebra.SOLVER} structures, into a regular AST built on System F
-    types. A future module named [Desugar] will transform this into simpler
-    constructs. *)
+type type_var = CamlX.f_type_var
+type type_term = CamlX.f_type_term
+type type_instance = CamlX.f_instance
 
-open Unify
-open Algebra.Identifiers
+type var = [
+  | `Var of Atom.t * type_term option
+]
 
-val translate: CamlX.Make(Unify.BaseSolver).expression -> CamlX.f_expression
-val string_of_expr: CamlX.f_expression -> string
+type pattern = [
+    var
+  | `Tuple of pattern list
+  | `Or of pattern * pattern
+  | `Any
+]
+
+type const = [
+  | `Char of char
+  | `Int of int
+  | `Float of float
+  | `String of string
+  | `Unit
+]
+
+type coercion = CamlX.f_coercion
+
+type expression = [
+  | `TyAbs of type_var * expression
+  | `TyApp of expression * type_term
+  | `Coerce of expression * coercion
+
+  | `Fun of var * expression
+  | `Match of expression * (pattern * expression) list
+  | `Let of pattern * expression * expression 
+  | `App of expression * expression list
+
+  | `Tuple of expression list
+  | `Instance of Atom.t * type_instance
+  | `Const of const
+]
