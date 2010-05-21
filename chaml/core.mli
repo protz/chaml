@@ -43,7 +43,7 @@ type const = [
 type coercion = CamlX.f_coercion
 
 type expression = [
-  | `TyAbs of type_var * expression
+  | `TyAbs of expression
   | `TyApp of expression * type_term
   | `Coerce of expression * coercion
 
