@@ -95,11 +95,9 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
           (* We deal with the trivial case fun x -> where x is already an identifier *)
           | [(`Var _ as v, expr)] ->
               begin match desugar_pat env v with
-              | (`Var (_, Some var_type) as v), ([_] as atoms) ->
-                  (* Possibly expensive, don't forget -noassert *)
-                  assert (arg_type = var_type);
+              | (`Var _ as v), ([_] as atoms) ->
                   let new_env = introduce atoms env in
-                  `Fun (v, desugar_expr new_env expr)
+                  `Fun (v, arg_type, desugar_expr new_env expr)
               | _ ->
                   assert false
               end
@@ -114,7 +112,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
              * var. This is where the type of the whole argument turns out to be
              * useful, and this is why we've been forwarding it through the many
              * passes since the beginning. *)
-            let var = `Var (atom, Some arg_type) in
+            let var = `Var atom in
             (* Take an instance of the introduced variable. Because we're in ML,
              * there's no universal quantification on the type of x so there's no type
              * variables to instanciate, so no `TyApp. *)
@@ -128,7 +126,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
             in
             (* Finally return fun x -> match x with [...] *)
             let mmatch = `Match (instance, (List.map gen pat_exprs)) in
-            `Fun (var, mmatch)
+            `Fun (var, arg_type, mmatch)
       end
 
   | `Match (_expr_type, _expr, _pat_exprs) ->
@@ -144,9 +142,9 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
 
 and desugar_pat env pat =
   match pat with
-  | `Var (ident, typ) ->
+  | `Var (ident, _typ) ->
       let atom = Atom.fresh ident in
-      `Var (atom, typ), [atom]
+      `Var atom, [atom]
 
   | `Tuple patterns ->
       let patterns, atoms = List.split (List.map (desugar_pat env) patterns) in

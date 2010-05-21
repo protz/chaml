@@ -17,12 +17,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type type_var = CamlX.f_type_var
-type type_term = CamlX.f_type_term
-type type_instance = CamlX.f_instance
-
 type var = [
-  | `Var of Atom.t * type_term option
+  | `Var of Atom.t
 ]
 
 type pattern = [
@@ -44,10 +40,10 @@ type coercion = CamlX.f_coercion
 
 type expression = [
   | `TyAbs of expression
-  | `TyApp of expression * type_term
+  | `TyApp of expression * CamlX.f_type_term
   | `Coerce of expression * coercion
 
-  | `Fun of var * expression
+  | `Fun of var * CamlX.f_type_term * expression
   | `Match of expression * (pattern * expression) list
   | `Let of pattern * expression * expression 
   | `App of expression * expression list
