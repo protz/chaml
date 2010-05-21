@@ -104,12 +104,16 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
                   assert false
               end
 
-          (* This is the case function p1 -> e1 | p2 -> e2 ... *)
+          (* This is the general case. We either have many branches, or a
+           * pattern instead of a single var. *)
           | _ ->
             (* First create a fake ident. We don't care about unique names anymore,
              * because atoms have a uniquely generated identifier. *)
             let atom = Atom.fresh (ident "__internal" Location.none) in
-            (* Now function is forbidden, only fun x -> with x being a single var *)
+            (* Now function is forbidden, only fun x -> with x being a single
+             * var. This is where the type of the whole argument turns out to be
+             * useful, and this is why we've been forwarding it through the many
+             * passes since the beginning. *)
             let var = `Var (atom, Some arg_type) in
             (* Take an instance of the introduced variable. Because we're in ML,
              * there's no universal quantification on the type of x so there's no type
