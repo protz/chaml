@@ -53,6 +53,6 @@ type expression = [
   | `App of expression * expression list
 
   | `Tuple of expression list
-  | `Instance of Atom.t * type_instance
+  | `Instance of Atom.t
   | `Const of const
 ]

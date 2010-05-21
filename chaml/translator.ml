@@ -301,7 +301,10 @@ let rec doc_of_expr: f_expression -> Pprint.document =
         indoc ^^ break1 ^^
         e2
 
-    | `Function (type_term, pat_expr_list) ->
+    | `Function (_type_term, pat_expr_list) ->
+        (* type_term of the argument as a whole; it might be a pattern so
+         * we have the type of the whole first argument. This is needed for
+         * [Desugar] to translate this `Function into a `Fun (`Match...) *)
         if (List.length pat_expr_list > 1) then
           let gen (pat, expr) =
             let pdoc = doc_of_pat pat in

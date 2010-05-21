@@ -36,6 +36,10 @@ let introduce: Atom.t list -> env -> env =
     in
     { atom_of_ident }
 
+let find: ident -> env -> Atom.t =
+  fun ident { atom_of_ident } ->
+    IdentMap.find ident atom_of_ident
+
 let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
   fun env expr ->
   match expr with
@@ -72,8 +76,14 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
       let expr = List.fold_left2 gen_branch e2 pat_coerc_exprs new_patterns in
       expr
 
-  | `Instance (_ident, _instance) ->
-      failwith "Instance not implemented"
+  | `Instance (ident, type_terms) ->
+      (* Remember, we have the invariant that the instance variables are in the
+       * global order, and so are the scheme variables (fingers crossed)! *)
+      let app expr type_term =
+        `TyApp (expr, type_term)
+      in
+      let instance = `Instance (find ident env) in
+      List.fold_left app instance type_terms
 
   | `App (expr, exprs) ->
       let exprs = expr :: exprs in
@@ -103,8 +113,8 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
             let var = `Var (atom, Some arg_type) in
             (* Take an instance of the introduced variable. Because we're in ML,
              * there's no universal quantification on the type of x so there's no type
-             * variables to instanciate. *)
-            let instance = `Instance (atom, []) in
+             * variables to instanciate, so no `TyApp. *)
+            let instance = `Instance atom in
             (* Translate the expressions and the patterns *)
             let gen (pat, expr) =
               let pat, atoms = desugar_pat env pat in
