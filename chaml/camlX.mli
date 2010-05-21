@@ -33,8 +33,12 @@ module Make (S: Algebra.SOLVER): sig
     | `Let of (pattern * S.pscheme * expression) list * expression 
     | `Instance of ident * S.instance
     | `App of expression * expression list
-    | `Lambda of (pattern * expression) list
-    | `Match of expression * (pattern * expression) list
+    | `Function of S.pscheme * (pattern * expression) list
+        (** This one doesn't generalize so we have the invariant that the young
+          * variables list of the pscheme is empty. *)
+    | `Match of expression * S.pscheme * (pattern * expression) list
+        (** Same invariant applies here. See ocamlconstraintgenerator.ml, the
+          * generalizing match doesn't translate properly. *)
     | `Tuple of expression list
     | `Const of const
   ]
@@ -67,9 +71,11 @@ type f_expression = [
   | `Instance of ident * f_instance
   | `App of f_expression * f_expression list
       (** Maybe we can simplify this later on (do we really want it?) *)
-  | `Lambda of (f_pattern * f_expression) list
+  | `Function of f_type_term * (f_pattern * f_expression) list
       (** This will be converted later on to a simple form that uses `Match. *)
-  | `Match of f_expression * (f_pattern * f_expression) list
+  | `Match of f_expression * f_type_term * (f_pattern * f_expression) list
+      (** The f_type_terms for `Function and `Match describe the types of the
+        * whole patterns. *)
   | `Tuple of f_expression list
   | `Const of f_const
 ]

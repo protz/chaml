@@ -80,12 +80,14 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
       let exprs = List.map (desugar_expr env) exprs in
       `App (List.hd exprs, List.tl exprs)
 
-  | `Lambda pat_exprs ->
+  | `Function (arg_type, pat_exprs) ->
       begin match pat_exprs with
           (* We deal with the trivial case fun x -> where x is already an identifier *)
           | [(`Var _ as v, expr)] ->
               begin match desugar_pat env v with
-              | (`Var (_, None) as v), ([_] as atoms) ->
+              | (`Var (_, Some var_type) as v), ([_] as atoms) ->
+                  (* Possibly expensive, don't forget -noassert *)
+                  assert (arg_type = var_type);
                   let new_env = introduce atoms env in
                   `Fun (v, desugar_expr new_env expr)
               | _ ->
@@ -98,7 +100,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
              * because atoms have a uniquely generated identifier. *)
             let atom = Atom.fresh (ident "__internal" Location.none) in
             (* Now function is forbidden, only fun x -> with x being a single var *)
-            let var = `Var (atom, None) in
+            let var = `Var (atom, Some arg_type) in
             (* Take an instance of the introduced variable. Because we're in ML,
              * there's no universal quantification on the type of x so there's no type
              * variables to instanciate. *)
@@ -115,7 +117,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
             `Fun (var, mmatch)
       end
 
-  | `Match (_expr, _pat_exprs) ->
+  | `Match (_expr_type, _expr, _pat_exprs) ->
       failwith "Match not implemented"
 
   | `Tuple exprs ->

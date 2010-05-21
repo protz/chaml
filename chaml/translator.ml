@@ -105,7 +105,7 @@ let translate =
           let fexpr = translate_expr env e2 in
           `Let (pat_expr_list, fexpr)
 
-      | `Lambda pat_expr_list ->
+      | `Function (pscheme, pat_expr_list) ->
            let pat_expr_list = List.map
             (fun (upat, uexpr) ->
               let fpat = translate_pat env ~assign_schemes:true upat in
@@ -114,7 +114,8 @@ let translate =
             )
             pat_expr_list
           in
-          `Lambda pat_expr_list
+          let type_term = type_term_of_uvar env pscheme.p_uvar in
+          `Function (type_term, pat_expr_list)
 
       | `Instance (ident, instance) ->
           let instance = List.map (type_term_of_uvar env) !instance in
@@ -127,7 +128,7 @@ let translate =
       | `App (e1, args) ->
           `App (translate_expr env e1, List.map (translate_expr env) args)
 
-      | `Match (_e1, _pat_expr_list) ->
+      | `Match (_e1, _pscheme, _pat_expr_list) ->
           failwith "Match not implemented"
 
       | `Tuple (exprs) ->
@@ -300,7 +301,7 @@ let rec doc_of_expr: f_expression -> Pprint.document =
         indoc ^^ break1 ^^
         e2
 
-    | `Lambda pat_expr_list ->
+    | `Function (type_term, pat_expr_list) ->
         if (List.length pat_expr_list > 1) then
           let gen (pat, expr) =
             let pdoc = doc_of_pat pat in
@@ -333,13 +334,13 @@ let rec doc_of_expr: f_expression -> Pprint.document =
     | `App (e1, args) ->
         concat (fun x y -> x ^^ space ^^ y) (List.map doc_of_expr (e1 :: args))
 
-    | `Match (_e1, _pat_expr_list) ->
+    | `Match (_e1, _pscheme, _pat_expr_list) ->
         failwith "Match pretty-printing not implemented"
 
     | `Tuple (exprs) ->
         (* XXX compute operator priorities cleanly here *)
         let paren_if_needed = function
-          | `Lambda _ as l ->
+          | `Function _ as l ->
               lparen ^^ (doc_of_expr l) ^^ rparen
           | x ->
               doc_of_expr x

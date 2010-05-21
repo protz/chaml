@@ -97,7 +97,7 @@ module Make(S: Algebra.SOLVER) = struct
     expr: camlx_expression;
   }
 
-  type constraint_pat_expr = {
+  type constraint_scheme = {
     scheme: type_scheme;
     pat_expr: camlx_pattern * S.pscheme * camlx_expression;
   }
@@ -289,7 +289,15 @@ module Make(S: Algebra.SOLVER) = struct
           let e_constraint =
             `Exists ([x1; x2], constr_conj (arrow_constr :: constraints))
           in
-          { e_constraint; expr = `Lambda patexprs }
+          (* We need to describe the type of the whole pattern. It's the same
+           * process as below for the match. We KNOW no variables will be
+           * generalized so we put None in the constraint above and the
+           * solver asserts this. So the pscheme is just a record with an
+           * empty list of young variables (that's correct) and a unification
+           * var that precisely describes the type of the whole pattern. So
+           * we're good! *)
+          let pscheme = new_pscheme x1 in
+          { e_constraint; expr = `Function (pscheme, patexprs) }
       | Pexp_apply (e1, label_expr_list) ->
           (* ti: xi *)
           let xis, sub_constraints = List.split
@@ -335,7 +343,7 @@ module Make(S: Algebra.SOLVER) = struct
           in
           let run (acc, map) pat_expr =
             let { scheme; pat_expr; } =
-              generate_constraint_pat_expr pat_expr
+              generate_constraint_scheme pat_expr
             in
             let _, _, new_map, _ = scheme in
             dont_bind_several_times pexp_loc map new_map;
@@ -410,10 +418,14 @@ module Make(S: Algebra.SOLVER) = struct
              * type-checking generalized match. *)
             {
               e_constraint = `Let ([scheme], constr_conj constraints);
-              expr = `Match (term_e1, pat_exprs)
+              expr = `Match (term_e1, solver_pscheme, pat_exprs)
             }
           else
+            (* This one is compatible with the rest of the type-checking process
+             * and translates and desugars properly. We should probably just
+             * dump the one above. *)
             let x1 = fresh_type_var ~letter:'x' () in
+            let pscheme = new_pscheme x1 in
             let { e_constraint = constr_e1; expr = term_e1 } =
               generate_constraint_expression x1 e1
             in
@@ -424,16 +436,27 @@ module Make(S: Algebra.SOLVER) = struct
               let { e_constraint = c2; expr } =
                 generate_constraint_expression t expr
               in
-              (* This rule doesn't generalize, ocaml-style. *)
               let let_constr = `Let ([[], c1, var_map, None], c2) in
               `Exists (introduced_vars, let_constr), (pat, expr)
             in
             let constraints, pat_exprs = 
               List.split (List.map generate_branch pat_expr_list)
             in
+            (* This rule doesn't generalize, ocaml-style. The [None] above
+             * enforces the invariant that no variables are generalized here
+             * (there's an assert in solver.ml).
+             * So we are right to create the pscheme and never pass it to the
+             * solver, because the solver won't have variables to put in
+             * young_vars anyway. So the pscheme is just a pointer to the
+             * unification variable that describes the type of the whole
+             * pattern, and that's precisely what we want!
+             *
+             * The other way round would be to put [Some pscheme] and assert
+             * later in translator.ml that no variables were generalized. This
+             * is equivalent. *)
             {
               e_constraint = `Exists ([x1], constr_conj (constr_e1 :: constraints));
-              expr = `Match (term_e1, pat_exprs);
+              expr = `Match (term_e1, pscheme, pat_exprs);
             }
       | Pexp_tuple (expressions) ->
           let generate exp =
@@ -531,7 +554,7 @@ module Make(S: Algebra.SOLVER) = struct
           constraint_expression
 
     (* This is only used by Pexp_let case. Still, it's a nice standalone block. *)
-    and generate_constraint_pat_expr: pattern * expression -> constraint_pat_expr =
+    and generate_constraint_scheme: pattern * expression -> constraint_scheme =
       fun (pat, expr) ->
         let x = fresh_type_var ~letter:'x' () in
         let { p_constraint = c1; var_map; introduced_vars; pat } =
