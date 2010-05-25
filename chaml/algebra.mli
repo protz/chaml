@@ -106,9 +106,9 @@ end
     speaking, but we want to easily have a IdentMap in the scope that is exactly
     the same everywhere. With multiple instanciations, this was getty hairy. Now
     we can do [open Algebra.Identifiers] and this works as well. *)
-module Identifiers: sig
 
-  (** {3 Identifiers} *)
+module Identifiers: sig
+  (** {3 Algebra.Identifiers} *)
 
   (** An identifier *)
   type long_ident
@@ -126,7 +126,6 @@ module Identifiers: sig
 
   (** Generate globally unique names. *)
   val fresh_name: ?prefix:string -> unit -> string
-
 end
 
 module Core: sig

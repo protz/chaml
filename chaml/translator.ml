@@ -20,31 +20,27 @@
 open Algebra.Identifiers
 open Unify
 open CamlX
-open Core
+
+(* Various helpers to work with environments *)
 
 module IntMap = Jmap.Make(struct
   type t = int
   let compare = compare
 end)
 
-(* Various helpers to work with environments *)
-
 type env = {
-  fvar_of_uvar: debruijn IntMap.t;
+  fvar_of_uvar: DeBruijn.t IntMap.t;
 }
 
 let lift_add env uvar =
   let new_map =
-    IntMap.map (fun x -> { index = x.index + 1 }) env.fvar_of_uvar
+    IntMap.map DeBruijn.lift env.fvar_of_uvar
   in
   let new_map =
-    IntMap.add (UnionFind.find uvar).id { index = 0 } new_map
+    IntMap.add (UnionFind.find uvar).id DeBruijn.zero new_map
   in
   Error.debug "[TLiftAdd] Adding %a\n" uvar_name uvar;
   { fvar_of_uvar = new_map }
-
-let union { fvar_of_uvar = map1 } { fvar_of_uvar = map2 } =
-  { fvar_of_uvar = IntMap.union map1 map2 }
 
 let concat f l =
   List.fold_left f (List.hd l) (List.tl l)
@@ -186,7 +182,7 @@ let translate =
             | _ :: tl ->
                 let c = fold tl in
                 let c1 = `ForallIntroC (
-                  `Compose (`ForallElim (`Var { index = 0 }), c))
+                  `Compose (`ForallElim (`Var DeBruijn.zero), c))
                 in
                 `Compose (c1, `DistribTuple)
           in
@@ -228,7 +224,7 @@ let translate =
                    | `Id -> `Id (* Don't uselessly rebind *)
                    | c ->
                        `ForallIntroC (
-                         `Compose (`ForallElim (`Var { index = 0 }), c)
+                         `Compose (`ForallElim (`Var DeBruijn.zero), c)
                        )
             in
             fold young_vars
@@ -242,10 +238,10 @@ let translate =
 let string_of_type_term scheme =
   let open TypePrinter in
   let scheme =
-    (scheme: f_type_term :> debruijn inspected_var)
+    (scheme: f_type_term :> DeBruijn.t inspected_var)
   in
   let scheme = string_of_type
-    ~string_of_key:(`Custom (fun x -> string_of_int x.index))
+    ~string_of_key:(`Custom DeBruijn.string_of_t)
     scheme
   in
   scheme

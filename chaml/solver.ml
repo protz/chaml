@@ -181,7 +181,7 @@ let solve =
           unify_or_raise unifier_env instance uvar;
           solver_instance := sort_global young_vars;
       | `Conj (c1, c2) ->
-          (* Do *NOT* forward _unifier_env! Identifiers in c1's scope must not
+          (* Do *NOT* forward _unifier_env! Algebra.Identifiers in c1's scope must not
            * go through c2's scope, this would be fatal. *)
           analyze unifier_env c2;
           analyze unifier_env c1

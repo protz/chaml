@@ -52,6 +52,50 @@ module Errors = struct
 
 end
 
+module Identifiers = struct
+  (* x, y ::= variable | constant | memory location *)
+  type long_ident =
+      Ident of string
+    | Dot of long_ident * string
+  type ident = long_ident * Location.t
+
+  (* Create an ident out of a string *)
+  let ident x pos = Ident x, pos
+
+  (* Get the name *)
+  let rec string_of_ident (ident, _loc) =
+    let rec string_of_ident = function
+    | Ident x -> x
+    | Dot (i, x) -> Printf.sprintf "%s.%s" (string_of_ident i) x
+    in
+    string_of_ident ident
+
+  (* The mapping from all the bound identifiers in a pattern to the corresponding
+   * type variables in the scheme. *)
+  module IdentMap = Jmap.Make (struct
+    type t = ident
+    let compare (x, _pos1) (y, _pos2) =
+      match x, y with
+        | Ident a, Ident b -> String.compare a b
+        | _ -> assert false
+  end)
+
+
+  (* Generate globally unique names on demand *)
+  let fresh_name =
+    let c = ref (-1) in
+    fun ?prefix () ->
+      c := !c + 1;
+      let prefix = if !c >= 26 && prefix = None then Some "v" else prefix in
+      let v = match prefix with
+        | Some l ->
+          l ^ (string_of_int !c)
+        | _ ->
+          String.make 1 (char_of_int (int_of_char 'a' + !c))
+      in
+      v
+end
+
 module TypeCons = struct
 
   open Errors
@@ -113,52 +157,6 @@ module TypeCons = struct
   let type_cons_float = type_cons "float" []
   let type_cons_unit = type_cons "unit" []
   let type_cons_bottom = type_cons "_bottom" []
-
-end
-
-module Identifiers = struct
-
-  (* x, y ::= variable | constant | memory location *)
-  type long_ident =
-      Ident of string
-    | Dot of long_ident * string
-  type ident = long_ident * Location.t
-
-  (* Create an ident out of a string *)
-  let ident x pos = Ident x, pos
-
-  (* Get the name *)
-  let rec string_of_ident (ident, _loc) =
-    let rec string_of_ident = function
-    | Ident x -> x
-    | Dot (i, x) -> Printf.sprintf "%s.%s" (string_of_ident i) x
-    in
-    string_of_ident ident
-
-  (* The mapping from all the bound identifiers in a pattern to the corresponding
-   * type variables in the scheme. *)
-  module IdentMap = Jmap.Make (struct
-    type t = ident
-    let compare (x, _pos1) (y, _pos2) =
-      match x, y with
-        | Ident a, Ident b -> String.compare a b
-        | _ -> assert false
-  end)
-
-
-  (* Generate globally unique names on demand *)
-  let fresh_name =
-    let c = ref (-1) in
-    fun ?prefix () ->
-      c := !c + 1;
-      let prefix = if !c >= 26 && prefix = None then Some "v" else prefix in
-      let v = match prefix with
-        | Some l ->
-          l ^ (string_of_int !c)
-        | _ ->
-          String.make 1 (char_of_int (int_of_char 'a' + !c))
-      in
-      v
 
 end
 

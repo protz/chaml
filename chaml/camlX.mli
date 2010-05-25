@@ -58,7 +58,7 @@ module Make (S: Algebra.SOLVER): sig
 
 end
 
-type f_type_term = Core.type_term
+type f_type_term = DeBruijn.type_term
 type f_instance = f_type_term list
 
 type f_expression = [

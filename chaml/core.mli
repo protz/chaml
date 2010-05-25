@@ -17,14 +17,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** For types *)
-
-type debruijn = { index: int; }
-type type_var = debruijn Algebra.Core.type_var
-type type_term = [
-    type_var
-  | `Cons of Algebra.TypeCons.type_cons * type_term list
-]
+open DeBruijn
 
 (** For terms *)
 
