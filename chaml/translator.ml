@@ -189,7 +189,7 @@ let translate =
           let rec fold uvars =
             match uvars with
             | [] ->
-                `Compose (`DistribTuple, `Id)
+                `Id
             | _ :: tl ->
                 let c = fold tl in
                 let c1 = `ForallIntroC (
@@ -232,7 +232,7 @@ let translate =
                    `Compose (`ForallElim Algebra.TypeCons.type_cons_bottom, fold tl)
                  else
                    match fold tl with
-                   | `Id -> `Id (* Don't uselessy rebind *)
+                   | `Id -> `Id (* Don't uselessly rebind *)
                    | c ->
                        `ForallIntroC (
                          `Compose (`ForallElim (`Var { index = 0 }), c)
@@ -281,12 +281,15 @@ let rec doc_of_expr: f_expression -> Pprint.document =
           let rb = fancystring (color colors.green "]") 1 in
           let lb' = fancystring (color colors.blue "[") 1 in
           let rb' = fancystring (color colors.blue "]") 1 in
+          let colon = fancystring (color colors.blue ":") 1 in
           let ldoc = gen_lambdas nlambdas in
           let scheme = string (string_of_type_term scheme) in
-          pdoc ^^ space ^^ equals ^^ (nest 2 (break1 ^^
-          ldoc ^^ space ^^ lb' ^^ scheme ^^ rb' ^^ dot)) ^^
-          (nest 2 (break1 ^^ edoc ^^
-            break1 ^^ lb ^^ cdoc ^^ rb))
+          pdoc ^^ space ^^ equals ^^
+          (nest 2 (
+            break1 ^^ edoc ^^ colon ^^
+            break1 ^^ ldoc ^^ space ^^ lb' ^^ scheme ^^ rb' ^^
+            break1 ^^ lb ^^ cdoc ^^ rb)
+          )
         in
         let pat_expr_list = List.map gen pat_expr_list in
         let anddoc = fancystring (color 208 "and") 3 in
@@ -337,7 +340,7 @@ let rec doc_of_expr: f_expression -> Pprint.document =
     | `App (e1, args) ->
         concat (fun x y -> x ^^ space ^^ y) (List.map doc_of_expr (e1 :: args))
 
-    | `Match (_e1, _pscheme, _pat_expr_list) ->
+    | `Match (_e1, _pat_expr_list) ->
         failwith "Match pretty-printing not implemented"
 
     | `Tuple (exprs) ->

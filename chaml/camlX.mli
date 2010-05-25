@@ -72,10 +72,16 @@ type f_expression = [
   | `App of f_expression * f_expression list
       (** Maybe we can simplify this later on (do we really want it?) *)
   | `Function of f_type_term * (f_pattern * f_expression) list
-      (** This will be converted later on to a simple form that uses `Match. *)
-  | `Match of f_expression * f_type_term * (f_pattern * f_expression) list
-      (** The f_type_terms for `Function and `Match describe the types of the
-        * whole patterns. *)
+      (** All patterns have the same type because we're in ML. This later
+       * desugars to a `Fun and a `Match. We need the f_type_term to annotate
+       * the argument of the `Fun. *)
+  | `Match of f_expression * (f_pattern * f_expression) list
+      (** When we add generalizing match, we will have:
+        *   f_expression * int * f_type_term * (f_pattern * f_coercion * f_expr) list
+        * where the int is the number of Lambdas.
+        * where f_type_term is needed to generate the proper coercions inside
+        *   the branches
+        **)
   | `Tuple of f_expression list
   | `Const of f_const
 ]

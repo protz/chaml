@@ -46,7 +46,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
   | `Let (pat_coerc_exprs, e2) ->
       (* We have the invariant that all identifiers are distinct, we explicitely
        * checked for that in the constraint generator. This is the first pass
-       * that allows us to get a grip on all generated atoms and patterns. *)
+       * that allows us to get a pointer to all generated atoms and patterns. *)
       let new_patterns, new_atoms =
         List.split
           (List.map (fun (pat, _, _) -> desugar_pat env pat) pat_coerc_exprs)
@@ -69,8 +69,14 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
         let e1 = add_lambda young_vars e1 in
         (* And apply the coercion *)
         let e1 = `Coerce (e1, coercion) in
-        (* The pattern has already been translated in a first pass *)
-        `Let (pat, e1, e2)
+        (* The pattern has already been translated in a first pass. Now check if
+         * it's just an identifier (we can use a regular let-binding) or a
+         * pattern (then, we use a match) *)
+        match pat with
+        | `Var atom ->
+            `Let (`Var atom, e1, e2)
+        | pat ->
+            `Match (e1, [(pat, e2)])
       in
       (* Wrap everyone around e2 *)
       let expr = List.fold_left2 gen_branch e2 pat_coerc_exprs new_patterns in
@@ -129,7 +135,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
             `Fun (var, arg_type, mmatch)
       end
 
-  | `Match (_expr_type, _expr, _pat_exprs) ->
+  | `Match (_expr, _pat_exprs) ->
       failwith "Match not implemented"
 
   | `Tuple exprs ->

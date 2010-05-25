@@ -45,7 +45,7 @@ type expression = [
 
   | `Fun of var * CamlX.f_type_term * expression
   | `Match of expression * (pattern * expression) list
-  | `Let of pattern * expression * expression 
+  | `Let of var * expression * expression 
   | `App of expression * expression list
 
   | `Tuple of expression list
