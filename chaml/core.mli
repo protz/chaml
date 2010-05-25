@@ -17,6 +17,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** For types *)
+
+type debruijn = { index: int; }
+type type_var = debruijn Algebra.Core.type_var
+type type_term = [
+    type_var
+  | `Cons of Algebra.TypeCons.type_cons * type_term list
+]
+
+(** For terms *)
+
 type var = [
   | `Var of Atom.t
 ]
@@ -36,14 +47,29 @@ type const = [
   | `Unit
 ]
 
-type coercion = CamlX.f_coercion
+type coercion = [
+  | `Id
+      (** The identity *)
+  | `Compose of coercion * coercion
+      (** Chain two coercions *)
+  | `ForallIntro
+      (** Introduce ∀ *)
+  | `ForallIntroC of coercion
+      (** Introduce ∀ and apply a coercion under it *)
+  | `ForallElim of type_term
+      (** Remove ∀ *)
+  | `CovarTuple of int * coercion
+      (** If τ1 is a subtype of τ2, then ... * τ1 * ... is a subtype of ... * τ2 * ... *)
+  | `DistribTuple
+      (** Distribute ∀ under, say, τ1 * τ2 *)
+]
 
 type expression = [
   | `TyAbs of expression
-  | `TyApp of expression * CamlX.f_type_term
+  | `TyApp of expression * type_term
   | `Coerce of expression * coercion
 
-  | `Fun of var * CamlX.f_type_term * expression
+  | `Fun of var * type_term * expression
   | `Match of expression * (pattern * expression) list
   | `Let of var * expression * expression 
   | `App of expression * expression list

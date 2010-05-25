@@ -58,12 +58,7 @@ module Make (S: Algebra.SOLVER): sig
 
 end
 
-type type_var = { index: int; }
-type f_type_var = type_var Algebra.Core.type_var
-type f_type_term = [
-    f_type_var
-  | `Cons of Algebra.TypeCons.type_cons * f_type_term list
-]
+type f_type_term = Core.type_term
 type f_instance = f_type_term list
 
 type f_expression = [
@@ -100,22 +95,7 @@ and f_const = [
   | `Unit
       (** This will eventually be removed when we have data types *)
 ]
-and f_coercion = [
-  | `Id
-      (** The identity *)
-  | `Compose of f_coercion * f_coercion
-      (** Chain two coercions *)
-  | `ForallIntro
-      (** Introduce ∀ *)
-  | `ForallIntroC of f_coercion
-      (** Introduce ∀ and apply a coercion under it *)
-  | `ForallElim of f_type_term
-      (** Remove ∀ *)
-  | `CovarTuple of int * f_coercion
-      (** If τ1 is a subtype of τ2, then ... * τ1 * ... is a subtype of ... * τ2 * ... *)
-  | `DistribTuple
-      (** Distribute ∀ under, say, τ1 * τ2 *)
-]
+and f_coercion = Core.coercion
 and f_clblock = {
   coercion: f_coercion;
   young_vars: int;

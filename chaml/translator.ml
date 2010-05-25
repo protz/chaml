@@ -20,14 +20,7 @@
 open Algebra.Identifiers
 open Unify
 open CamlX
-
-module DeBruijn = struct
-  let lift: int -> f_type_term -> f_type_term =
-    fun _ _ -> assert false
-
-  let subst: f_type_term -> type_var -> f_type_term =
-    fun _ _ -> assert false
-end
+open Core
 
 module IntMap = Jmap.Make(struct
   type t = int
@@ -37,7 +30,7 @@ end)
 (* Various helpers to work with environments *)
 
 type env = {
-  fvar_of_uvar: type_var IntMap.t;
+  fvar_of_uvar: debruijn IntMap.t;
 }
 
 let lift_add env uvar =
@@ -249,7 +242,7 @@ let translate =
 let string_of_type_term scheme =
   let open TypePrinter in
   let scheme =
-    (scheme: f_type_term :> type_var inspected_var)
+    (scheme: f_type_term :> debruijn inspected_var)
   in
   let scheme = string_of_type
     ~string_of_key:(`Custom (fun x -> string_of_int x.index))
