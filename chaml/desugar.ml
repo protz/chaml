@@ -46,6 +46,9 @@ let find: ident -> env -> Atom.t =
   fun ident { atom_of_ident } ->
     IdentMap.find ident atom_of_ident
 
+let concat f l =
+  List.fold_left f (List.hd l) (List.tl l)
+
 let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
   fun env expr ->
   match expr with
@@ -77,16 +80,17 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
         let coercion =
           generate_coerc new_env { pattern = pat; forall = young_vars; type_term }
         in
-        let pat = `Coerce (pat, coercion) in
+        let new_pat = `Coerce (pat, coercion) in
         (* The pattern has already been translated in a first pass. Now check if
          * it's just an identifier (we can use a regular let-binding) or a
          * pattern (then, we use a match) *)
         match pat with
         | `Var atom ->
+            Error.debug "[DLet] Found a regular let\n";
             assert (coercion = `Id);
             `Let (`Var atom, e1, e2)
-        | pat ->
-            `Match (e1, [(pat, e2)])
+        | _ ->
+            `Match (e1, [(new_pat, e2)])
       in
       (* Wrap everyone around e2 *)
       let expr = List.fold_left2 gen_branch e2 pat_coerc_exprs new_patterns in
@@ -183,9 +187,6 @@ and generate_coerc env { forall; type_term; pattern; } =
     let `Cons (cons_name, _) = Algebra.TypeCons.type_cons_tuple fake_list in
     cons_name
   in
-  let concat f l =
-    List.fold_left f (List.hd l) (List.tl l)
-  in
   match pattern, type_term with
   | `Tuple patterns, `Cons (cons_name, cons_args)
     when cons_name = type_cons_tuple (List.length patterns) ->
@@ -263,3 +264,169 @@ and desugar_const const =
 let desugar expr =
   let env = { atom_of_ident = IdentMap.empty } in
   desugar_expr env expr
+
+
+
+(* Pretty-printing stuff *)
+
+let pcolor ?l c s =
+  let l = Option.map_none (String.length s) l in
+  Pprint.fancystring (Bash.color c "%s" s) l
+
+let arrow = pcolor 220 "->"
+
+let rec doc_of_expr: Core.expression -> Pprint.document = 
+  let open Pprint in
+  let open Bash in
+  function
+    | `TyAbs e ->
+        let edoc = doc_of_expr e in
+        let lambda = pcolor colors.blue ~l:1 "Λ" in
+        begin match e with
+        | `TyAbs _ ->
+            lambda ^^ edoc
+        | _ ->
+            lambda ^^ dot ^^ space ^^ edoc
+        end
+
+    | `TyApp (e, t) ->
+        let edoc = doc_of_expr e in
+        let t = string (DeBruijn.string_of_type_term t) in
+        let bullet = pcolor colors.red ~l:1 "•" in
+        let lb = pcolor colors.red "[" in
+        let rb = pcolor colors.red "]" in
+        edoc ^^ bullet ^^ lb ^^ t ^^ rb
+
+    | `Let (`Var v, e1, e2) ->
+        let letdoc = pcolor 220 "let" in
+        let vdoc = string (Atom.string_of_atom v) in
+        let indoc = pcolor 220 "in" in
+        let e1 = doc_of_expr e1 in
+        let e2 = doc_of_expr e2 in
+        letdoc ^^ space ^^ vdoc ^^ space ^^ equals ^^ 
+          (nest 2 (break1 ^^ e1)) ^^
+        break1 ^^ indoc ^^ break1 ^^
+        e2
+
+    | `Fun (`Var v, t, e2) ->
+        let vdoc = string (Atom.string_of_atom v) in
+        let t = string (DeBruijn.string_of_type_term t) in
+        let vdoc = lparen ^^ vdoc ^^ colon ^^ space ^^ t ^^ rparen in
+        let e2 = doc_of_expr e2 in
+        let edoc = nest 2 (break1 ^^ e2) in
+        (pcolor 220 "fun") ^^ space ^^ vdoc ^^ space ^^ arrow ^^ space ^^ edoc
+
+    | `Instance atom ->
+        string (Atom.string_of_atom atom)
+
+    | `App (e1, args) ->
+        concat (fun x y -> x ^^ space ^^ y) (List.map doc_of_expr (e1 :: args))
+
+    | `Match (e, pat_exprs) ->
+        let edoc = doc_of_expr e in
+        let gen (pat, expr) =
+          let pdoc = doc_of_pat pat in
+          let edoc = doc_of_expr expr in
+          (pcolor 220 "|") ^^ space ^^ pdoc ^^ space ^^ arrow ^^
+            (nest 4 (break1 ^^ edoc))
+        in
+        let pat_exprs = List.map gen pat_exprs in
+        let pat_exprs = concat (fun x y -> x ^^ break1 ^^ y) pat_exprs in
+        let matchdoc = pcolor 220 "match" in
+        let withdoc = pcolor 220 "with" in
+        matchdoc ^^
+          (nest 2 (break1 ^^ edoc)) ^^ break1 ^^ withdoc ^^
+        (nest 2 (break1 ^^ pat_exprs))
+
+    | `Tuple (exprs) ->
+        (* XXX compute operator priorities cleanly here *)
+        let has_fun = List.exists (function `Fun _ -> true | _ -> false) exprs in
+        let may_break = if has_fun then (fun x -> nest 2 (break1 ^^ x)) else fun x -> x in
+        let paren_if_needed = function
+          | `Fun _ as l ->
+              nest 2 (break1 ^^ lparen ^^ (doc_of_expr l) ^^ rparen)
+          | x ->
+              may_break (doc_of_expr x)
+        in
+        let edocs = List.map paren_if_needed exprs in
+        let edoc = concat (fun x y -> x ^^ comma ^^ space ^^ y) edocs in
+        lparen ^^ edoc ^^ rparen
+
+    | `Const c ->
+        doc_of_const c
+
+and doc_of_pat: Core.pattern -> Pprint.document =
+  let open Pprint in
+  let open Bash in
+  function
+    | `Any ->
+        underscore
+
+    | `Tuple patterns ->
+        let pdocs = List.map doc_of_pat patterns in
+        let pdoc = concat (fun x y -> x ^^ comma ^^ space ^^ y) pdocs in
+        lparen ^^ pdoc ^^ rparen
+
+    | `Or (p1, p2) ->
+        let pdoc1 = doc_of_pat p1 in
+        let pdoc2 = doc_of_pat p2 in
+        pdoc1 ^^ space ^^ bar ^^ space ^^ pdoc2
+
+    | `Var atom ->
+        string (Atom.string_of_atom atom)
+
+    | `Coerce (pat, coerc) ->
+        let pdoc = doc_of_pat pat in
+        let cdoc = doc_of_coerc coerc in
+        let triangle = pcolor colors.green ~l:1 "▸" in
+        pdoc ^^ space ^^ triangle ^^ space ^^ cdoc
+
+and doc_of_const: Core.const -> Pprint.document =
+  let open Pprint in
+  function
+    | `Char c ->
+        squote ^^ (string (String.make 1 c)) ^^ squote
+    | `Int i ->
+        string (string_of_int i)
+    | `Float f ->
+        string (string_of_float f)
+    | `String s ->
+        dquote ^^ (string s) ^^ dquote
+    | `Unit ->
+        string "()"
+
+and doc_of_coerc: Core.coercion -> Pprint.document =
+  let open Pprint in
+  function
+    | `Id ->
+        string "id"
+
+    | `Compose (c1, c2) ->
+       let c1 = doc_of_coerc c1 in
+       let c2 = doc_of_coerc c2 in
+       c1 ^^ semi ^^ space ^^ c2
+
+    | `ForallIntro ->
+        lparen ^^ (fancystring "∀" 1) ^^ rparen
+
+    | `ForallIntroC c ->
+        let c = doc_of_coerc c in
+        (fancystring "∀" 1) ^^ lbracket ^^ c ^^ rbracket
+
+    | `ForallElim arg ->
+        let arg = string (DeBruijn.string_of_type_term arg) in
+        (fancystring "•" 1) ^^ lbracket ^^ arg ^^ rbracket 
+
+    | `CovarTuple (i, coercion) ->
+        let coercion = doc_of_coerc coercion in
+        let i = string (string_of_int i) in
+        (string "p") ^^ lbracket ^^ i ^^ rbracket ^^ lbracket ^^ coercion ^^ rbracket
+
+    | `DistribTuple ->
+        fancystring "∀→" 2
+
+let string_of_expr expr =
+  let buf = Buffer.create 16 in
+  let doc = Pprint.(^^) (doc_of_expr expr) Pprint.hardline in
+  Pprint.Buffer.pretty 1.0 Bash.twidth buf doc;
+  Buffer.contents buf

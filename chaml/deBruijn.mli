@@ -32,3 +32,4 @@ val index: t -> int
 val zero: t
 
 val string_of_t: t -> string
+val string_of_type_term: type_term -> string

@@ -33,6 +33,7 @@ debug_ast:
 	  $(BUILDFLAGS) -tag use_unix chaml/chaml.byte
 	OCAMLRUNPARAM=b=1 ./chaml.byte --print-typed-ast --enable debug \
 		--disable default-bindings\
+		--print-core-ast\
 		test.ml
 	./noyacchack.sh
 

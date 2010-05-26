@@ -32,3 +32,6 @@ let ident { identifier; _ } = identifier
 let compare { id = id1; _ } { id = id2; _ } = compare id1 id2
 
 let equal = (==)
+
+let string_of_atom { identifier; id } = 
+  Printf.sprintf "%s/%d" (Algebra.Identifiers.string_of_ident identifier) id

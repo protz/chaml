@@ -26,3 +26,4 @@ val ident: t -> Algebra.Identifiers.ident
 
 val compare: t -> t -> int
 val equal: t -> t -> bool
+val string_of_atom: t -> string

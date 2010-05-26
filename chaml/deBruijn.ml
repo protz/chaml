@@ -31,3 +31,15 @@ let index { index } = index
 let zero = { index = 0 }
 
 let string_of_t x = string_of_int x.index
+
+let string_of_type_term scheme =
+  let open TypePrinter in
+  let scheme =
+    (scheme: type_term :> t inspected_var)
+  in
+  let scheme = string_of_type
+    ~string_of_key:(`Custom string_of_t)
+    scheme
+  in
+  scheme
+

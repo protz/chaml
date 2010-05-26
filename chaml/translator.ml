@@ -148,17 +148,6 @@ let translate =
 
   translate_expr { fvar_of_uvar = IntMap.empty }
 
-let string_of_type_term scheme =
-  let open TypePrinter in
-  let scheme =
-    (scheme: f_type_term :> DeBruijn.t inspected_var)
-  in
-  let scheme = string_of_type
-    ~string_of_key:(`Custom DeBruijn.string_of_t)
-    scheme
-  in
-  scheme
-
 (* Just generate as many uppercase lambdas as needed *)
 let gen_lambdas n = 
   let open Bash in
@@ -182,7 +171,7 @@ let rec doc_of_expr: f_expression -> Pprint.document =
           let rb' = fancystring (color colors.blue "]") 1 in
           let colon = fancystring (color colors.blue ":") 1 in
           let ldoc = gen_lambdas nlambdas in
-          let scheme = string (string_of_type_term scheme) in
+          let scheme = string (DeBruijn.string_of_type_term scheme) in
           pdoc ^^ space ^^ equals ^^
           (nest 2 (
             break1 ^^ edoc ^^ colon ^^
@@ -228,7 +217,7 @@ let rec doc_of_expr: f_expression -> Pprint.document =
     | `Instance (ident, instance) ->
         let ident = string (string_of_ident ident) in
         if List.length instance > 0 then
-          let instance = List.map (fun x -> string (string_of_type_term x)) instance in
+          let instance = List.map (fun x -> string (DeBruijn.string_of_type_term x)) instance in
           let instance = concat (fun x y -> x ^^ comma ^^ space ^^ y) instance in
           let lb = fancystring (color colors.red "[") 1 in
           let rb = fancystring (color colors.red "]") 1 in
@@ -278,7 +267,7 @@ and doc_of_pat: f_pattern -> Pprint.document =
         | None ->
             string (string_of_ident ident)
         | Some scheme ->
-            let scheme = string_of_type_term scheme in
+            let scheme = DeBruijn.string_of_type_term scheme in
             let scheme = fancystring
               (Bash.color Bash.colors.Bash.red "%s" scheme)
               (String.length scheme)
@@ -299,37 +288,6 @@ and doc_of_const: f_const -> Pprint.document =
         dquote ^^ (string s) ^^ dquote
     | `Unit ->
         string "()"
-
-(* and doc_of_coerc: f_coercion -> Pprint.document =
-  let open Pprint in
-  function
-    | `Id ->
-        string "id"
-
-    | `Compose (c1, c2) ->
-       let c1 = doc_of_coerc c1 in
-       let c2 = doc_of_coerc c2 in
-       c1 ^^ semi ^^ space ^^ c2
-
-    | `ForallIntro ->
-        lparen ^^ (fancystring "∀" 1) ^^ rparen
-
-    | `ForallIntroC c ->
-        let c = doc_of_coerc c in
-        (fancystring "∀" 1) ^^ lbracket ^^ c ^^ rbracket
-
-    | `ForallElim arg ->
-        let arg = string (string_of_type_term arg) in
-        (fancystring "•" 1) ^^ lbracket ^^ arg ^^ rbracket 
-
-    | `CovarTuple (i, coercion) ->
-        let coercion = doc_of_coerc coercion in
-        let i = string (string_of_int i) in
-        (string "p") ^^ lbracket ^^ i ^^ rbracket ^^ lbracket ^^ coercion ^^ rbracket
-
-    | `DistribTuple ->
-        fancystring "∀→" 2
-*)
 
 let string_of_expr expr =
   let buf = Buffer.create 16 in

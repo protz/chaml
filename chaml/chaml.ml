@@ -111,6 +111,7 @@ let _ =
   let arg_print_constraint = ref false in
   let arg_print_types = ref true in
   let arg_print_typed_ast = ref false in
+  let arg_print_core_ast = ref false in
   let add_opt v k = Options.set_opt k v in
   let usage = String.concat ""
                 ["ChaML: a type-checker for OCaml programs.\n";
@@ -125,6 +126,7 @@ let _ =
       "--print-constraint", Arg.Set arg_print_constraint, "print the constraint in a format mini can parse";
       "--dont-print-types", Arg.Clear arg_print_types, "don't print the inferred types, à la ocamlc -i";
       "--print-typed-ast", Arg.Set arg_print_typed_ast, "print the AST annotated with the types found by the solver";
+      "--print-core-ast", Arg.Set arg_print_core_ast, "print the System F generated term";
       "--enable", Arg.String (add_opt true), "enable one of the features above";
       "--disable", Arg.String (add_opt false), "disable one of the features above";
     ]
@@ -176,12 +178,15 @@ let _ =
       | `Ok ->
           ()
     end;
-    (* Translate to the core language *)
+    (* Translate to the first intermediate language *)
+    let camlx_ast = Translator.translate hterm in
     if !arg_print_typed_ast then begin
-      let camlx_ast = Translator.translate hterm in
       flush stdout; flush stderr;
       print_string (Translator.string_of_expr camlx_ast);
-      let core_ast = Desugar.desugar camlx_ast in
-      ignore (core_ast)
+    end;
+    let core_ast = Desugar.desugar camlx_ast in
+    if !arg_print_core_ast then begin
+      flush stdout; flush stderr;
+      print_string (Desugar.string_of_expr core_ast);
     end;
   end
