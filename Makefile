@@ -54,7 +54,8 @@ count:
 	#wc -l `find chaml stdlib tests -iname '*.ml' -or -iname '*.mli' -or -iname '*.mly' -or -iname '*.mll'` | sort -n
 	sloccount chaml tests stdlib Makefile *.sh
 
-GRAPH_FILES = $(shell find chaml -iname '*.ml*' -and -not -iname 'algebra.ml*' -and -not -iname '.*')
+#GRAPH_FILES = $(shell find chaml -iname '*.ml*' -and -not -iname 'algebra.ml*' -and -not -iname '.*')
+GRAPH_FILES = $(shell find chaml -iname '*.ml*' -and -not -iname '.*')
 
 build_graph:
 	ocamldoc -dot -I _build/chaml/ -I _build/parsing/ -I _build/stdlib/ \
