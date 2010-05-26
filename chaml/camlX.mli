@@ -36,9 +36,11 @@ module Make (S: Algebra.SOLVER): sig
     | `Function of S.pscheme * (pattern * expression) list
         (** This one doesn't generalize so we have the invariant that the young
           * variables list of the pscheme is empty. *)
-    | `Match of expression * S.pscheme * (pattern * expression) list
-        (** Same invariant applies here. See ocamlconstraintgenerator.ml, the
-          * generalizing match doesn't translate properly. *)
+    | `Match of expression * S.pscheme * (pattern * S.pscheme option * expression) list
+        (** The is the most general(izing) match. There is [Some pscheme] if
+          * this is generalizing match and the expression that's returned is
+          * polymorphic. As we're taking an instance, we need this to be able to
+          * rebuild the F-term properly. *)
     | `Tuple of expression list
     | `Const of const
   ]
@@ -70,13 +72,11 @@ type f_expression = [
       (** All patterns have the same type because we're in ML. This later
        * desugars to a `Fun and a `Match. We need the f_type_term to annotate
        * the argument of the `Fun. *)
-  | `Match of f_expression * (f_pattern * f_expression) list
-      (** When we add generalizing match, we will have:
-        *   f_expression * int * f_type_term * (f_pattern * f_coercion * f_expr) list
-        * where the int is the number of Lambdas.
-        * where f_type_term is needed to generate the proper coercions inside
-        *   the branches
-        **)
+  | `Match of f_expression * f_clblock * int * (f_pattern * f_expression) list
+      (** The f_clblock is necessary to properly generate the various coercions
+       * needed for each branch of the generalizing match. As all branches have
+       * the same type, there is always the same number of generalized
+       * variables, that's the integer. **)
   | `Tuple of f_expression list
   | `Const of f_const
 ]
@@ -95,9 +95,7 @@ and f_const = [
   | `Unit
       (** This will eventually be removed when we have data types *)
 ]
-and f_coercion = Core.coercion
 and f_clblock = {
-  coercion: f_coercion;
   young_vars: int;
-  type_term: f_type_term;
+  f_type_term: f_type_term;
 }

@@ -17,6 +17,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Some helpers to work with types represented using De Bruijn indices. *)
+
 type t
 
 type type_var = t Algebra.Core.type_var
@@ -26,6 +28,7 @@ type type_term = [
 ]
 
 val lift: t -> t
+val index: t -> int
 val zero: t
 
 val string_of_t: t -> string

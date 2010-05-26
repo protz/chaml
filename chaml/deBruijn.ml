@@ -26,6 +26,7 @@ type type_term = [
 ]
 
 let lift x = { index = x.index + 1 }
+let index { index } = index
 
 let zero = { index = 0 }
 

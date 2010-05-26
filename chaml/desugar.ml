@@ -24,6 +24,12 @@ type env = {
   atom_of_ident: Atom.t IdentMap.t;
 }
 
+type cenv = {
+  forall: int;
+  type_term: DeBruijn.type_term;
+  pattern: Core.pattern;
+}
+
 (* Introduce new identifiers in scope, possibly overriding previously defined
  * ones. *)
 let introduce: Atom.t list -> env -> env =
@@ -56,7 +62,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
       let e2 = desugar_expr new_env e2 in
       (* And then we desugar all of the initial branches in the same previous
        * scope *)
-      let gen_branch e2 (_, { coercion; young_vars; _ }, e1) pat = 
+      let gen_branch e2 (_, { young_vars; f_type_term = type_term }, e1) pat = 
         let e1 = desugar_expr env e1 in
         (* Beware, now we must generate proper F terms *)
         let rec add_lambda i e =
@@ -67,13 +73,17 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
         in
         (* So we generate proper Lambdas *)
         let e1 = add_lambda young_vars e1 in
-        (* And apply the coercion *)
-        let e1 = `Coerce (e1, coercion) in
+        (* Generate the coercion *)
+        let coercion =
+          generate_coerc new_env { pattern = pat; forall = young_vars; type_term }
+        in
+        let pat = `Coerce (pat, coercion) in
         (* The pattern has already been translated in a first pass. Now check if
          * it's just an identifier (we can use a regular let-binding) or a
          * pattern (then, we use a match) *)
         match pat with
         | `Var atom ->
+            assert (coercion = `Id);
             `Let (`Var atom, e1, e2)
         | pat ->
             `Match (e1, [(pat, e2)])
@@ -135,7 +145,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
             `Fun (var, arg_type, mmatch)
       end
 
-  | `Match (_expr, _pat_exprs) ->
+  | `Match (_expr, _clblock, _forall, _pat_exprs) ->
       failwith "Match not implemented"
 
   | `Tuple exprs ->
@@ -163,6 +173,84 @@ and desugar_pat env pat =
 
   | `Any ->
       `Any, []
+
+(* [generate_coercion] walks down the pattern scheme and the pattern in
+ * parallel, and returns a list of coercions needed to properly type this
+ * pattern *)
+and generate_coerc env { forall; type_term; pattern; } =
+  let type_cons_tuple i =
+    let fake_list = Jlist.make i () in
+    let `Cons (cons_name, _) = Algebra.TypeCons.type_cons_tuple fake_list in
+    cons_name
+  in
+  let concat f l =
+    List.fold_left f (List.hd l) (List.tl l)
+  in
+  match pattern, type_term with
+  | `Tuple patterns, `Cons (cons_name, cons_args)
+    when cons_name = type_cons_tuple (List.length patterns) ->
+      (* Let's move all the variables inside the branches *)
+      let gen i pattern type_term =
+        let c =
+          generate_coerc env { forall; pattern; type_term; }
+        in
+        `CovarTuple (i, c)
+      in
+      (* We have the first coercion *)
+      let c =
+        concat (fun x y -> `Compose (x, y)) (Jlist.map2i gen patterns cons_args)
+      in
+      (* Explain that we inject all the variables inside the branches *)
+      let rec fold forall =
+        if forall = 0 then
+            `Id
+        else
+          let c = fold (forall - 1) in
+          let c1 = `ForallIntroC (
+            `Compose (`ForallElim (`Var DeBruijn.zero), c))
+          in
+          `Compose (c1, `DistribTuple)
+      in
+      `Compose (fold forall, c)
+
+  | `Var _, _ ->
+      (* Are we still under \Lambdas? If not, then we've got a proper
+       * coercion. If we still have some \Lambdas, we must remove those that
+       * are useless. *)
+      if forall = 0 then
+        `Id
+      else
+        (* Mark all the variables quantified in this scheme
+           XXX this probably has a bad complexity *)
+        let seen = Array.make forall false in
+        let rec walk type_term =
+          match type_term with
+            | `Var v ->
+                let i = DeBruijn.index v in
+                if i < forall then
+                  seen.(DeBruijn.index v) <- true
+            | `Cons (_cons_name, cons_args) ->
+                List.iter walk cons_args
+        in
+        walk type_term;
+        (* We remove quantifiers we don't use *)
+        let rec fold i =
+          if i = 0 then
+            `Id
+          else
+             if not seen.(i-1) then
+               `Compose (`ForallElim Algebra.TypeCons.type_cons_bottom, fold (i - 1))
+             else
+               let c = fold (i - 1) in
+               if c = `Id then
+                 `Id
+               else
+                 `ForallIntroC (`Compose (`ForallElim (`Var DeBruijn.zero), c))
+        in
+        fold forall
+                
+  | _ ->
+      failwith "Only supporting coercions for tuples at the moment\n"
 
 and desugar_const const =
   match const with

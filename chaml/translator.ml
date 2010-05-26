@@ -71,20 +71,15 @@ let translate =
               (fun (upat, pscheme, uexpr) ->
                 (* The patterns are translated in the current environment *)
                 let fpat = translate_pat env ~assign_schemes:false upat in
-                (* When generating the coercion, we have the invariant that
-                 * variables are sorted according to the global order. That's
-                 * important for \forall elimination. *)
-                let fcoerc = translate_coerc env fpat pscheme in 
-                let young_vars = List.length pscheme.p_young_vars in
-                Error.debug "[TScheme] %d variables in this pattern\n" young_vars;
                 (* Then we move to the rigt of let p1 = e1, this is where we
                  * introduce the new type variables *)
                 let new_env = List.fold_left lift_add env pscheme.p_young_vars in
-                let scheme = type_term_of_uvar new_env pscheme.p_uvar in
+                let f_type_term = type_term_of_uvar new_env pscheme.p_uvar in
+                let young_vars = List.length pscheme.p_young_vars in
+                Error.debug "[TScheme] %d variables in this pattern\n" young_vars;
                 let clblock = {
-                  coercion = fcoerc;
                   young_vars;
-                  type_term = scheme;
+                  f_type_term;
                 } in
                 let fexpr = translate_expr new_env uexpr in
                 (fpat, clblock, fexpr)
@@ -149,88 +144,6 @@ let translate =
           in
           `Var (ident, scheme)
 
-  (* [translate_coercion] walks down the pattern scheme and the pattern in
-   * parallel, and returns a list of coercions needed to properly type this
-   * pattern *)
-  and translate_coerc: env -> f_pattern -> unifier_pscheme -> f_coercion =
-    fun env pat { p_uvar = uvar; p_young_vars = young_vars } ->
-      let type_cons_tuple i =
-        let fake_list = Jlist.make i () in
-        let `Cons (cons_name, _) = Algebra.TypeCons.type_cons_tuple fake_list in
-        cons_name
-      in
-      let repr = UnionFind.find uvar in
-      match pat, repr with
-      | `Tuple patterns, { term = Some (`Cons (cons_name, cons_args)) }
-        when cons_name = type_cons_tuple (List.length patterns) ->
-          (* Let's move all the variables inside the branches *)
-          let gen i pat uvar =
-            let c =
-              translate_coerc env pat { p_uvar = uvar; p_young_vars = young_vars }
-            in
-            `CovarTuple (i, c)
-          in
-          (* We have the first coercion *)
-          let c =
-            concat (fun x y -> `Compose (x, y)) (Jlist.map2i gen patterns cons_args)
-          in
-          (* Explain that we inject all the variables inside the branches *)
-          let rec fold uvars =
-            match uvars with
-            | [] ->
-                `Id
-            | _ :: tl ->
-                let c = fold tl in
-                let c1 = `ForallIntroC (
-                  `Compose (`ForallElim (`Var DeBruijn.zero), c))
-                in
-                `Compose (c1, `DistribTuple)
-          in
-          `Compose (fold young_vars, c)
-
-      | `Var (_, None), _ ->
-          (* Are we still under \Lambdas? If not, then we've got a proper
-           * coercion. If we still have some \Lambdas, we must remove those that
-           * are useless. *)
-          if List.length young_vars = 0 then
-            `Id
-          else
-            (* XXX this probably has a bad complexity *)
-            let seen = Uhashtbl.create 16 in
-            (* Mark all the variables quantified in this scheme *)
-            let rec walk uvar =
-              let repr = UnionFind.find uvar in
-              if not (Uhashtbl.mem seen repr) then begin
-                Uhashtbl.add seen repr ();
-                match repr.term with
-                  | None ->
-                      ()
-                  | Some (`Cons (_cons_name, cons_args)) ->
-                      List.iter walk cons_args
-              end
-            in
-            walk uvar;
-            (* Create the vector for elimination.
-             * None = leave as is, Some x = instanciate with x *)
-            let rec fold uvars =
-              match uvars with
-              | [] -> `Id
-              | uvar :: tl ->
-                 let repr = UnionFind.find uvar in
-                 if not (Uhashtbl.mem seen repr) then
-                   `Compose (`ForallElim Algebra.TypeCons.type_cons_bottom, fold tl)
-                 else
-                   match fold tl with
-                   | `Id -> `Id (* Don't uselessly rebind *)
-                   | c ->
-                       `ForallIntroC (
-                         `Compose (`ForallElim (`Var DeBruijn.zero), c)
-                       )
-            in
-            fold young_vars
-                    
-      | _ ->
-          failwith "Only supporting coercions for tuples at the moment\n"
   in
 
   translate_expr { fvar_of_uvar = IntMap.empty }
@@ -262,12 +175,9 @@ let rec doc_of_expr: f_expression -> Pprint.document =
   let open Bash in
   function
     | `Let (pat_expr_list, e2) ->
-        let gen (pat, { coercion; young_vars = nlambdas; type_term = scheme }, expr) =
+        let gen (pat, { young_vars = nlambdas; f_type_term = scheme }, expr) =
           let pdoc = doc_of_pat pat in
           let edoc = doc_of_expr expr in
-          let cdoc = doc_of_coerc coercion in
-          let lb = fancystring (color colors.green "▸ [") 3 in
-          let rb = fancystring (color colors.green "]") 1 in
           let lb' = fancystring (color colors.blue "[") 1 in
           let rb' = fancystring (color colors.blue "]") 1 in
           let colon = fancystring (color colors.blue ":") 1 in
@@ -276,8 +186,8 @@ let rec doc_of_expr: f_expression -> Pprint.document =
           pdoc ^^ space ^^ equals ^^
           (nest 2 (
             break1 ^^ edoc ^^ colon ^^
-            break1 ^^ ldoc ^^ space ^^ lb' ^^ scheme ^^ rb' ^^
-            break1 ^^ lb ^^ cdoc ^^ rb)
+            break1 ^^ ldoc ^^ space ^^ lb' ^^ scheme ^^ rb'
+            )
           )
         in
         let pat_expr_list = List.map gen pat_expr_list in
@@ -329,7 +239,7 @@ let rec doc_of_expr: f_expression -> Pprint.document =
     | `App (e1, args) ->
         concat (fun x y -> x ^^ space ^^ y) (List.map doc_of_expr (e1 :: args))
 
-    | `Match (_e1, _pat_expr_list) ->
+    | `Match (_e1, _, _, _pat_expr_list) ->
         failwith "Match pretty-printing not implemented"
 
     | `Tuple (exprs) ->
@@ -390,7 +300,7 @@ and doc_of_const: f_const -> Pprint.document =
     | `Unit ->
         string "()"
 
-and doc_of_coerc: f_coercion -> Pprint.document =
+(* and doc_of_coerc: f_coercion -> Pprint.document =
   let open Pprint in
   function
     | `Id ->
@@ -419,6 +329,7 @@ and doc_of_coerc: f_coercion -> Pprint.document =
 
     | `DistribTuple ->
         fancystring "∀→" 2
+*)
 
 let string_of_expr expr =
   let buf = Buffer.create 16 in

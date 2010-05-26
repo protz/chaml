@@ -17,6 +17,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This is a cleaner representation of identifiers. *)
+
 type t
 
 val fresh: Algebra.Identifiers.ident -> t

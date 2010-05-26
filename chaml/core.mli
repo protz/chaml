@@ -25,21 +25,6 @@ type var = [
   | `Var of Atom.t
 ]
 
-type pattern = [
-    var
-  | `Tuple of pattern list
-  | `Or of pattern * pattern
-  | `Any
-]
-
-type const = [
-  | `Char of char
-  | `Int of int
-  | `Float of float
-  | `String of string
-  | `Unit
-]
-
 type coercion = [
   | `Id
       (** The identity *)
@@ -57,10 +42,27 @@ type coercion = [
       (** Distribute ∀ under, say, τ1 * τ2 *)
 ]
 
+type pattern = [
+    var
+  | `Tuple of pattern list
+  | `Or of pattern * pattern
+  | `Any
+
+  | `Coerce of pattern * coercion
+]
+
+type const = [
+  | `Char of char
+  | `Int of int
+  | `Float of float
+  | `String of string
+  | `Unit
+]
+
 type expression = [
   | `TyAbs of expression
   | `TyApp of expression * type_term
-  | `Coerce of expression * coercion
+  (* | `Coerce of expression * coercion *)
 
   | `Fun of var * type_term * expression
   | `Match of expression * (pattern * expression) list

@@ -365,11 +365,9 @@ module Make(S: Algebra.SOLVER) = struct
              * instanciation constraint into each branch. This allows us to
              * simplify the constraint beforehand and perform better.
              *
-             * XXX this is not compatible with further steps, from translator.ml
-             * onwards. The instance we allocate is never used anywhere in the
-             * CamlX term, and the same goes for the pschemes. We use an
-             * identifier that doesn't appear back in the CamlX tree... A lot of
-             * work would be needed for this to translate into CamlX. XXX *)
+             * The CamlX.Make term that is created corresponds by default to a
+             * generalized match.
+             *)
             let print_var_name buf () =
               Buffer.add_string buf (PrettyPrinter.string_of_type_var t)
             in
@@ -396,14 +394,11 @@ module Make(S: Algebra.SOLVER) = struct
               let { e_constraint = c2; expr } =
                 generate_constraint_expression t expr
               in
-              (* This is just a placeholder and will be discarded later on as we
-               * don't plan on type-checking generalized match. It is here just to
-               * avoid breaking the testcase. *)
               let pscheme = new_pscheme y in
               let let_constr: type_constraint =
                 `Let ([y :: introduced_vars, c, var_map, Some pscheme], c2)
               in
-              let_constr, (pat, expr)
+              let_constr, (pat, Some pscheme, expr)
             in
             let constraints, pat_exprs =
               List.split (List.map generate_branch pat_expr_list)
@@ -413,17 +408,13 @@ module Make(S: Algebra.SOLVER) = struct
             let solver_pscheme = new_pscheme x1 in
             let map = IdentMap.add ident1 (x1, solver_scheme) IdentMap.empty in
             let scheme = [x1], constr_e1, map, Some solver_pscheme in
-            (* XXX the fake ident we introduce is not kept in the lambda
-             * tree we generate. Anyway, it's not like we have any hope of
-             * type-checking generalized match. *)
+            (* XXX the fake ident we introduce is not kept in the CamlX term we
+             * generate. *)
             {
               e_constraint = `Let ([scheme], constr_conj constraints);
               expr = `Match (term_e1, solver_pscheme, pat_exprs)
             }
           else
-            (* This one is compatible with the rest of the type-checking process
-             * and translates and desugars properly. We should probably just
-             * dump the one above. *)
             let x1 = fresh_type_var ~letter:'x' () in
             let pscheme = new_pscheme x1 in
             let { e_constraint = constr_e1; expr = term_e1 } =
@@ -437,7 +428,7 @@ module Make(S: Algebra.SOLVER) = struct
                 generate_constraint_expression t expr
               in
               let let_constr = `Let ([[], c1, var_map, None], c2) in
-              `Exists (introduced_vars, let_constr), (pat, expr)
+              `Exists (introduced_vars, let_constr), (pat, None, expr)
             in
             let constraints, pat_exprs = 
               List.split (List.map generate_branch pat_expr_list)

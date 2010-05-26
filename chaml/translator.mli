@@ -18,9 +18,10 @@
 (*****************************************************************************)
 
 (** This modules transforms the AST obtained from the constraint generator, that
-    contains {!Algebra.SOLVER} structures, into a regular AST built on System F
-    types. A future module named [Desugar] will transform this into simpler
-    constructs. *)
+    contains {!Algebra.SOLVER} structures, into a regular AST built on cleaner
+    types. The types that were previously [UnionFind] structures are now
+    represented using [DeBruijn] indices. [Desugar] will take this
+    representation and send it into System F. *)
 
 open Unify
 open Algebra.Identifiers
