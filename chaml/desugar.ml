@@ -207,10 +207,8 @@ and generate_coerc env { forall; type_term; pattern; } =
             `Id
         else
           let c = fold (forall - 1) in
-          let c1 = `ForallIntroC (
-            `Compose (`ForallElim (`Var DeBruijn.zero), c))
-          in
-          `Compose (c1, `DistribTuple)
+          let c1 = if c = `Id then `Id else `ForallCovar c in
+          if c1 <> `Id then `Compose (c1, `DistribTuple) else `Id
       in
       `Compose (fold forall, c)
 
@@ -239,14 +237,12 @@ and generate_coerc env { forall; type_term; pattern; } =
           if i = 0 then
             `Id
           else
+             let c = fold (i - 1) in
              if not seen.(i-1) then
-               `Compose (`ForallElim Algebra.TypeCons.type_cons_bottom, fold (i - 1))
+               let celim = `ForallElim Algebra.TypeCons.type_cons_bottom in
+               if c = `Id then celim else `Compose (celim, c)
              else
-               let c = fold (i - 1) in
-               if c = `Id then
-                 `Id
-               else
-                 `ForallIntroC (`Compose (`ForallElim (`Var DeBruijn.zero), c))
+               if c = `Id then `Id else `ForallCovar c
         in
         fold forall
                 
@@ -409,9 +405,9 @@ and doc_of_coerc: Core.coercion -> Pprint.document =
     | `ForallIntro ->
         lparen ^^ (fancystring "∀" 1) ^^ rparen
 
-    | `ForallIntroC c ->
+    | `ForallCovar c ->
         let c = doc_of_coerc c in
-        (fancystring "∀" 1) ^^ lbracket ^^ c ^^ rbracket
+        (fancystring "∀co" 3) ^^ lbracket ^^ c ^^ rbracket
 
     | `ForallElim arg ->
         let arg = string (DeBruijn.string_of_type_term arg) in
@@ -420,7 +416,7 @@ and doc_of_coerc: Core.coercion -> Pprint.document =
     | `CovarTuple (i, coercion) ->
         let coercion = doc_of_coerc coercion in
         let i = string (string_of_int i) in
-        (string "p") ^^ lbracket ^^ i ^^ rbracket ^^ lbracket ^^ coercion ^^ rbracket
+        (string "p") ^^ i ^^ lbracket ^^ coercion ^^ rbracket
 
     | `DistribTuple ->
         fancystring "∀→" 2

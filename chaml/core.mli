@@ -32,8 +32,8 @@ type coercion = [
       (** Chain two coercions *)
   | `ForallIntro
       (** Introduce ∀ *)
-  | `ForallIntroC of coercion
-      (** Introduce ∀ and apply a coercion under it *)
+  | `ForallCovar of coercion
+      (** Apply a coercion under a ∀ *)
   | `ForallElim of type_term
       (** Remove ∀ *)
   | `CovarTuple of int * coercion
