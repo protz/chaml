@@ -17,8 +17,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type colors = { green: int; red: int; blue: int; }
-let colors = { green = 119; red = 203; blue = 81; }
+type colors = { green: int; red: int; blue: int; yellow: int; }
+let colors = { green = 119; red = 203; blue = 81; yellow = 227 }
 
 let color c fmt =
   Printf.kbprintf

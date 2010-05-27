@@ -56,7 +56,7 @@ count:
 	sloccount chaml tests stdlib Makefile *.sh
 
 GRAPH_FILES = $(shell find chaml -iname '*.ml*' -and -not -iname 'algebra.ml*' -and -not -iname '.*' -and -not -iname 'algebra.ml*' -and -not -iname 'typePrinter.ml*')
-GRAPH_FILES = $(shell ls chaml/*.ml* stdlib/*.ml*)
+#GRAPH_FILES = $(shell ls chaml/*.ml* stdlib/*.ml*)
 
 build_graph:
 	ocamldoc -dot -I _build/chaml/ -I _build/parsing/ -I _build/stdlib/ \

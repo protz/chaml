@@ -20,7 +20,7 @@
 (** Provides wrappers for some bash fancy printing, mainly boxes and colors. *)
 
 (** A set of nice colors. *)
-type colors = { green : int; red : int; blue : int; }
+type colors = { green : int; red : int; blue : int; yellow: int; }
 
 (** They have been chosen arbitrarily out of the 256-color set available. *)
 val colors : colors

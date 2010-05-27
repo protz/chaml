@@ -187,6 +187,12 @@ and generate_coerc env { forall; type_term; pattern; } =
     let `Cons (cons_name, _) = Algebra.TypeCons.type_cons_tuple fake_list in
     cons_name
   in
+  let compose c1 c2 =
+    match c1, c2 with
+    | `Id, c1 -> c1
+    | c2, `Id -> c2
+    | _ -> `Compose (c1, c2)
+  in 
   match pattern, type_term with
   | `Tuple patterns, `Cons (cons_name, cons_args)
     when cons_name = type_cons_tuple (List.length patterns) ->
@@ -199,7 +205,7 @@ and generate_coerc env { forall; type_term; pattern; } =
       in
       (* We have the first coercion *)
       let c =
-        concat (fun x y -> `Compose (x, y)) (Jlist.map2i gen patterns cons_args)
+        concat compose (Jlist.map2i gen patterns cons_args)
       in
       (* Explain that we inject all the variables inside the branches *)
       let rec fold forall =
@@ -208,7 +214,7 @@ and generate_coerc env { forall; type_term; pattern; } =
         else
           let c = fold (forall - 1) in
           let c1 = if c = `Id then `Id else `ForallCovar c in
-          if c1 <> `Id then `Compose (c1, `DistribTuple) else `Id
+          compose c1 `DistribTuple
       in
       `Compose (fold forall, c)
 
@@ -240,7 +246,7 @@ and generate_coerc env { forall; type_term; pattern; } =
              let c = fold (i - 1) in
              if not seen.(i-1) then
                let celim = `ForallElim Algebra.TypeCons.type_cons_bottom in
-               if c = `Id then celim else `Compose (celim, c)
+               compose celim c
              else
                if c = `Id then `Id else `ForallCovar c
         in
@@ -262,14 +268,13 @@ let desugar expr =
   desugar_expr env expr
 
 
-
 (* Pretty-printing stuff *)
 
 let pcolor ?l c s =
   let l = Option.map_none (String.length s) l in
   Pprint.fancystring (Bash.color c "%s" s) l
 
-let arrow = pcolor 220 "->"
+let arrow = pcolor Bash.colors.Bash.yellow "->"
 
 let rec doc_of_expr: Core.expression -> Pprint.document = 
   let open Pprint in
@@ -294,9 +299,9 @@ let rec doc_of_expr: Core.expression -> Pprint.document =
         edoc ^^ bullet ^^ lb ^^ t ^^ rb
 
     | `Let (`Var v, e1, e2) ->
-        let letdoc = pcolor 220 "let" in
+        let letdoc = pcolor colors.yellow "let" in
         let vdoc = string (Atom.string_of_atom v) in
-        let indoc = pcolor 220 "in" in
+        let indoc = pcolor colors.yellow "in" in
         let e1 = doc_of_expr e1 in
         let e2 = doc_of_expr e2 in
         letdoc ^^ space ^^ vdoc ^^ space ^^ equals ^^ 
@@ -310,7 +315,7 @@ let rec doc_of_expr: Core.expression -> Pprint.document =
         let vdoc = lparen ^^ vdoc ^^ colon ^^ space ^^ t ^^ rparen in
         let e2 = doc_of_expr e2 in
         let edoc = nest 2 (break1 ^^ e2) in
-        (pcolor 220 "fun") ^^ space ^^ vdoc ^^ space ^^ arrow ^^ space ^^ edoc
+        (pcolor 207 ~l:1 "λ") ^^ space ^^ vdoc ^^ space ^^ arrow ^^ space ^^ edoc
 
     | `Instance atom ->
         string (Atom.string_of_atom atom)
@@ -323,13 +328,13 @@ let rec doc_of_expr: Core.expression -> Pprint.document =
         let gen (pat, expr) =
           let pdoc = doc_of_pat pat in
           let edoc = doc_of_expr expr in
-          (pcolor 220 "|") ^^ space ^^ pdoc ^^ space ^^ arrow ^^
+          (pcolor colors.yellow "|") ^^ space ^^ pdoc ^^ space ^^ arrow ^^
             (nest 4 (break1 ^^ edoc))
         in
         let pat_exprs = List.map gen pat_exprs in
         let pat_exprs = concat (fun x y -> x ^^ break1 ^^ y) pat_exprs in
-        let matchdoc = pcolor 220 "match" in
-        let withdoc = pcolor 220 "with" in
+        let matchdoc = pcolor colors.yellow "match" in
+        let withdoc = pcolor colors.yellow "with" in
         matchdoc ^^
           (nest 2 (break1 ^^ edoc)) ^^ break1 ^^ withdoc ^^
         (nest 2 (break1 ^^ pat_exprs))
@@ -381,7 +386,7 @@ and doc_of_const: Core.const -> Pprint.document =
   let open Pprint in
   function
     | `Char c ->
-        squote ^^ (string (String.make 1 c)) ^^ squote
+        squote ^^ (char c) ^^ squote
     | `Int i ->
         string (string_of_int i)
     | `Float f ->
