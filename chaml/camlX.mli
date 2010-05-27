@@ -69,13 +69,11 @@ type f_expression = [
       (** Maybe we can simplify this later on (do we really want it?) *)
   | `Function of f_type_term * (f_pattern * f_expression) list
       (** All patterns have the same type because we're in ML. This later
-       * desugars to a `Fun and a `Match. We need the f_type_term to annotate
-       * the argument of the `Fun. *)
-  | `Match of f_expression * f_clblock * int * (f_pattern * f_expression) list
+         desugars to a `Fun and a `Match. We need the f_type_term to annotate
+         the argument of the `Fun. *)
+  | `Match of f_expression * f_clblock * (f_pattern * f_expression) list
       (** The f_clblock is necessary to properly generate the various coercions
-       * needed for each branch of the generalizing match. As all branches have
-       * the same type, there is always the same number of generalized
-       * variables, that's the integer. **)
+         needed for each branch of the generalizing match. **)
   | `Tuple of f_expression list
   | `Const of f_const
 ]

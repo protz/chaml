@@ -291,6 +291,7 @@ let solve =
           )
           pool_vars
         in
+        Error.debug "%a" debug_inpool (None, young_vars, sub_env);
         begin match pscheme with
           | None ->
               assert (List.length young_vars = 0)

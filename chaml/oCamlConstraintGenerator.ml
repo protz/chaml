@@ -396,6 +396,14 @@ module Make(S: Algebra.SOLVER) = struct
               let { e_constraint = c2; expr } =
                 generate_constraint_expression t expr
               in
+              (* Why do we have generalized variables here? We're taking an
+               * *instance* of e1 (as in "match e1 with ..."). This means the
+               * scheme is duplicated, fresh variables are created, and are
+               * possibly left generalized. However, when type-checking at the
+               * very end of the process, we'll copy e1 (that already has
+               * Lambdas) and do the pattern-matching, so those variables will
+               * be redundant with those from e1. So we use them here and later
+               * on, but they do not represent real Lambdas below the "->". *)
               let pscheme = new_pscheme y in
               let let_constr: type_constraint =
                 `Let ([y :: introduced_vars, c, var_map, Some pscheme], c2)
@@ -406,12 +414,11 @@ module Make(S: Algebra.SOLVER) = struct
               List.split (List.map generate_branch pat_expr_list)
             in
             let solver_scheme = new_scheme x1 in
-            (* Same remark, this is just a placeholder too. *)
             let solver_pscheme = new_pscheme x1 in
             let map = IdentMap.add ident1 (x1, solver_scheme) IdentMap.empty in
             let scheme = [x1], constr_e1, map, Some solver_pscheme in
-            (* XXX the fake ident we introduce is not kept in the CamlX term we
-             * generate. *)
+            (* The fake ident we introduce is not kept in the CamlX term we
+             * generate. It's unimportant. *)
             {
               e_constraint = `Let ([scheme], constr_conj constraints);
               expr = `Match (term_e1, solver_pscheme, pat_exprs)

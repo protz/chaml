@@ -112,8 +112,25 @@ let translate =
       | `App (e1, args) ->
           `App (translate_expr env e1, List.map (translate_expr env) args)
 
-      | `Match (_e1, _pscheme, _pat_expr_list) ->
-          failwith "Match not implemented"
+      | `Match (expr, pscheme, pat_exprs) ->
+          (* C/Pasted from `Let: generalize expr properly *)
+          let new_env = List.fold_left lift_add env pscheme.p_young_vars in
+          let f_type_term = type_term_of_uvar new_env pscheme.p_uvar in
+          let young_vars = List.length pscheme.p_young_vars in
+          Error.debug "[TMatch] %d generalized variables\n" young_vars;
+          let clblock = {
+            young_vars;
+            f_type_term;
+          } in
+          let fexpr = translate_expr new_env expr in
+          (* Generate patterns and expressions properly *)
+          let gen (pat, _pscheme, expr) =
+            let fpat = translate_pat env ~assign_schemes:false pat in
+            let fexpr = translate_expr env expr in
+            fpat, fexpr
+          in
+          let pat_exprs = List.map gen pat_exprs in
+          `Match (fexpr, clblock, pat_exprs)
 
       | `Tuple (exprs) ->
           `Tuple (List.map (translate_expr env) exprs)
@@ -225,8 +242,30 @@ let rec doc_of_expr: f_expression -> Pprint.document =
     | `App (e1, args) ->
         concat (fun x y -> x ^^ space ^^ y) (List.map doc_of_expr (e1 :: args))
 
-    | `Match (_e1, _, _, _pat_expr_list) ->
-        failwith "Match pretty-printing not implemented"
+    | `Match (expr, { young_vars; f_type_term }, pat_expr_list) ->
+        let ldoc = gen_lambdas young_vars in
+        let lb' = fancystring (color colors.blue "[") 1 in
+        let rb' = fancystring (color colors.blue "]") 1 in
+        let scheme = string (DeBruijn.string_of_type_term f_type_term) in
+        let gen (pat, expr) =
+          let pdoc = doc_of_pat pat in
+          let edoc = doc_of_expr expr in
+          bar ^^ space ^^ pdoc ^^ space ^^ minus ^^ rangle ^^
+            (nest 4 (break1 ^^ edoc)
+          )
+        in
+        let pat_expr_list = List.map gen pat_expr_list in
+        let pat_expr_list = concat
+          (fun x y -> x ^^ break1 ^^ y)
+          pat_expr_list
+        in
+        let matchdoc = fancystring (color 208 "match") 5 in
+        let exprdoc = doc_of_expr expr in
+        let withdoc = fancystring (color 208 "with") 4 in
+        matchdoc ^^ space ^^ exprdoc ^^ colon ^^ space ^^
+        ldoc ^^ dot ^^ space ^^ lb' ^^ scheme ^^ rb' ^^ space ^^
+        withdoc ^^ break1 ^^
+        pat_expr_list
 
     | `Tuple (exprs) ->
         (* XXX compute operator priorities cleanly here *)

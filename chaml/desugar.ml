@@ -51,6 +51,12 @@ let concat f l =
 
 let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
   fun env expr ->
+  let rec wrap_lambda i e =
+    if i > 0 then
+      wrap_lambda (i - 1) (`TyAbs e)
+    else
+      e
+  in
   match expr with
   | `Let (pat_coerc_exprs, e2) ->
       (* We have the invariant that all identifiers are distinct, we explicitely
@@ -68,14 +74,8 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
       let gen_branch e2 (_, { young_vars; f_type_term = type_term }, e1) pat = 
         let e1 = desugar_expr env e1 in
         (* Beware, now we must generate proper F terms *)
-        let rec add_lambda i e =
-          if i > 0 then
-            add_lambda (i - 1) (`TyAbs e)
-          else
-            e
-        in
         (* So we generate proper Lambdas *)
-        let e1 = add_lambda young_vars e1 in
+        let e1 = wrap_lambda young_vars e1 in
         (* Generate the coercion *)
         let new_pat =
           generate_coerc new_env { pattern = pat; forall = young_vars; type_term }
@@ -87,6 +87,9 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
         | `Var atom ->
             Error.debug "[DLet] Found a regular let\n";
             `Let (`Var atom, e1, e2)
+        | `Any ->
+            Error.debug "[DAny] Let's not use match for that one\n";
+            `Let (`Var (Atom.fresh (ident "_" Location.none)), e1, e2)
         | _ ->
             `Match (e1, [(new_pat, e2)])
       in
@@ -147,8 +150,22 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
             `Fun (var, arg_type, mmatch)
       end
 
-  | `Match (_expr, _clblock, _forall, _pat_exprs) ->
-      failwith "Match not implemented"
+  | `Match (expr, { young_vars; f_type_term = type_term }, pat_exprs) ->
+      let expr = desugar_expr env expr in
+      let expr = wrap_lambda young_vars expr in
+      let gen (pat, expr) =
+        let pat, atoms = desugar_pat env pat in
+        let sub_env = introduce atoms env in
+        let pat =
+          generate_coerc sub_env { pattern = pat; forall = young_vars; type_term }
+        in
+        let expr = 
+          desugar_expr sub_env expr
+        in
+        (pat, expr)
+      in
+      let pat_exprs = List.map gen pat_exprs in
+      `Match (expr, pat_exprs)
 
   | `Tuple exprs ->
       let exprs = List.map (desugar_expr env) exprs in
@@ -188,7 +205,7 @@ and desugar_pat env ?rebind pat =
   | `Any ->
       `Any, []
 
-(* [generate_coercion] walks down the pattern scheme and the pattern in
+(* [generate_coerc] walks down the pattern scheme and the pattern in
  * parallel, and returns a list of coercions needed to properly type this
  * pattern *)
 and generate_coerc env cenv =
