@@ -17,9 +17,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open DeBruijn
+(** The final {!Desugar} translation step sends the {!CamlX.f_expression} into
+    this System F-like core language. This is the language we type-check. *)
 
-(** For terms *)
+open DeBruijn
 
 type var = [
   | `Var of Atom.t

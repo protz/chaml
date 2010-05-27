@@ -80,7 +80,7 @@ DOCFILES = chaml/constraint.mli chaml/oCamlConstraintGenerator.mli\
 	   chaml/algebra.mli chaml/unionFind.mli\
 	   chaml/typePrinter.mli chaml/translator.mli\
 	   chaml/core.mli chaml/desugar.mli chaml/atom.mli\
-	   pprint/pprint.mli\
+	   chaml/deBruijn.mli pprint/pprint.mli\
 	   stdlib/*.mli #`find $(OCAMLLIBPATH) -maxdepth 1 -iname '*.mli' -and -not -iname 'condition.mli'`
 
 doc: build_graph

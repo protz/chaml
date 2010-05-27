@@ -17,7 +17,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** An OCaml front-end for the constraint generator. *)
+(** An OCaml front-end for the constraint generator: takes a [Parsetree.t] and
+   returns a {!CamlX.Make.expression} as well as a
+   {!Constraint.Make.type_constraint} *)
 
 (** This module makes use of the OCaml parser and lexer, walks the OCaml AST and
     produces constraints suitable for solving later on by ChaML. It depends on

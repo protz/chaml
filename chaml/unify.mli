@@ -49,7 +49,7 @@ type descriptor = {
 
 (** The type of unificator variables. They are often called [uvar] in the code.
     *)
-and unifier_var = descriptor UnionFind.point
+and unifier_var
 
 (** An equivalence class in the unifier is just a multi-equations between an
     arbitrary number of variables and a term. The natural way to represent this
@@ -98,6 +98,18 @@ module BaseSolver: sig
 
   val string_of_var: var -> string
 end
+
+(** {3 Utils} *)
+
+(** Obtain the descriptor for a given {unifier_var} *)
+val find: unifier_var -> descriptor
+
+(** This a globally unique, thread-safe id *)
+val id: unifier_var -> int
+
+(** Get the rank *)
+val rank: unifier_var -> int
+
 
 (** {3 Pools and environments} *)
 

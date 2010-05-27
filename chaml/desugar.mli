@@ -17,9 +17,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module takes the AST that contains "clean" types and desugars
-    all the constructs into a core System F language. Types are left untouched
-    but coercions are generated as needed. *)
+(** This module takes the {!CamlX.f_expression} AST that contains "clean" types
+    and desugars all the constructs into a core System F {!Core.expression}.
+    Types are left untouched but coercions are generated as needed. *)
 
 val desugar: CamlX.f_expression -> Core.expression
 val string_of_expr: Core.expression -> string

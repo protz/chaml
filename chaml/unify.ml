@@ -114,6 +114,10 @@ module BaseSolver = struct
   let string_of_var uvar = (UnionFind.find uvar).name
 end
 
+let find = UnionFind.find
+let id x = (find x).id
+let rank x = (find x).rank
+
 (* This is used by the solver to pass information down the recursive calls.
  * - We can use a Hashtbl because all type variables are distinct (although
  * strictly speaking we should use a map for scopes).

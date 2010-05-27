@@ -74,7 +74,7 @@ let run_dfs ~occurs_check young_vars =
             repr.rank <- max_rank;
           repr.rank
   and dont_loop rank uvar =
-    let repr = UnionFind.find uvar in
+    let repr = find uvar in
     match Uhashtbl.find_opt seen repr with
     | Some false ->
         repr.rank
@@ -90,7 +90,7 @@ let run_dfs ~occurs_check young_vars =
         r
   in
   let f uvar =
-    let repr = UnionFind.find uvar in
+    let repr = find uvar in
     ignore (dont_loop repr.rank uvar);
     assert (repr.rank >= 0)
   in
@@ -110,13 +110,13 @@ let debug_inpool buf (prev_ranks, l, sub_env) =
     | None ->
         List.map
           (fun x ->
-             let repr = (UnionFind.find x) in
+             let repr = find x in
                Printf.sprintf "%s(%d)" repr.name repr.rank)
           l
     | Some ranks ->
         List.map2
           (fun var old_rank ->
-            let repr = (UnionFind.find var) in
+            let repr = find var in
             if old_rank <> repr.rank then
               Bash.color 42 "%s(%d)" repr.name repr.rank
             else
@@ -136,7 +136,7 @@ let debug_scheme buf (scheme, ident) =
   Buffer.add_string buf str
 
 let sort_global young_vars =
-  let c x y = (UnionFind.find x).id - (UnionFind.find y).id in
+  let c x y = id x - id y in
   let young_vars = List.sort c young_vars in
   young_vars
 
@@ -232,7 +232,7 @@ let solve =
           let t_list = ref [] in
           List.iter
             (fun x -> 
-              let repr = UnionFind.find x in
+              let repr = find x in
               if not (Mark.same repr.mark mark) then begin
                 t_list := x :: !t_list;
                 repr.mark <- mark;
@@ -241,7 +241,6 @@ let solve =
           pool_vars;
           !t_list
         in
-        let rank x = (UnionFind.find x).rank in
         let pool_vars = List.sort (fun a b -> rank a - rank b) pool_vars in
 
         (* This is rank propagation. See lemma 10.6.7 in ATTAPL. This is needed. *)
@@ -255,7 +254,7 @@ let solve =
          * never be instanciated), with the unhabited bottom type constructor.
          * *)
         let deal_with_unreachable uvar =
-          let repr = UnionFind.find uvar in
+          let repr = find uvar in
           if (repr.term = None && not (Uhashtbl.mem reachable repr)) then begin
             Error.debug "%s"
               (Bash.color 144 "[Unreachable] %a\n" uvar_name uvar);
@@ -278,7 +277,7 @@ let solve =
         let current_rank = current_rank sub_env in
         let young_vars = List.filter
           (fun uvar ->
-            let repr = UnionFind.find uvar in
+            let repr = find uvar in
             assert (repr.rank <= current_rank);
             (* Is it a young variable? *)
             if repr.rank = current_rank then begin

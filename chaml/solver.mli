@@ -17,7 +17,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The solver works on top of the unifier and the constraint generator. *)
+(** The solver takes a {!Constraint.Make.type_constraint} and solves it. It uses
+    the unifier heavily. *)
 
 (** This can be forwarded to other modules that depend on a solver. This is
     actually borrowed from [Unify]. *)

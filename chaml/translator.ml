@@ -37,7 +37,7 @@ let lift_add env uvar =
     IntMap.map DeBruijn.lift env.fvar_of_uvar
   in
   let new_map =
-    IntMap.add (UnionFind.find uvar).id DeBruijn.zero new_map
+    IntMap.add (id uvar) DeBruijn.zero new_map
   in
   Error.debug "[TLiftAdd] Adding %a\n" uvar_name uvar;
   { fvar_of_uvar = new_map }
@@ -49,7 +49,7 @@ let concat f l =
  * scheme into the right fscheme structure (it's a f_type_term) *)
 let type_term_of_uvar env uvar =
   let rec type_term_of_uvar uvar =
-    let repr = UnionFind.find uvar in
+    let repr = find uvar in
     match repr.term with
     | None ->
         let fvar = IntMap.find repr.id env.fvar_of_uvar in

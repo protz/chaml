@@ -17,11 +17,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This modules transforms the AST obtained from the constraint generator, that
-    contains {!Algebra.SOLVER} structures, into a regular AST built on cleaner
-    types. The types that were previously [UnionFind] structures are now
-    represented using [DeBruijn] indices. [Desugar] will take this
-    representation and send it into System F. *)
+(** Takes the {!CamlX.Make.expression} and removes the {!Unify.BaseSolver}
+    structures to give a {!CamlX.f_expression}. The types that were previously
+    [UnionFind] structures are now represented using {!DeBruijn} indices.
+    {!Desugar} will take this representation and send it into System F. *)
 
 open Unify
 open Algebra.Identifiers

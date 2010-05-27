@@ -5,9 +5,16 @@ in input an OCaml file and returns a Fω term that represents the original input
 and is guaranteed to be correctly typed.
 
 
-{2 Core Modules}
-{!modules: OCamlConstraintGenerator Constraint Unify Solver CamlX
-Translator Core Desugar Algebra
+{2 The translation process}
+
+These are the modules called by the main driver [ChaML] (in order).
+{!modules:
+OCamlConstraintGenerator Solver 
+Translator Desugar 
+}
+
+These core modules depend on some types and data structures.
+{!modules: Constraint Unify CamlX Core Algebra
 }
 
 {2 Helper modules}
