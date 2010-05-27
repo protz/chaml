@@ -124,9 +124,15 @@ let translate =
           } in
           let fexpr = translate_expr new_env expr in
           (* Generate patterns and expressions properly *)
-          let gen (pat, _pscheme, expr) =
+          let gen (pat, pscheme, expr) =
             let fpat = translate_pat env ~assign_schemes:false pat in
             let fexpr = translate_expr env expr in
+            begin match pscheme with
+              | Some pscheme ->
+                  assert (List.length pscheme.p_young_vars = young_vars);
+              | None ->
+                  assert (young_vars = 0)
+            end;
             fpat, fexpr
           in
           let pat_exprs = List.map gen pat_exprs in
