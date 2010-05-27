@@ -32,6 +32,10 @@ module Make: functor (S: Algebra.SOLVER) -> sig
   (** Creates a human-readable representation of an error *)
   val string_of_error: error -> string
 
+  (** This follows the global convention: modules that are called by the driver
+   * are expected to provide pretty-printers. *)
+  val string_of_constraint: pretty_printing:bool -> Constraint.Make(S).type_constraint -> string
+
   (** The driver calls this function. The client of this module is forced to deal
       with the [`Error] case. *)
   val generate_constraint:

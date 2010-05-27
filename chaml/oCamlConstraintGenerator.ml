@@ -28,6 +28,8 @@ module Make(S: Algebra.SOLVER) = struct
   open Algebra.TypeCons
   open Algebra.Identifiers
 
+  let string_of_constraint = PrettyPrinter.string_of_constraint
+
   (* This is error handling. Add new errors here *)
   type error =
     | NotImplemented of string * Location.t

@@ -21,7 +21,6 @@ exception Error
 exception Outdated_version
 
 module OCamlConstraintGenerator = OCamlConstraintGenerator.Make(Solver.BaseSolver)
-module Constraint = Constraint.Make(Solver.BaseSolver)
 
 (* Stolen from driver/pparse.ml *)
 (* val file : formatter -> string -> (Lexing.lexbuf -> 'a) -> string -> 'a *)
@@ -159,7 +158,7 @@ let _ =
     if !arg_print_constraint then begin
       let pretty_printing = Options.get_opt "pretty-printing" in
       let str =
-        Constraint.PrettyPrinter.string_of_constraint ~pretty_printing konstraint
+        OCamlConstraintGenerator.string_of_constraint ~pretty_printing konstraint
       in
       print_endline str;
       flush stdout
