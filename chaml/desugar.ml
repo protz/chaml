@@ -77,17 +77,15 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
         (* So we generate proper Lambdas *)
         let e1 = add_lambda young_vars e1 in
         (* Generate the coercion *)
-        let coercion =
+        let new_pat =
           generate_coerc new_env { pattern = pat; forall = young_vars; type_term }
         in
-        let new_pat = `Coerce (pat, coercion) in
         (* The pattern has already been translated in a first pass. Now check if
          * it's just an identifier (we can use a regular let-binding) or a
          * pattern (then, we use a match) *)
         match pat with
         | `Var atom ->
             Error.debug "[DLet] Found a regular let\n";
-            assert (coercion = `Id);
             `Let (`Var atom, e1, e2)
         | _ ->
             `Match (e1, [(new_pat, e2)])
@@ -160,20 +158,32 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
       let c = desugar_const c in
       `Const c
 
-and desugar_pat env pat =
+and desugar_pat env ?rebind pat =
   match pat with
   | `Var (ident, _typ) ->
-      let atom = Atom.fresh ident in
-      `Var atom, [atom]
+      if Option.unit_bool rebind then
+        `Var (find ident env), []
+      else
+        let atom = Atom.fresh ident in
+        `Var atom, [atom]
 
   | `Tuple patterns ->
-      let patterns, atoms = List.split (List.map (desugar_pat env) patterns) in
+      let patterns, atoms = List.split (List.map (desugar_pat ?rebind env) patterns) in
       `Tuple patterns, List.flatten atoms
 
   | `Or (p1, p2) ->
-      let p1, a1 = desugar_pat env p1 in
-      let p2, a2 = desugar_pat env p2 in
-      `Or (p1, p2), a1 @ a2
+      (* We must ensure we bind exactly the same identifiers here. This works
+       * because we checked previously that the set of identifiers is the same
+       * in both branches (in the constraint generation). So we are sure that
+       * all the indentifiers we lookup are exactly the ones we just added in
+       * premad_env. *)
+      Error.debug "[DOr] Orpat in\n";
+      let p1, a1 = desugar_pat ?rebind env p1 in
+      let premade_env = introduce a1 env in
+      let p2, a2 = desugar_pat premade_env ~rebind:() p2 in
+      assert (List.length a2 = 0);
+      Error.debug "[DOr] Orpat out\n";
+      `Or (p1, p2), a1
 
   | `Any ->
       `Any, []
@@ -181,7 +191,7 @@ and desugar_pat env pat =
 (* [generate_coercion] walks down the pattern scheme and the pattern in
  * parallel, and returns a list of coercions needed to properly type this
  * pattern *)
-and generate_coerc env { forall; type_term; pattern; } =
+and generate_coerc env cenv =
   let type_cons_tuple i =
     let fake_list = Jlist.make i () in
     let `Cons (cons_name, _) = Algebra.TypeCons.type_cons_tuple fake_list in
@@ -193,67 +203,85 @@ and generate_coerc env { forall; type_term; pattern; } =
     | c2, `Id -> c2
     | _ -> `Compose (c1, c2)
   in 
-  match pattern, type_term with
-  | `Tuple patterns, `Cons (cons_name, cons_args)
-    when cons_name = type_cons_tuple (List.length patterns) ->
-      (* Let's move all the variables inside the branches *)
-      let gen i pattern type_term =
-        let c =
-          generate_coerc env { forall; pattern; type_term; }
+  (* Instead of returning a pattern every time and possibly using
+   *  `Coerce (`Coerce ( ... ) ... )
+   * we choose to accumulate coercions and compose the pattern with the coercion
+   * only at the last moment, i.e. when the function below returns, or when we
+   * encounter a `Or pattern. *)
+  let rec generate_coerc env { forall; type_term; pattern } =
+    match pattern, type_term with
+    | `Tuple patterns, `Cons (cons_name, cons_args)
+      when cons_name = type_cons_tuple (List.length patterns) ->
+        (* Let's move all the variables inside the branches *)
+        let gen i pattern type_term =
+          let pattern, c =
+            generate_coerc env { forall; pattern; type_term; }
+          in
+          pattern, if c = `Id then `Id else `CovarTuple (i, c)
         in
-        `CovarTuple (i, c)
-      in
-      (* We have the first coercion *)
-      let c =
-        concat compose (Jlist.map2i gen patterns cons_args)
-      in
-      (* Explain that we inject all the variables inside the branches *)
-      let rec fold forall =
-        if forall = 0 then
-            `Id
-        else
-          let c = fold (forall - 1) in
-          let c1 = if c = `Id then `Id else `ForallCovar c in
-          compose c1 `DistribTuple
-      in
-      `Compose (fold forall, c)
-
-  | `Var _, _ ->
-      (* Are we still under \Lambdas? If not, then we've got a proper
-       * coercion. If we still have some \Lambdas, we must remove those that
-       * are useless. *)
-      if forall = 0 then
-        `Id
-      else
-        (* Mark all the variables quantified in this scheme
-           XXX this probably has a bad complexity *)
-        let seen = Array.make forall false in
-        let rec walk type_term =
-          match type_term with
-            | `Var v ->
-                let i = DeBruijn.index v in
-                if i < forall then
-                  seen.(DeBruijn.index v) <- true
-            | `Cons (_cons_name, cons_args) ->
-                List.iter walk cons_args
-        in
-        walk type_term;
-        (* We remove quantifiers we don't use *)
-        let rec fold i =
-          if i = 0 then
-            `Id
+        (* We have the first coercion *)
+        let patterns, coercions = List.split (Jlist.map2i gen patterns cons_args) in
+        let c = concat compose coercions in
+        (* Explain that we inject all the variables inside the branches *)
+        let rec fold forall =
+          if forall = 0 then
+              `Id
           else
-             let c = fold (i - 1) in
-             if not seen.(i-1) then
-               let celim = `ForallElim Algebra.TypeCons.type_cons_bottom in
-               compose celim c
-             else
-               if c = `Id then `Id else `ForallCovar c
+            let c = fold (forall - 1) in
+            let c1 = if c = `Id then `Id else `ForallCovar c in
+            compose c1 `DistribTuple
         in
-        fold forall
-                
-  | _ ->
-      failwith "Only supporting coercions for tuples at the moment\n"
+        `Tuple patterns, `Compose (fold forall, c)
+
+    | `Var _, _ ->
+        (* Are we still under \Lambdas? If not, then we've got a proper
+         * coercion. If we still have some \Lambdas, we must remove those that
+         * are useless. *)
+        if forall = 0 then
+          pattern, `Id
+        else
+          (* Mark all the variables quantified in this scheme
+             XXX this probably has a bad complexity *)
+          let seen = Array.make forall false in
+          let rec walk type_term =
+            match type_term with
+              | `Var v ->
+                  let i = DeBruijn.index v in
+                  if i < forall then
+                    seen.(DeBruijn.index v) <- true
+              | `Cons (_cons_name, cons_args) ->
+                  List.iter walk cons_args
+          in
+          walk type_term;
+          (* We remove quantifiers we don't use *)
+          let rec fold i =
+            if i = 0 then
+              `Id
+            else
+               let c = fold (i - 1) in
+               if not seen.(i-1) then
+                 let celim = `ForallElim Algebra.TypeCons.type_cons_bottom in
+                 compose celim c
+               else
+                 if c = `Id then `Id else `ForallCovar c
+          in
+          pattern, fold forall
+
+    | `Or (p1, p2), _ ->
+        let p1, c1 = generate_coerc env { forall; type_term; pattern = p1 } in
+        let p2, c2 = generate_coerc env { forall; type_term; pattern = p2 } in
+        let p1 = if c1 = `Id then p1 else `Coerce (p1, c1) in
+        let p2 = if c2 = `Id then p2 else `Coerce (p2, c2) in
+        `Or (p1, p2), `Id
+
+    | `Any, _ ->
+        `Any, `Id
+                  
+    | _ ->
+        failwith "Only supporting coercions for tuples at the moment\n"
+  in
+  let pat, coerc = generate_coerc env cenv in
+  if coerc = `Id then pat else `Coerce (pat, coerc)
 
 and desugar_const const =
   match const with
@@ -325,10 +353,18 @@ let rec doc_of_expr: Core.expression -> Pprint.document =
 
     | `Match (e, pat_exprs) ->
         let edoc = doc_of_expr e in
+        let bar = pcolor colors.yellow "|" in
+        let rec gen_split pat =
+          match pat with
+          | `Or (p1, p2) ->
+              (gen_split p1) ^^ break1 ^^ bar ^^ space ^^ (gen_split p2)
+          | _ ->
+              doc_of_pat pat
+        in
         let gen (pat, expr) =
-          let pdoc = doc_of_pat pat in
+          let pdoc = gen_split pat in
           let edoc = doc_of_expr expr in
-          (pcolor colors.yellow "|") ^^ space ^^ pdoc ^^ space ^^ arrow ^^
+          bar ^^ space ^^ pdoc ^^ space ^^ arrow ^^
             (nest 4 (break1 ^^ edoc))
         in
         let pat_exprs = List.map gen pat_exprs in
