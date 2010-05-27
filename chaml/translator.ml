@@ -172,11 +172,8 @@ let rec doc_of_expr: f_expression -> Pprint.document =
           let colon = fancystring (color colors.blue ":") 1 in
           let ldoc = gen_lambdas nlambdas in
           let scheme = string (DeBruijn.string_of_type_term scheme) in
-          pdoc ^^ space ^^ equals ^^
-          (nest 2 (
-            break1 ^^ edoc ^^ colon ^^
-            break1 ^^ ldoc ^^ space ^^ lb' ^^ scheme ^^ rb'
-            )
+          pdoc ^^ colon ^^ space ^^ lb' ^^ scheme ^^ rb' ^^ space ^^ equals ^^
+            (nest 2 (break1 ^^ edoc ^^ colon)
           )
         in
         let pat_expr_list = List.map gen pat_expr_list in
