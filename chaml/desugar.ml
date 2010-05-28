@@ -309,7 +309,12 @@ and desugar_const const =
       x
 
 let desugar expr =
-  let env = { atom_of_ident = IdentMap.empty } in
+  let add op map =
+    let ident = ident op Location.none in
+    IdentMap.add ident (Atom.fresh ident) map
+  in
+  let atom_of_ident = add "+" (add "*" IdentMap.empty) in
+  let env = { atom_of_ident } in
   desugar_expr env expr
 
 

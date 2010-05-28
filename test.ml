@@ -5,5 +5,5 @@ let v =
     rev ((fun x -> x), (fun y -> y), (fun x -> x))
   in
   match f, f with
-  | _, f3 ->
-      f3 2, f3 2., f3
+  | g, f ->
+      f (2 + 2), f 2., f g
