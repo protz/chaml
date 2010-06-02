@@ -119,7 +119,7 @@ module TypeCons = struct
     Hashtbl.add tbl "string" { cons_name = "string"; cons_arity = 0 };
     Hashtbl.add tbl "float" { cons_name = "float"; cons_arity = 0 };
     Hashtbl.add tbl "unit" { cons_name = "unit"; cons_arity = 0 };
-    Hashtbl.add tbl "_bottom" { cons_name = "⊥"; cons_arity = 0 };
+    Hashtbl.add tbl "_bottom" { cons_name = "⟂"; cons_arity = 0 };
     tbl
 
   (* Instanciate a type constructor with its type variables, thus creating a type

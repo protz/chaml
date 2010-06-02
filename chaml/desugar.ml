@@ -309,11 +309,12 @@ and desugar_const const =
       x
 
 let desugar expr =
-  let add op map =
+  let add map op =
+    let ident' = ident (Printf.sprintf "(%s)" op) Location.none in
     let ident = ident op Location.none in
-    IdentMap.add ident (Atom.fresh ident) map
+    IdentMap.add ident (Atom.fresh ident') map
   in
-  let atom_of_ident = add "+" (add "*" IdentMap.empty) in
+  let atom_of_ident = List.fold_left add IdentMap.empty ["-"; "+"; "*"] in
   let env = { atom_of_ident } in
   desugar_expr env expr
 
@@ -371,7 +372,8 @@ let rec doc_of_expr: Core.expression -> Pprint.document =
         string (Atom.string_of_atom atom)
 
     | `App (e1, args) ->
-        concat (fun x y -> x ^^ space ^^ y) (List.map doc_of_expr (e1 :: args))
+        let e1 = lparen ^^ (doc_of_expr e1) ^^ rparen in
+        concat (fun x y -> x ^^ space ^^ y) (e1 :: (List.map doc_of_expr args))
 
     | `Match (e, pat_exprs) ->
         let edoc = doc_of_expr e in
@@ -482,7 +484,7 @@ and doc_of_coerc: Core.coercion -> Pprint.document =
         (string "p") ^^ i ^^ lbracket ^^ coercion ^^ rbracket
 
     | `DistribTuple ->
-        fancystring "∀→" 2
+        fancystring "∀×" 2
 
 let string_of_expr expr =
   let buf = Buffer.create 16 in

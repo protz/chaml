@@ -524,6 +524,17 @@ module Make(S: Algebra.SOLVER) = struct
             let plus_map = IdentMap.add (ident "+" pos) (plus_var, solver_scheme) IdentMap.empty in
             [plus_var], `Equals (plus_var, plus_type), plus_map, Some solver_pscheme
           in
+          let minus_scheme =
+            let minus_var = fresh_type_var ~letter:'z' () in
+            let minus_type =
+              type_cons_arrow type_cons_int (type_cons_arrow type_cons_int type_cons_int)
+            in
+            let pos = Location.none in
+            let solver_scheme = new_scheme minus_var in
+            let solver_pscheme = new_pscheme minus_var in
+            let minus_map = IdentMap.add (ident "-" pos) (minus_var, solver_scheme) IdentMap.empty in
+            [minus_var], `Equals (minus_var, minus_type), minus_map, Some solver_pscheme
+          in
           let mult_scheme =
             let mult_var = fresh_type_var ~letter:'z' () in
             let mult_type =
@@ -535,7 +546,7 @@ module Make(S: Algebra.SOLVER) = struct
             let mult_map = IdentMap.add (ident "*" pos) (mult_var, solver_scheme) IdentMap.empty in
             [mult_var], `Equals (mult_var, mult_type), mult_map, Some solver_pscheme
           in
-          [plus_scheme; mult_scheme]
+          [plus_scheme; minus_scheme; mult_scheme]
         in
         let topmost_expression =
           let finish = {
