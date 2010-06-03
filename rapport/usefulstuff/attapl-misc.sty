@@ -1,0 +1,377 @@
+% Miscellaneous latex commands for ATTAPL
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Some helper functions...
+
+% A convenient way of defining relation symbols.  Each invocation of
+%    \newrelation{\relname}{...body...}
+% defines two commands:
+%    \relname  --  a version with ``tight'' (\mathord) spacing
+%    \RELNAME  --  a version with ``generous'' (\mathrel) spacing
+\def\newrelation#1#2{
+   % a hack from p. 331 of the TeXbook:
+     \def\doit##1\endname{\uppercase{\def\@TEMPSYMNAME{##1}}}
+     \expandafter\doit#1\endname
+   % \typeout{Defining #1 and \@TEMPSYMNAME}
+   % \@ifdefinable\name{}
+   % \@ifdefinable\NAME{}
+   \expandafter\newcommand\csname #1\endcsname{\mathord{#2}}
+   \expandafter\newcommand\csname\@TEMPSYMNAME\endcsname{\mathrel{#2}}
+   }
+
+% A similar hack for mathematical prefix symbols
+\def\newprefix#1#2{
+   % a hack from p. 331 of the TeXbook:
+     \def\doit##1\endname{\uppercase{\def\@TEMPSYMNAME{##1}}}
+     \expandafter\doit#1\endname
+   % \typeout{Defining #1 and \@TEMPSYMNAME}
+   % \@ifdefinable\name{}
+   % \@ifdefinable\NAME{}
+   \expandafter\newcommand\csname #1\endcsname{\mathord{#2}}
+   \expandafter\newcommand\csname\@TEMPSYMNAME\endcsname{\mathord{#2}\;}
+   }
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Names of some popular type systems
+
+\newcommand{\FSUBlikename}[1]{{\it #1}}
+\newcommand{\FOMEGASUB}{\FSUBlikename{F}$_{\leq}^{\,\omega}$}
+\newcommand{\FOMEGA}{\FSUBlikename{F}$^{\,\omega}$}
+\newcommand{\FSUB}{\FSUBlikename{F}$_\leq$}
+\newcommand{\F}{\FSUBlikename{F}}
+\newcommand{\FMEET}{\FSUBlikename{F}$_{\!\meet}$}
+\newcommand{\FSUBMU}{\FSUBlikename{F}$_{\Leq\mu}$}
+\newcommand{\STLCSUB}{\ensuremath{\lambda_{\mbox{\tiny \tt <:}}}}
+\newcommand{\STLC}{\ensuremath{\lambda_\rightarrow}}
+\newcommand{\LAMBDAOMEGA}{\ensuremath{\lambda_\omega}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Useful symbols
+
+\newcommand{\eqdef}{\stackrel{{\rm def}}{=}}
+\newcommand{\defeq}{\eqdef}
+\newcommand{\emptycontext}{\emptyset} 
+\newcommand{\lengthof}[1]{|#1|}
+\newcommand{\In}{\texttt{:}}
+\newcommand{\Inkind}{\texttt{:\!:}}
+\newcommand{\IN}{\mathrel{\mbox{\large \texttt{:}}}}
+\newcommand{\INKIND}{\mathrel{\mbox{\large \texttt{:\!:}}}}
+\newcommand{\Leq}{\protect\itbox{<\kern-0.13em:}}
+\newcommand{\LEQ}{\mathrel{\mbox{\large \texttt{<$\!$:}}}}
+\newcommand{\Geq}{\protect\itbox{:\kern-0.13em>}}
+\newcommand{\GEQ}{\mathrel{\mbox{\large \texttt{:$\!$>}}}}
+\newcommand{\FV}{\kw{FV}}
+\newcommand{\BV}{\kw{BV}}
+\newcommand{\dom}{\kw{dom}}
+\newcommand{\range}{\kw{range}}
+
+\newcommand{\LAMBDA}{\ensuremath{\lambda}}
+\def\Defn{\ensuremath{\leftrightarrow}}
+\def\FORALL{\ensuremath{\forall}}
+\def\EXISTS{\ensuremath{\exists}}
+\def\STRUCT{\ensuremath{\cal S}\,}
+\def\KNOWNAS{\ensuremath{\triangleright}\,}
+\def\PI{\ensuremath{\Pi}}
+\def\PIGEN{\ensuremath{\Pi^{\textit{gen}}}}
+\def\PIAPP{\ensuremath{\Pi^{\textit{app}}}}
+\def\SIGMA{\ensuremath{\Sigma}}
+\def\SING{\ensuremath{\cal S}}
+
+\newcommand{\p}{\vdash}
+\newcommand{\notp}{\not\p}
+\newcommand{\Gp}{\Gamma\p}
+\newprefix{Comma}{,}
+
+\newcommand{\List}{\kw{List}}
+\newcommand{\Top}{\kw{Top}}
+
+\newcommand{\substop}[1]{[#1]} 
+\newcommand{\multisubst}[1]{\substop{#1}}
+\newcommand{\subst}[2]{\multisubst{#1\mapsto#2}}
+\newcommand{\match}[2]{\kw{match}(#1,\,#2)}
+\newcommand{\substplus}{+}
+\newcommand{\emptysubst}{\multisubst{\,}}
+
+\newrelation{Arrow}{\rightarrow}
+\newrelation{DoubleHeadedArrow}{\rightarrowtail}
+\newrelation{TArrow}{\Rightarrow}
+\newrelation{LeftArrow}{\leftarrow}
+\newrelation{Times}{\,\times\,}
+\newrelation{Conv}{\longleftrightarrow^\ast}
+\newrelation{Eqv}{\equiv}
+\newrelation{Evalone}{\longrightarrow}
+\newrelation{Evalmany}{\Evalone^{\!\mbox{\raisebox{1pt}{\tiny $\ast$}}}}
+\newrelation{Implies}{\Rightarrow}
+\newrelation{Notin}{\notin}
+\newrelation{Eq}{=}
+\newrelation{Notleq}{\not{\!\!\itbox{<$\!$:}}}
+\newrelation{Meet}{\wedge}
+\renewcommand{\Join}{\mathord{\vee}}
+\newcommand{\JOIN}{\mathrel{\vee}}
+% three-bars arrow  
+\newrelation{Eqvred}{\Rrightarrow}
+\newrelation{Eqveqv}{\Lleftarrow\!\!\!\!\Rrightarrow}
+
+\def\tallslug{\rule[.2mm]{.17mm}{1.7mm}}
+\def\smallslug{\rule[.6mm]{.17mm}{.8mm}}
+\def\LCurlyBar{\ensuremath{\itbox{\char'173}\!\tallslug\,}}
+\def\BarRCurly{\,\tallslug\!\itbox{\char'175}}
+\def\LSquareBar{\ensuremath{\itbox{[}\hspace{-.5mm}\tallslug\hspace{.4mm}}}
+\def\BarRSquare{\ensuremath{\hspace{.4mm}\tallslug\hspace{-.4mm}\itbox{]}}}
+\def\LAngleBar{\ensuremath{\itbox{<}\hspace{-.4mm}\smallslug\hspace{.2mm}}}
+\def\BarRAngle{\ensuremath{\hspace{.2mm}\smallslug\hspace{-.4mm}\itbox{>}}}
+
+\newcommand{\STORE}{\ensuremath{\mu}}
+\newcommand{\STORETYPING}{\ensuremath{\Sigma}}
+\newcommand{\STATEMENT}{\ensuremath{{\cal J}}}
+\newcommand{\DER}{\ensuremath{{\cal D}}}
+\newcommand{\DERC}{\ensuremath{{\cal C}}}
+
+% vdash with arrowhead   
+\newcommand{\pA}{\mathrel{\vdash\!\!\!\!\raisebox{.45ex}{$\scriptscriptstyle \blacktriangleright$}}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Miscellaneous
+
+% not used, but included to prevent compile errors
+\newcounter{ttfigure}  
+
+\newcommand{\TAPL}{{\em TAPL}}
+\newcommand{\TAPLCHAPTER}[1]{{\it TAPL}, Chapter {#1}}
+\newcommand{\TAPLCHAPTERS}[1]{{\it TAPL}, Chapters {#1}}
+\newcommand{\TAPLSECTION}[1]{{\it TAPL}, \S{#1}}
+\newcommand{\TAPLREF}[1]{{\it TAPL}, {#1}}
+\newcommand{\CSHARP}{\mbox{C$^\sharp$}}
+
+\newcommand{\SECTIONREF}[1]{\S\ref{#1}}
+
+\newcommand{\showsystems}[1]{\@unmarkedfootnotetext{#1}}
+
+\newcommand{\kw}[1]{\mbox{\it #1}}
+\newcommand{\rnsmall}[1]{\mbox{{\small \rn{#1}}}}
+\newcommand{\rntiny}[1]{\mbox{{\tiny \rn{#1}}}}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Notes to each other
+
+\newcommand{\underconstruction}[1]{{\it #1}%
+                        \ifdraft  % \marginpar{\large$\rightarrow$}% 
+                        % \else \typeout{*** Under construction ***}% 
+                        \fi}
+\newcommand{\finish}[1]{\ifdraft [{\it #1}]\marginpar{\large$\rightarrow$}% 
+                        % \else \typeout{*** Finish ***}% 
+                        \fi}
+\newcommand{\finalcheck}[1]{\iffinalcheck [{\it #1}]\marginpar{\large$\rightarrow$}% 
+                        % \else \typeout{*** Finish ***}% 
+                        \fi}
+\newcommand{\finishlater}[1]{}
+
+\providecommand{\FIX}[1]{\finalcheck{#1 --bcp}}
+\providecommand{\FIXJNF}[1]{\finalcheck{#1 --jnf}}
+\providecommand{\bcp}[1]{\finish{#1 --bcp}}
+\providecommand{\rh}[1]{\finish{#1 --rh}}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Indexing commands
+
+\newcommand{\indexandsay}[1]{\index{#1}#1}
+\newcommand{\indeximpl}[2][\relax]{\index{#2@{\tt #2}
+    implementation#1}\index{implementations!#2@{\tt #2}#1}}
+\newcommand{\indexlang}[1]{\index{#1}\index{programming languages!#1}}
+\newcommand{\indexlangquiet}[1]{\indexquiet{#1}\indexquiet{programming languages!#1}}
+\newcommand{\indexlangandsay}[1]{\indexlang{#1}#1}
+\newcommand{\indexlangquietandsay}[1]{\indexquiet{#1}\indexquiet{programming languages!#1}#1}
+\newcommand{\indexlangopen}[1]{\index{#1|(}\index{programming languages!#1|(}}
+\newcommand{\indexlangclose}[1]{\index{#1|)}\index{programming languages!#1|)}}
+\newcommand{\defterm}[1]{{\it #1\/}}
+\newcommand{\indexterm}[2][\empty]{%
+  \ifx#1\empty
+    \index{#2}%
+  \else
+    \index{#1}%
+  \fi 
+  \defterm{#2}%
+}
+\newcommand{\indexsym}[2]{\index{ #2@$#1$\quad #2}}
+\newcommand{\indextt}[2][\empty]{%
+  \ifx#1\empty
+    \index{#2@{\tt #2}}%
+  \else
+    \index{#2@{\tt #2} #1}%
+  \fi
+}
+\newcommand{\indexit}[2][\empty]{%
+  \ifx#1\empty
+    \index{#2@{\it #2}}%
+  \else
+    \index{#2@{\it #2} #1}%
+  \fi
+}
+\newcommand{\NAME}[2]{#1 #2}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Exercises and solutions
+
+\newenvironment{solutionorhint}[2]{%
+   % \@ifundefined{breakifnearbottom}{}{\breakifnearbottom}
+   \begin{trivlist}\item[]%
+     \hskip 0pt
+     % \hskip \labelsep
+     \formatbcptheoremnumber{\ref{ex:#1}}%
+     {\bcptheoremheaderfont #2:}\label{sol:#1}}%
+   {\end{trivlist}}  
+\newenvironment{solution}[1]
+  {\begin{solutionorhint}{#1}%{solution} --DR change
+    {\@ifundefined{hypertarget}{}{\hypertarget{sol:#1}}Solution}}
+  {\end{solutionorhint}}
+\newenvironment{hint}[1]
+  {\begin{solutionorhint}{#1}{Hint}}  
+  {\end{solutionorhint}}
+\newcommand{\solref}[1]{\label{ex:#1}\solrefwithoutlabel{#1}}
+\newcommand{\solrefwithoutlabel}[1]{\def\EXTEMP{}}
+\newcommand{\hintref}[1]{\label{ex:#1}\def\EXTEMP{}}
+
+\let\oldexercise=\exercise
+\let\oldendexercise=\endexercise
+\renewenvironment{exercise}
+  {\def\EXTEMP{\marginpar{\Large Solution?}}\def\EXTEMPTOO{\marginpar{\Large how hard?}}\oldexercise}
+  {\oldendexercise\ifdraft\EXTEMP\EXTEMPTOO\fi}
+\newcommand{\nosolutionsymbol}{\ensuremath{\nrightarrow}}
+\newcommand{\nosolution}{\nosolutionsymbol\gdef\EXTEMP{}}
+\newcommand{\GRADED}{\gdef\EXTEMPTOO{}}
+
+\newcommand{\QuickCheckSymbol}{\mbox{$\bigstar$}}
+\newcommand{\EasySymbol}{\mbox{$\bigstar\mskip-2mu\bigstar$}}
+\newcommand{\ModerateSymbol}{\mbox{$\bigstar\mskip-2mu\bigstar\mskip-2mu\bigstar$}}
+\newcommand{\ChallengingSymbol}{\mbox{$\bigstar\mskip-2mu\bigstar\mskip-2mu\bigstar\mskip-2mu\bigstar$}}
+\newcommand{\QuickCheck}{\QuickCheckSymbol\GRADED}
+\newcommand{\Easy}{\EasySymbol\GRADED}
+\newcommand{\Moderate}{\ModerateSymbol\GRADED}
+\newcommand{\Challenging}{\ChallengingSymbol\GRADED}
+\newcommand{\DoIt}{{\bcptheoremheaderfont Recommended}}
+\newcommand{\Recommended}{\DoIt}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Theorems, lemmas, etc.
+
+\newbcptheorem{term}{Terminology}
+\newbcptheorem{note}{Note}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Figures and displays
+
+\newcommand{\bcpcaption}[2]{\ttlabel{#1}%
+  \begin{flushleft}%
+    {\bf Figure \@currentlabel: #2}%
+  \end{flushleft}
+}
+% \newcommand{\prefacecaption}[2]{%
+%     \refstepcounter{ttfigure}%
+%     {\bf Figure P-\arabic{ttfigure}:}  #2
+%     \label{fig:#1}%
+% }
+
+\newenvironment{indentleft}
+               {\list{}{}%
+                \item\relax}
+               {\endlist}
+
+\newenvironment{wide}
+               {\list{}{\advance\leftmargin -113pt
+                        \advance\textwidth 100pt
+                        \itemindent 0pt
+                        \labelsep 0pt
+                        \labelwidth 0pt}%
+                \item\relax}
+               {\endlist}
+
+\newenvironment{widefigure}
+    {\begin{figure*}\begin{wide}}
+    {\end{wide}\end{figure*}}
+
+\newenvironment{TTCOMPONENTONECOL}[2]{%
+  \gdef\COMPONENTLABEL{#1}%
+  \gdef\COMPONENTNAME{#2}%
+  \begin{figure}\begin{wide}%
+  \begin{minipage}{\linewidth}%
+  \TTtoprule
+  }{%
+  \end{minipage}%
+  \bcpcaption{\COMPONENTLABEL}{\COMPONENTNAME}%
+  \end{wide}\end{figure}%
+  }
+
+\newcommand{\finaldisplay}[1]{%
+  \begin{trivlist}%
+    \@beginparpenalty\predisplaypenalty
+    \@endparpenalty\postdisplaypenalty
+    \item[]\leavevmode
+    \hb@xt@\linewidth\bgroup 
+      \hspace{\bcpdisplayindent}$\m@th\displaystyle %
+      #1$%
+      \hfil
+      \endofpf
+    \egroup
+  \end{trivlist}%
+}
+
+\@ifundefined{begintrivarray}{
+  \newenvironment{trivarray}{\begin{array}[t]{@{}llll}}{\end{array}}
+}{
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Bibliography and citation formatting
+
+\newcommand{\citeterse}{\citep}
+\newcommand{\citeyr}[1]{(\citeyear{#1})}
+\newcommand{\citeyropen}[1]{\citeyear{#1}}
+\newcommand{\longcite}[1]{\citeauthor{#1} \citeyearpar{#1}}
+\newcommand{\fulllongcite}[1]{\citeauthor*{#1} \citeyearpar{#1}}
+\newcommand{\citeopen}[1]{\citealp*{#1}}
+\newcommand{\citeopenterse}[1]{\citealp{#1}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Comments
+
+\renewenvironment {comment}{\begin{quote}\color{blue}}{\end{quote}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Compact notations for TAPL-style ``XXX..YYY'' superscripts
+
+\newcommand{\VARUPTO}[2]%
+  {\ensuremath{\,^{\scriptscriptstyle \,#1\mathord{\in}\SMALLFROMTO{\mathit{1}}{#2}}}}
+\newcommand{\IUPTO}[1]{\VARUPTO{i}{#1}}
+\newcommand{\ONEUPTON}{\FROMTO{\mathit{1}}{n}}
+\newcommand{\IUPTON}{\VARUPTO{i}{n}}
+\newcommand{\AUPTOO}{\VARUPTO{a}{o}}
+\newcommand{\AUPTOM}{\VARUPTO{a}{m}}
+\newcommand{\IUPTOK}{\IUPTO{k}}
+\newcommand{\IUPTOM}{\IUPTO{m}}
+\newcommand{\JUPTOM}{\VARUPTO{j}{m}}
+\newcommand{\KUPTOM}{\VARUPTO{k}{m}}
+\newcommand{\JUPTOP}{\VARUPTO{j}{p}}
+\newcommand{\JUPTON}{\VARUPTO{j}{n}}
+\newcommand{\LUPTOQ}{\VARUPTO{l}{q}}
+\newcommand{\JUPTOIMINUSONE}{\VARUPTO{j}{i\smallminus\mathit{1}}}
+\newcommand{\IUPTONPLUSK}{\IUPTO{n\mathord{+}k}}
+\newcommand{\IUPTOJMINUSONE}{\IUPTO{j\!\smallminus\!\mathit{1}}}
+\newcommand{\KFROMJPLUSONEUPTON}%
+  {\ensuremath{^{\scriptscriptstyle 
+     \,k\mathord{\in}j\!\mathord{+}\!\FROMTO{\mathit{1}}{n}}}}
+\newcommand{\KFROMIPLUSONEUPTON}%
+  {\ensuremath{^{\scriptscriptstyle 
+     \,k\mathord{\in}i\!\mathord{+}\!\FROMTO{\mathit{1}}{n}}}}
+
+\newcommand{\DOTDOT}{\mathord{.\hspace*{-.05em}.}}
+\newcommand{\SMALLDOTDOT}{\mathord{..}}
+\newcommand{\FOREACH}[1]{\mbox{for each $#1$}\ \ \ \ }
+\newcommand{\FOREACHIUPTON}{\FOREACH{i}}
+\newcommand{\FROMTO}[2]{#1\DOTDOT#2}
+\newcommand{\SMALLFROMTO}[2]{#1\SMALLDOTDOT#2}
+
+\newcommand{\pfdisplayhack}[1][0pt]{\vspace*{-6ex}\vspace*{-#1}\leavevmode
+  \\ \hbox{} \hfill\endofpf\iffinalcheck\marginpar{check $\Box$}\fi}

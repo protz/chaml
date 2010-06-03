@@ -1,0 +1,363 @@
+% BCP's theorems and such
+
+\usepackage{amssymb}
+
+% Control breaking before sectioning commands:
+\newif \ifbcptheorembreakbeforesections  \bcptheorembreakbeforesectionsfalse
+
+% Global counter for numbered text:
+\newcounter{numtextctr}[section]
+
+% We change the look of the numbered text counter depending on
+% whether we're inside a section, a subsection, etc.
+\renewcommand{\thenumtextctr}{\thesection.\arabic{numtextctr}}
+
+% Redefinitions of sectioning commands
+
+\def\thepartname{}
+\def\thechaptername{}
+
+%\let\@@ORIGpart=\part
+%\renewcommand{\part}[1]{\@@ORIGpart{#1}%
+%  \setcounter{numtextctr}{0}%
+%  \gdef\thepartname{Part \thepart. #1}
+%  \renewcommand{\thenumtextctr}{\thepart.\arabic{numtextctr}}}
+\newcommand{\prt}[1]{\part{#1}%
+  \setcounter{numtextctr}{0}%
+  \gdef\thepartname{Part \thepart. #1}
+  \renewcommand{\thenumtextctr}{\thepart.\arabic{numtextctr}}}
+\newcommand{\prtstar}[1]{\part*{#1}% 
+  \setcounter{numtextctr}{0}%
+  \gdef\thepartname{#1}
+  \renewcommand{\thenumtextctr}{\thepart.\arabic{numtextctr}}}
+
+\newcommand{\chapstar}[1]{\cleardoublepage\chapter*{#1}%
+  \setcounter{numtextctr}{0}%
+  \gdef\thechaptername{\thechapter. #1}
+  \renewcommand{\thenumtextctr}{\thechapter.\arabic{numtextctr}}}
+
+%\let\@@ORIGchapter=\chapter
+%\renewcommand{\chapter}[1]{\cleardoublepage\@@ORIGchapter{#1}%
+%  \setcounter{numtextctr}{0}%
+%  \gdef\thechaptername{#1}
+%  \renewcommand{\thenumtextctr}{\thechapter.\arabic{numtextctr}}}
+%\newcommand{\chap}{\chapter}
+\newcommand{\chap}[1]{\cleardoublepage\chapter{#1}%
+  \setcounter{numtextctr}{0}%
+  \gdef\thechaptername{\thechapter. #1}
+  \renewcommand{\thenumtextctr}{\thechapter.\arabic{numtextctr}}}
+
+\def\@@OLDsection{\sect}
+\newcommand{\sect}[1]{%
+  \ifbcptheorembreakbeforesections
+    \@ifundefined{breakifnearbottom}{}{\breakifnearbottom}
+  \fi
+  \@@OLDsection{#1}\nopagebreak[4]%
+  \setcounter{numtextctr}{0}%
+  \renewcommand{\thenumtextctr}{\thesection.\arabic{numtextctr}}}
+
+\AtBeginDocument{
+  \let\@@OLDsection=\section
+  \renewcommand{\section}{\sect}
+}
+
+\newcommand{\subsect}[1]{%
+  \ifbcptheorembreakbeforesections
+    \@ifundefined{breakifnearbottom}{}{\breakifnearbottom}
+  \fi
+  \ifnum \c@secnumdepth > 1 
+    \subsection{#1}%
+    \setcounter{numtextctr}{0}%
+    \renewcommand{\thenumtextctr}{\thesubsection.\arabic{numtextctr}}%
+  \else
+    \subsection*{#1}%
+    \addcontentsline{toc}{subsection}{\ \ \ #1}%
+  \fi
+  }
+\newcommand{\subsubsect}[1]{%
+  \ifbcptheorembreakbeforesections
+    \@ifundefined{breakifnearbottom}{}{\breakifnearbottom}
+  \fi
+  \subsubsection{#1}%
+  \ifnum \c@secnumdepth > 2
+    \setcounter{numtextctr}{0}%
+    \renewcommand{\thenumtextctr}{\thesubsubsection.\arabic{numtextctr}}%
+  \fi}
+
+\newif\ifnumbertheorems \numbertheoremstrue
+
+% The next few definitions are cribbed from latex.tex:
+\def\newbcptheorem#1#2{%
+  \global\@namedef{#1}{\@bcpthm{#2}}%
+  \global\@namedef{end#1}{\@endbcptheorem}}
+ 
+\def\@bcpthm#1{%
+   \refstepcounter{numtextctr}%
+   \let \theHnumtextctr \thenumtextctr
+   \@ifnextchar[{\@bcpythm{#1}}{\@bcpxthm{#1}}}
+
+\def\@bcpxthm#1{\@beginbcptheorem{#1}{}\ignorespaces}
+\def\@bcpythm#1[#2]{\@beginbcptheorem{#1}{ [#2]}\ignorespaces}
+ 
+\def\formatbcptheoremnumber#1{#1\ }
+
+\def\bcptheoremheaderfont{\bf}
+
+\def\everyendbcptheorem{}
+\def\everybeginbcptheorem{}
+\def\@beginbcptheorem#1#2{%
+   \everybeginbcptheorem
+   \trivlist 
+     \item[\hskip \labelsep{\bcptheoremheaderfont
+                     \ifnumbertheorems
+                         \formatbcptheoremnumber{\thenumtextctr}%
+                     \fi #1#2:}]}
+\def\@endbcptheorem{\everyendbcptheorem\endtrivlist}
+ 
+ 
+% Some standard bcptheorem environments:
+\newbcptheorem{axiom}{Axiom}
+\newbcptheorem{theorem}{Theorem}
+\newbcptheorem{lemma}{Lemma}
+\newbcptheorem{prop}{Proposition}
+\newbcptheorem{fact}{Fact}
+\newbcptheorem{proposition}{Proposition}
+\newbcptheorem{corollary}{Corollary}
+\newbcptheorem{defn}{Definition}
+\newbcptheorem{definition}{Definition}
+\newbcptheorem{conjecture}{Conjecture}
+\newbcptheorem{observation}{Observation}
+\newbcptheorem{remark}{Remark}
+\newbcptheorem{example}{Example}
+\newbcptheorem{abbreviation}{Abbreviation}
+\newbcptheorem{abbrev}{Abbreviation}
+\newbcptheorem{notation}{Notation}
+\newbcptheorem{convention}{Convention}
+\newbcptheorem{conventions}{Conventions}
+\newbcptheorem{exercise}{Exercise}
+
+\def\endofpfmarker{\mbox{$\square$}}
+\def\endofpfcommands{%
+  \ifmmode
+    % This assumes that the fleqn style is being used:
+    \egroup$\hbox{\ }\hfill\endofpfmarker$\bgroup
+  \else
+    ~\hfill\endofpfmarker
+  \fi
+  }
+\def\endofpf{}
+\def\noendofpf{\gdef\endofpf{}}
+\def\startofpf{\gdef\endofpf{\endofpfcommands\gdef\endofpf{}}}
+
+\newcommand{\prooflabelface}{\bf}
+
+\newenvironment{pf}{%
+   \startofpf \trivlist
+     \item[\hskip \labelsep{\prooflabelface
+                     Proof: 
+                   }]%
+   }{\endofpf\endtrivlist}
+\newenvironment{pfof}[1]{%
+   \startofpf \trivlist
+     \item[\hskip \labelsep{\prooflabelface 
+                     Proof of #1: 
+                   }]%
+   }{\endofpf\endtrivlist}
+\newenvironment{pfsketch}{%
+   \startofpf \trivlist
+     \item[\hskip \labelsep{\prooflabelface 
+                     Proof sketch: 
+                   }]%
+   }{\endofpf\endtrivlist}
+
+% Aliases
+\@ifundefined{proof}{
+  \newenvironment{proof}{\begin{pf}}{\end{pf}}}{}
+\newenvironment{proofof}{\begin{pfof}}{\end{pfof}}
+\newenvironment{proofsketch}{\begin{pfsketch}}{\end{pfsketch}}
+
+% These are now deprecated:
+\newenvironment{pfnobox}{\begin{pf}}{\end{pf}}
+\newenvironment{pfofnobox}[1]{%
+   \trivlist  \startofpf
+     \item[\hskip \labelsep{\bf 
+                     Proof of #1: 
+                   }]%
+   }{\endofpf\endtrivlist}
+\newenvironment{pfsketchnobox}{%
+   \trivlist  \startofpf
+     \item[\hskip \labelsep{\bf 
+                     Proof sketch: 
+                   }]%
+   }{\endofpf\endtrivlist}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Still needs to be fixed!!
+\newcommand{\casefont}{\bcptheoremheaderfont}
+\newcommand{\casecolonfont}{\rm}
+\newcounter{casecounter}
+\renewcommand{\thecasecounter}{\roman{casecounter}}
+
+\def\flushtopCaseHeader#1{%
+   \raise 0.5\baselineskip
+   \hbox{%
+    {\setbox\@tempboxa\hbox{#1}%
+     \@tempdima\dp\@tempboxa
+     \@tempdimb\ht\@tempboxa
+     \ht\@tempboxa\z@
+     \lower \@tempdimb \box\@tempboxa
+     }}}
+
+\def\indentedtext{\list{}{
+   \listparindent 1.5em 
+ % \itemindent\listparindent
+ % \advance\leftmargin -1em
+   \advance\leftmargin .5em 
+ \itemindent 0em
+ \parsep 0pt plus 1pt
+ \partopsep 0pt 
+ \topsep 0pt plus 1pt minus 1pt}\item[]}
+\let\endindentedtext=\endlist
+
+% \newenvironment{bcpcasearray}{\quad\begin{array}[t]{@{}l@{\qquad}l@{\qquad}l@{\qquad}l}}{\end{array}}
+\newenvironment{bcpcasearray}{\quad\begin{array}[t]{@{}l@{}l@{}l@{}l}}{\end{array}} 
+
+% \newenvironment{namedcase}[1]{%
+%         \smallbreak \pagebreak[3]
+%         \noindent #1 \nobreak 
+%         \list{}{\topsep 0pt plus 1pt
+%                 \partopsep 0pt
+%                 \parskip 0pt
+%                 \leftmargin 1.5pc  
+%                 \@beginparpenalty\@M
+%                 }\item[]\clubpenalty\@M}%
+%         {\endlist}
+\newenvironment{namedcase}[1]{% 
+        \smallbreak \pagebreak[3]
+        \noindent #1 \\[\smallskipamount] \noindent \ignorespaces}%
+        {}
+
+\newenvironment{case}[1]{%
+        \refstepcounter{casecounter}%
+        \begin{namedcase}{{\casefont{Case} \thecasecounter\casecolonfont: } #1}%
+        }{\end{namedcase}}
+
+\newenvironment{textcase}[1]{%
+        \refstepcounter{casecounter}%
+        \begin{namedcase}{{\casefont{Case}\casecolonfont: } #1}%
+        }{\end{namedcase}}
+
+\newenvironment{namedeqncase}[2]{%
+        \begin{namedcase}{{\casefont{Case} {\rm #1}\casecolonfont: } 
+          $\begin{bcpcasearray}
+            #2
+          \end{bcpcasearray}$}%
+        }{\end{namedcase}}
+
+\newenvironment{numberedcase}[2]{%
+        \begin{namedcase}{{\casefont{Case} {\rm #1}\casecolonfont: } $\bcpcasearray{#2}$ }%
+        }{\end{namedcase}}
+
+\newenvironment{numberedcases}[2]{%
+        \begin{namedcase}{{\casefont{Cases} {\rm #1}\casecolonfont: } $\bcpcasearray{#2}$ }%
+        }{\end{namedcase}}
+
+\newenvironment{namedcases}[1]{%
+        \begin{namedcase}{{\casefont{Cases} {\rm #1}\casecolonfont: }}%
+        }{\end{namedcase}}
+
+\newenvironment{rncase}[1]{%
+        \begin{namedcase}{{\casefont{Case} \rn{#1}\casecolonfont: }}%
+        }{\end{namedcase}}
+
+\newenvironment{rntextcase}[2]{%
+        \begin{namedcase}{{\casefont{Case} \rn{#1}\casecolonfont: } #2}%
+        }{\end{namedcase}}
+
+\newenvironment{rneqncase}[2]{%
+        \begin{namedcase}{{\casefont{Case} \rn{#1}\casecolonfont: } 
+           $\begin{bcpcasearray} #2 \end{bcpcasearray}$ }%
+        }{\end{namedcase}}
+
+\newenvironment{rnsubcase}[1]{%
+        \begin{namedcase}{{\casefont{Subcase} \rn{#1}\casecolonfont: }}%
+        }{\end{namedcase}}
+
+\newenvironment{rneqnsubcase}[2]{%
+        \begin{namedcase}{{\casefont{Subcase} \rn{#1}\casecolonfont: } 
+           $\begin{bcpcasearray} #2 \end{bcpcasearray}$ }%
+        }{\end{namedcase}}
+
+\newenvironment{textsubcase}[1]{%
+        \begin{namedcase}{{\casefont{Subcase}\casecolonfont: } #1}\ignorespaces
+        }{\end{namedcase}}
+
+\newenvironment{eqncase}[1]{%
+        \begin{namedcase}{{\casefont{Case\/}\casecolonfont: } 
+           $\begin{bcpcasearray} #1 \end{bcpcasearray}$ }\ignorespaces
+        }{\end{namedcase}}
+
+\newenvironment{eqnsubcase}[1]{%
+        \begin{namedcase}{{\casefont{Subcase\/}\casecolonfont: } 
+           $\begin{bcpcasearray} #1 \end{bcpcasearray}$ }\ignorespaces
+        }{\end{namedcase}}
+
+\newenvironment{othercases}{%
+        \begin{namedcase}{{\casefont{Other cases\/}\casecolonfont:}}
+           \ignorespaces
+        }{\end{namedcase}}
+
+\newenvironment{othersubcases}{%
+        \begin{namedcase}{{\casefont{Other subcases}\/\casecolonfont:}}
+           \ignorespaces
+        }{\end{namedcase}}
+
+\newenvironment{rulepaircase}[3]{%
+        \begin{namedcase}{{\casefont{Case} \rn{#1}/\rn{#2}\casecolonfont: }
+        $#3$}\smallskip%
+        }{\end{namedcase}}
+
+\newenvironment{rulecase}[2]{%
+        \begin{namedcase}{{\casefont{Case} \rn{#1}\casecolonfont:}\hfill
+        \advancedepthby{0.5\baselineskip}%
+                       {\flushtopCaseHeader{\small #2}}\hfill}}{\end{namedcase}}
+
+\newenvironment{infaxcase}[2]{%
+        \begin{namedcase}{{\casefont{Case} \rn{#1}\casecolonfont: } $#2$}\smallskip %
+        }{\end{namedcase}}
+
+\newenvironment{infrulecase}[3]{%
+        \begin{namedcase}{{\casefont{Case} \rn{#1}\casecolonfont: } 
+                          ${\strut\displaystyle #2}
+                           \over
+                           {\strut\displaystyle #3}$}
+                         \smallskip
+        }{\end{namedcase}}
+
+\newenvironment{infaxpluscase}[3]{%
+        \begin{namedcase}{{\casefont{Case} #1\casecolonfont: } $#2$\ \ \ #3}\smallskip
+        }{\end{namedcase}}
+
+\newenvironment{infrulepluscase}[4]{%
+        \begin{namedcase}{{\casefont Case #1\casecolonfont: } 
+                          ${\strut\displaystyle #2}
+                           \over
+                           {\strut\displaystyle #3}$
+                          \ \ \ #4}
+                         \smallskip
+        }{\end{namedcase}}
+
+\newenvironment{basecase}[1]{%
+        \begin{namedcase}{{\casefont{Base step}\casecolonfont: } #1}%
+        }{\end{namedcase}}
+
+\newenvironment{inductioncase}[1]{%
+        \begin{namedcase}{{\casefont{Induction step}\casecolonfont: } #1}%
+        }{\end{namedcase}}
+

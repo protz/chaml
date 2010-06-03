@@ -1,0 +1,104 @@
+\usepackage{amsmath,amssymb,amsopn} %amsopn pour les nouveaux opérateurs
+\usepackage{mathrsfs} %pour la police anglaise \mathscr{}
+\usepackage{array} %pour les nouveaux types de colonne à côté des graphiques (\begin{array}{b})
+\usepackage{calc} %faire des + - * / dans le code
+\usepackage[pdftex,a4paper]{geometry} %changer les marges simplement
+\usepackage{wrapfig} %les images (graphiques) avec le texte qui s'adapte
+\usepackage{enumerate} %pour les i) ii)
+\usepackage{multirow} %pour la partie Gauss des matrices
+\usepackage{xspace} %pour la fin des commandes \dl, \sev, pour pouvoir faire \dl. et \dl mot après.
+
+%latex mange trop de marges
+\geometry{lmargin=15mm,rmargin=15mm,tmargin=20mm,bmargin=23mm}
+
+%les petites boîtes exemple
+\newcounter{exemple}
+\setcounter{exemple}{1}
+\renewcommand{\theexemple}{\Roman{exemple}}
+\newcommand{\exemple}[3]{\petiteboite{#1}{#2}{\quad\textsc{\bfseries{}Exemple \theexemple\stepcounter{exemple}}}{#3}} 
+\newcommand{\petiteboite}[4]{\begin{wrapfigure}{#1}{#2}{\fbox{\parbox{#2}{\quad\textsc{\bfseries{}#3 }\vspace{.5ex}\\\small{}#4}}}} 
+
+%gestion de ma nouvelle hiérarchie : partie
+%USAGE: \part{Mon titre} OU BIEN \part[1]{Mon titre qui tient sur deux lignes
+%avec un meilleur espacement entre les lignes}
+\newcounter{partie}
+\newlength{\lligne}
+\newlength{\lmot}
+\newlength{\vhack}
+\renewcommand{\thepartie}{\Roman{partie}}
+\newcommand{\partiename}{Partie}
+\newcommand{\partiemark}[1]{\markboth{\thepartie.\quad#1}{\thepartie.\quad#1}}
+\renewcommand{\part}[2][0]{
+  \newpage
+  \stepcounter{partie}
+  \setcounter{section}{0}
+  %pour la table des matières
+  \addcontentsline{toc}{partie}{\bfseries\scshape\numberline{\thepartie}#2}
+  \partiemark{#2}
+  %UGLY HACK ! pour avoir des en-têtes corrects malgré tout
+  \renewcommand{\rightmark}{\thepartie.\quad#2}
+  %calcul de la largeur de la ligne à gauche de ``Partie 1''
+  \settowidth{\lmot}{\large\textsc{Part \thepartie}}
+  \setlength{\lligne}{(\columnwidth - \lmot - 2em)/2}
+  %pour l'option
+  \setlength{\vhack}{\smallskipamount*#1}
+  %tracé effectif
+  \begin{center}
+  %\hspace{-.5ex}
+  \rule[.5ex]{\lligne}{.05em}\quad{\large\textsc{Part \thepartie}}\quad
+  \rule[.5ex]{\lligne}{.05em}
+  {\vspace{\vhack}\huge\textsc{#2}}
+  \hfil\rule[1.5ex]{\lligne + \lligne + 2em + \lmot}{.05em}
+  \vspace{-2ex}
+  %il reste un bug : la deuxième ligne est un pixel trop à gauche
+  \end{center}
+}
+
+%le look des sections
+\makeatletter
+\renewcommand{\section}{\@startsection{section}{1}{0em}%
+  {\baselineskip}{.25\baselineskip}%
+  {\center\large\bfseries}}
+\makeatother
+\renewcommand{\sectionmark}[1]{\markboth{\thesection.\ #1}{\rightmark}}
+%\renewcommand{\thesection}{\thepartie.\arabic{section}}
+\renewcommand{\thesection}{\arabic{section}}
+
+%le look des subsections
+\makeatletter
+\renewcommand{\subsection}{\@startsection{subsection}{2}{0em}
+  {.5\baselineskip}{.125\baselineskip}
+  {\bfseries\sffamily}}
+\makeatother
+\renewcommand{\thesubsection}{\alph{subsection}.\!}
+
+%le look des subsubsections
+\makeatletter
+\renewcommand{\subsubsection}{\@startsection{subsubsection}{3}{0em}
+  {.5\baselineskip}{.125\baselineskip}
+  {\center\sffamily}}
+\makeatother
+\renewcommand{\thesubsubsection}{\Large$\star$}
+
+%pour la table des matières, personnalisation de l'affichage
+\makeatletter
+\newcommand\l@partie{\@dottedtocline{-1}{0em}{2.3em}}
+\renewcommand\l@section{\@dottedtocline{1}{.5em}{1.5em}}
+\renewcommand\l@subsection{\@dottedtocline{1}{1em}{1.7em}}
+\makeatother
+
+%les caractères jolis de fin de section
+\DeclareFontFamily{OT1}{sincos}{}
+\DeclareFontShape{OT1}{sincos}{m}{n}{<-> sincos}{}
+\newcommand{\sincos}{\fontencoding{OT1}\fontfamily{sincos}\fontseries{m}%
+  \fontshape{n}\fontsize{10}{12}\selectfont}
+
+%les en-têtes
+\pagestyle{plain}
+\makeatletter
+\renewcommand{\@evenfoot}{\hfil\itshape - \thepage\ -\hfil}
+\renewcommand{\@oddfoot}{\@evenfoot}
+\renewcommand{\@evenhead}{\textsc{\bfseries\large\rightmark}\ \hfil\ {\footnotesize\leftmark}}
+\renewcommand{\@oddhead}{{\footnotesize\leftmark}\ \hfil\ \textsc{\bfseries\large\rightmark}}
+\makeatother
+

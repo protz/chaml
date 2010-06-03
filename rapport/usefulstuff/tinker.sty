@@ -1,0 +1,292 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% BCP's ``TinkerType'' package for modular description of
+% systems of inference rules
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Definitions:
+% ------------
+%
+% FEATURE -- an identifying tag for grouping sets of related rules
+% (usually typeset in a box)
+%
+% RULE --
+%    1) NAME -- a string
+%    2) BODY -- an axiom, inference rule, or syntax clause
+%
+% a COMPONENT consists of
+%    1) an uninterpreted TITLE
+%    2) a set of SELECTING FEATURES 
+%    3) a set of REQUIRED FEATURES
+%    4) a collection of RULES
+%
+% CORPUS -- a sequence of COMPONENTS (perhaps with intervening text)
+%
+% SYSTEM SPEC -- a set of FEATURES (usually typeset \Lam{FEATURES})
+%
+% SYSTEM -- a collection of relations defined from a system spec S and a
+% corpus CR as follows: 
+%    1) Close S under dependencies: for each component C in CR, if all  
+%       the selecting features of C are present in S, then add all the
+%       required features of C to S.
+%    2) Select from CR the rules from all the components whose selecting
+%       features are in S.
+%    3) Delete all but the rightmost occurrence of rules with the same
+%       name. 
+%    4) Take the least fixed point of the resulting set of rule bodies.
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% User parameters for component layout
+\newlength{\TTRuleDepth}
+\setlength{\TTRuleDepth}{.25mm}
+\newlength{\TTDescenderWidth}
+\setlength{\TTDescenderWidth}{.35mm}
+\newlength{\TTDescenderHeight}
+\setlength{\TTDescenderHeight}{1.5mm}
+\newlength{\TTOverhang}
+\setlength{\TTOverhang}{.8mm}
+
+\newif \iftttwocol  \tttwocoltrue
+
+% Internals
+\newif \ifinsideTTcomponent  \insideTTcomponentfalse
+
+\newlength{\TTTopDescenderOffset}
+\setlength{\TTTopDescenderOffset}{\TTDescenderHeight}
+\addtolength{\TTTopDescenderOffset}{-\TTRuleDepth}
+\newcommand{\TTtoprule}{%
+  \noindent
+  \makebox[\linewidth]{%
+    \hspace*{-1\TTDescenderWidth}%
+    \hspace*{-1\TTOverhang}%
+    %\hspace*{-1cm}
+    \rule[-\TTTopDescenderOffset]{\TTDescenderWidth}{\TTDescenderHeight}%
+    \rule{\linewidth}{\TTRuleDepth}%
+    \rule{2\TTOverhang}{\TTRuleDepth}%
+    \rule[-\TTTopDescenderOffset]{\TTDescenderWidth}{\TTDescenderHeight}%
+  }
+}
+
+\newcommand{\TTbottomrule}{%
+  \makebox[\linewidth]{%
+    \hspace*{-1\TTDescenderWidth}%
+    \hspace*{-1\TTOverhang}%
+    \rule{\TTDescenderWidth}{\TTDescenderHeight}%
+    \rule{\linewidth}{\TTRuleDepth}%
+    \rule{2\TTOverhang}{\TTRuleDepth}%
+    \rule{\TTDescenderWidth}{\TTDescenderHeight}%
+  }
+}
+
+\newenvironment{tinkerlist}{%
+  \nopagebreak[4]
+  \begingroup
+  \setlength{\afterruleskip}{.4ex}%
+  \begin{list}{}{\leftmargin 0pt
+                 \rightmargin \leftmargin
+                 \labelwidth 0pt
+                 \itemindent 0pt
+                 \parindent 0pt
+                 \topsep .5ex
+                 \partopsep 0pt
+                 \itemsep 0pt
+                 \parsep 0pt
+                }
+  \item[]
+  \nopagebreak[4]
+  % \begin{multicols}{2}
+}{%
+  % \end{multicols}
+  \nopagebreak[4]%
+  \end{list}%
+  \vskip-2ex
+  \nopagebreak[4]%
+  \endgroup
+  \noindent \ignorespaces
+}
+
+\newif\ifttfigures  \ttfigurestrue
+
+\DeclareRobustCommand{\nonbreakhyphen}{\hbox{-}}
+
+\newcommand{\ttlabel}[1]{%
+  \refstepcounter{figure}%
+  % \gdef\@currentlabel{\arabic{chapter}-\arabic{figure}}%
+  % \gdef\@currentlabel{\thechapter\nonbreakhyphen\arabic{figure}}%
+  \label{fig:#1}%
+}
+
+\newcommand{\ttsamelabel}{%
+  % \gdef\@currentlabel{\arabic{chapter}-\arabic{figure}}%
+  %\gdef\@currentlabel{\thechapter\nonbreakhyphen\arabic{figure}}%
+}
+
+\def\hackyinsertmulticolbugspace{}
+\def\extraspacehack#1{\gdef\hackyinsertmulticolbugspace{\vskip #1}}
+
+\newenvironment{TTCOMPONENT}[3][\empty]{%
+  % Arg 1 (optional) = conventional symbol
+  % Arg 2            = written-out name
+  % Arg 3            = features
+  \insideTTcomponenttrue
+  %\@ifundefined{breakifnearbottom}{}{\breakifnearbottom}
+  \ifttfigures\else
+    \@ifundefined{breakifoverfraction}{}{\breakifoverfraction{0.7}}%
+    \noindent
+  \fi
+  \begingroup
+  \ifttfigures 
+    \begin{figure*}[ht]%
+  \fi
+  %\iftttwocol
+    \begin{list}{}{\advance\leftmargin -15pt}\item
+  %\fi
+  \relax
+      \makebox[\linewidth]{%
+       \it
+       #3
+       \gdef\ttcomponentlabel{#2}%
+       \hfill 
+       #1\relax
+      }%
+      \\[-2mm]
+    \nopagebreak[4]%
+    \TTtoprule
+    \vskip-.2ex
+    \begin{tinkerlist}%
+    % \iftttwocol
+      \setlength{\multicolsep}{0pt}%
+      \setlength{\columnsep}{15pt}%
+      \setlength{\premulticols}{0pt}%
+      \setlength{\postmulticols}{0pt}%
+      \setlength{\columnseprule}{.3pt}%
+      \raggedcolumns
+      \iftttwocol \begin{multicols}{2}%
+         %\else \begin{multicols}{1}%
+      \fi
+      \vspace*{-2.6ex}   % HACK!!
+    % \fi
+  \gdef\AFTERTTCOMPONENTHACK{}%
+}{%
+  \iftttwocol \end{multicols}\else \item xxx \fi
+  \end{tinkerlist}%
+  \vskip-2.0ex
+  \noindent
+    \hackyinsertmulticolbugspace 
+    \gdef\hackyinsertmulticolbugspace{}%
+  \TTbottomrule
+  \ifttfigures
+     % One way:
+     %{\bf \hspace*{87pt}\@currentlabel: \ttcomponentlabel}%
+     % Another way:
+     %\makebox[\linewidth]{%
+     %  \hfil \bf \@currentlabel: \ttcomponentlabel \hfil }%
+    %{\bf Figure \@currentlabel: \ttcomponentlabel}%
+    \caption{\ttcomponentlabel}
+    \addcontentsline{lof}{figure}{\numberline{\@currentlabel}{\ttcomponentlabel}}%
+    % \iftttwocol 
+      \end{list}%
+    % \fi
+    \vspace*{-2ex}
+    \AFTERTTCOMPONENTHACK
+    \end{figure*}%
+  \fi
+  \endgroup
+  \insideTTcomponentfalse
+}
+
+\newcommand{\REQUIRES}[1]{\quad Requires #1}
+\newcommand{\INCLUDES}[1]{\quad Includes #1}
+
+\newcommand{\summaryhead}[2][\empty]{%
+   % \@ifundefined{breakifnearbottom}{}{\breakifnearbottom}%
+   \vspace{.4ex}
+   \noindent 
+     \ifx#1\empty {\it #2}%
+     % I wanted to put a \disablehighlighting inside the \ensuremath,
+     % but it made the spacing come out funny...
+     \else {\it #2} \hfill \fbox{\ensuremath{#1}}%
+     \fi
+   }
+
+\newcommand{\TTskip}{%
+   \medskip\pagebreak[2]%\breakifnearbottom
+   }
+\newcommand{\syntaxskipamount}{1mm}
+
+\newcommand{\TTCurrentSyntaxCategory}{}
+\newcommand{\TTSyntaxCategory}[1]{%
+  \gdef\TTCurrentSyntaxCategory{%
+           \vbox to 1.2em{}%
+           \ensuremath{#1} \ \ ::= \ \ }%
+  \ignorespaces}
+
+\newcommand{\syntaxboxwidth}{1.3cm}
+
+\newcommand{\TTSyntaxCategoryNamed}[3]{%
+ \hbox to \linewidth{%
+   \hbox to \syntaxboxwidth{\vbox to 1.2em{}\hfil\ensuremath{#1} \ \ ::= \ \ 
+    \ifthenelse{\equal{#2}{}}{\hskip 0em minus 1em}{}}%
+    #2 \hfil 
+    \iftttwocol
+      {\it #3:}%
+    \else
+      \hbox to 1.4in{{\it #3}\hfil}%
+    \fi
+   }
+ }
+
+\newcommand{\TTSyntaxAlternative}[2]{%
+  \leavevmode
+%  \ifinsideTTcomponent
+    \hbox to \linewidth{%
+      \hbox to \syntaxboxwidth{\hfil \TTCurrentSyntaxCategory}%
+      \ensuremath{#1}   \hfil 
+      \iftttwocol
+        {\it #2}%
+      \else
+        \hbox to 1.3in{{\it #2}\hfil}% 
+      \fi
+    }%
+%   \else
+%     \hbox to \textwidth{%
+%       \hbox to 1cm{} 
+%       \hbox to 1.7cm{\hfil \TTCurrentSyntaxCategory}%
+%       \ensuremath{#1}   \hfil {\it #2}% 
+%     }%
+%   \fi
+  \gdef\TTCurrentSyntaxCategory{}%
+  \par
+%  \linebreak
+  \ignorespaces
+}
+
+% \newcommand{\TTSyntaxCategoryNamed}[3]{%
+%   \hbox to \linewidth{%
+%     \hbox to 1.7cm{\vbox to 1.2em{}\hfil\ensuremath{#1} \ \ ::= \ \ }%
+%     #2 \hfil \fbox{{\it #3}}%
+%     }
+%   }
+
+% \newcommand{\TTSyntaxCategoryNamed}[3]{%
+%   \hbox to \linewidth{%
+%     \hbox to 1.7cm{\vbox to 1.2em{}\hfil\ensuremath{#1} \ \ ::= \ \ }%
+%     #2 \hfil ({\it #3}...)%
+%     }
+%   }
+
+\newcommand{\DropRule}[1] {\HIGHLIGHT{{\it Drop old rule:}  #1}%
+                           \vspace{\afterruleskip}}
+\newcommand{\DropRules}[1]{\HIGHLIGHT{{\it Drop old rules:} #1}%
+                           \vspace{\afterruleskip}}
+
+% Features
+\newcommand{\TTfeaturebox}{\fbox}
+\newcommand{\TTfeature}[1]{\protect\TTfeaturebox{\ensuremath{#1}}}
+
+
+
+
+

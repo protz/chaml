@@ -1,0 +1,578 @@
+%; whizzy -macros top.tex
+
+\usepackage{pst-node}
+\let \red \relax
+% -----------------------------------------------------------------------------
+% This Boolean flag tells whether we are compiling a short/full version.
+
+\newboolean{fullpaper}
+\setboolean{fullpaper}{true}
+
+\RequirePackage{moreverb}
+\newenvironment{full}
+  {\ifthenelse{\boolean{fullpaper}}{}{\comment}}
+  {\ifthenelse{\boolean{fullpaper}}{}{\endcomment}}
+\newenvironment{FULL}
+  {\ifthenelse{\boolean{fullpaper}}{}{\comment}}
+  {\ifthenelse{\boolean{fullpaper}}{}{\endcomment}}
+\newenvironment{short}
+  {\ifthenelse{\boolean{fullpaper}}{\comment}{}}
+  {\ifthenelse{\boolean{fullpaper}}{\endcomment}{}}
+
+\newcommand{\ifshort}[1]{\ifthenelse{\boolean{fullpaper}}{}{#1}}
+\newcommand{\iffull}[1]{\ifthenelse{\boolean{fullpaper}}{#1}{}}
+\newcommand{\shortfull}[2]{\ifthenelse{\boolean{fullpaper}}{#2}{#1}}
+\newenvironment{Proof}
+  {\ifthenelse{\boolean{fullpaper}}{\proof}{\comment}}
+  {\ifthenelse{\boolean{fullpaper}}{\endproof}{\endcomment}}
+
+% Display the \nosolution symbol only in the short version, for some exercises.
+\shortfull{\newcommand{\fullsolution}{, \nosolution}}{\newcommand{\fullsolution}{\relax}}
+
+% BCP:
+\newcommand{\indexfull}[1]{\iffull{\index{#1}}}
+\newcommand{\indexsymfull}[2]{\iffull{\indexsym{#1}{#2}}}
+\newcommand{\emphindexfull}[1]{\iffull{\index{#1}}\emph{#1}}
+\newcommand{\emphfull}[1]{\shortfull{#1}{\emph{#1}}}
+
+% -----------------------------------------------------------------------------
+% Environment whose contents must appear in the full version only.
+\newenvironment{fullversion}{\comment}{\endcomment}
+
+% Comment se référer au document lui-même.
+\newcommand{\this}{this chapter\xspace}
+
+% Handy macro.
+\newcommand{\ifnotempty}[2]{\ifthenelse{\equal{#1}{}}{}{#2}}
+
+% Macros for entering/exiting math mode.
+\newcommand{\dollar}{}
+\let\dollar=$
+\newcommand{\doubledollar}{\dollar\dollar}
+
+% BNF definitions.
+\newenvironment{bnf}{\doubledollar\begin{array}{rclr}}{\end{array}\doubledollar}
+\newcommand{\eq}{& = &}
+
+% Règles de réécriture, formatées dans un tableau, avec nom et side-condition.
+\newenvironment{regles}
+  {\begin{tabular*}{\linewidth}{.R:R!{\extracolsep{0em}}C!{}L.R:}}
+  {\end{tabular*}}
+% \newcommand{\regle}[4]{%
+%             #2 & \red & #3   \\
+% (\DefRule{#1}) &      & \ifnotempty{#4}
+%                         {\text{\footnotesize if $#4$}}\\[1mm]
+% }
+\newcommand{\regleskip}{2mm}
+\newcommand{\regle}[4]{&%
+  \ifthenelse{\equal{#4}{}}%
+    {#2 & \red & #3 & (\DefRule{#1}) \\[\regleskip]}%
+    {#2 & \red & #3 & (\DefRule{#1}) \\&
+        &      & \text{\footnotesize if $#4$}\\[\regleskip]}%
+}
+
+% Handy indexing macros.
+\newcommand{\emphindex}[1]{\emph{#1}\index{#1}}
+
+% For proof trees.
+\RequirePackage{usefulstuff/mathpartir}
+\renewcommand {\TirName}[1]{\softlink{#1}{\textsc{#1}}}
+\renewcommand {\RefTirName}[1]{\softtarget{#1}{\textsc{#1}}}
+
+% Keywords.
+\newcommand{\kwd}[1]{\text{\textsf{#1}}}
+\newcommand{\kwtt}[1]{\code{#1}}
+
+% Meta-variables.
+\newcommand{\kind}{\kappa}                % Kind.
+\newcommand{\normalkind}{\star}           % The `normal' kind.
+\newcommand{\fieldkind}{{\circ}}          % The `record field' kind.
+\newcommand{\vfieldkind}{\bullet}         % The `variant field' kind.
+\newcommand{\flagkind}{\diamond}          % The `presence flag' kind.
+\newcommand{\kindarrow}{\Rightarrow}      % The arrow for kinds. 
+\newcommand{\kindprod}{\otimes}           % The product for kinds. 
+
+\newcommand{\model}{\mathcal{M}}          % Model.
+\newcommand{\modelk}[1]{\model_{#1}}      % Model associated with a kind.
+\newcommand{\modeltc}[1]{#1}              % Model function associated with a type constructor.
+\newcommand{\modelp}[1]{#1}               % Model predicate associated with a predicate.
+\newcommand{\ttyp}{{\kwtt{T}}}            % Type.
+\newcommand{\tvar}{{\kwtt{X}}}            % Type variable.
+\newcommand{\twar}{{\kwtt{Y}}}            % Type variable.
+\newcommand{\tzar}{{\kwtt{Z}}}            % Type variable.
+\newcommand{\utvar}{X}                    % User type variable. TEMPORARY déjà pris
+\newcommand{\utvars}{{\bar\utvar}}        % User type variables.
+\newcommand{\uttyp}{T}                    % User type. TEMPORARY déjà pris
+\newcommand{\meq}{\epsilon}               % Multi-equation.
+\newcommand{\co}{C}                       % Constraint.
+\newcommand{\cp}{D}                       % Alternate constraint.
+
+\newcommand{\tnam}{{\kwtt{D}}}            % Type name.
+\newcommand{\dc}{\elab}                   % Data constructor.
+\newcommand{\rl}{\elab}                   % Record label.
+\newcommand{\iso}{\approx}
+\newcommand{\datadef}[3]{#1\,#2\iso#3}
+
+% Expressions.
+\newcommand{\dlet}[2]{\kwtt{let}\;#1=\penalty50\relax#2}
+\newcommand{\elet}[3]{\dlet{#1}{#2}\;\penalty10\kwtt{in}\;\penalty20\relax#3}
+\newcommand{\sdletrec}[2]{\kwtt{letrec}\;#1=#2}
+\newcommand{\dletrec}[3]{\sdletrec{#1}{\efun{#2}{#3}}}
+\newcommand{\sletrec}[3]{\sdletrec{#1}{#2}\;\kwtt{in}\;#3}
+\newcommand{\eletrec}[4]{\sletrec{#1}{\efun{#2}{#3}}{#4}}
+\newcommand{\ppat}{{\kwtt p}}
+\newcommand{\orpat}[2]{#1\vee#2}
+\newcommand{\andpat}[2]{#1\wedge#2}
+\newcommand{\wildpat}{\text{\lower 0.05cm\vbox{\hrule height 0.015cm width 0.15cm}}}
+\newcommand{\gsvee}{\oplus}              % Angelic choice operator. Left bias.
+\newcommand{\biggsvee}{\bigoplus}
+\newcommand{\gswedge}{\otimes}           % Union operator.
+\newcommand{\usualclauses}{{(\ppat_i.\et_i)_{i=1}^k}}
+\newcommand{\ematch}[2]{\kwtt{match}\;#1\;\kwtt{with}\;{\mathcode
+`\."213A #2}}
+\newcommand{\efunction}[1]{\lambda{\mathcode `\. "213A #1}}
+\newcommand{\cconf}[2]{#1/#2}            % Closed configuration. Decided not to distinguish.
+
+% abstract syntax of terms
+\newcommand{\evar}{{\kwtt z}}            % Program variable.
+\newcommand{\efar}{{\kwtt f}}            % Program variable.
+\newcommand{\erar}{{\kwtt r}}            % Program variable.
+\newcommand{\evars}{{\bar\evar}}
+\newcommand{\evarc}{{\vec\evar}}
+\newcommand{\et}{{\kwtt t}}              % Term
+\newcommand {\efun}[2]{\lambda #1.\penalty 200\relax#2} 
+\newcommand {\eapp@one}[1]{#1}
+\newcommand {\eapp@more}{\expandafter \eapp \expandafter [\the\@tempcnta]}
+\newcommand {\eapp}[3][1]{\@tempcnta #1\relax
+  \ifnum \@tempcnta>\@ne 
+    \advance \@tempcnta by \m@ne \let \@do \eapp@more
+  \else \let \@do \eapp@one \fi
+  \@do {#2\;\penalty100\relax#3}}
+\let \tapp \eapp
+\newcommand {\econ}{{\kwtt c}}           % Constant
+\newcommand {\econset}{{\cal Q}}          % Constant
+\newcommand {\edestructors}{\ensuremath{\mathcal Q^-}}          % Constructors
+\newcommand {\econstructors}{\ensuremath{\mathcal Q^+}}         % Destructors
+\newcommand {\evid}{{\kwtt x}}           % Identifier (Var or Constant)
+\newcommand {\ewid}{{\kwtt y}}           % Identifier (Var or Constant)
+\newcommand {\evids}{{\bar \evid}}        % Set of identifiers
+\newcommand {\ehole}[1][]{[#1]}
+\newcommand {\ec}{{\cal E}}               % Evaluation context
+\newcommand {\ecin}[2]{#1[#2]}            % Replacement in evaluation context
+\newcommand {\ev}{{\kwtt v}}              % Value
+\newcommand {\ew}{{\kwtt w}}              % Value
+\newcommand {\evc}{{\vec\ev}}             % Vector of values.
+\newcommand {\ewc}{{\vec\ew}}             % Vector of values.
+\newcommand {\evm}{{\kwtt V}}             % Finite function from row labels to values.
+\newcommand {\es}{\mu}                    % Store
+\newcommand {\eobj}{o}                    % Expression or configuration
+\newcommand {\eS}{M}                      % Store typing
+\newcommand {\tcref}{{\kwd{ref}}}
+\newcommand {\tref}[1]{\tcref\;#1}        % Type of location (arity 1)
+\newcommand {\tbiref}[2]{\kwd{biref}\;#1\,#2} % Type of location (arity 2)
+\newcommand {\eloc}{m}                 % Store location
+\newcommand {\store}[2]{#1\mapsto #2}     % Store cell
+
+\newcommand{\tclist}{{\kwd{list}}}
+\newcommand{\tlist}[1]{\tclist\,#1}
+\newcommand{\nil}{{\kwtt{Nil}}}
+\newcommand{\cons}{{\kwtt{Cons}}}
+
+\newcommand{\tcmaybe}{\mathopen{}\mathrel{\kwd{maybe}}}
+\newcommand{\tceither}{\mathopen{}\mathrel{\kwd{either}}}
+\newcommand {\tcpre}{{\kwd{pre}}}
+\newcommand {\tcabs}{{\kwd{abs}}}
+\newcommand {\tpre}[1]{\mathopen{}\mathrel{\tcpre}#1}
+\newcommand {\tabs}{\tcabs}
+\newcommand {\tdot}{\cdot}
+
+\newcommand{\red}{\rightarrow}            % Reducing constraints.
+
+% set of ...
+\newcommand {\tvars}{{\bar \tvar}}
+\newcommand {\twars}{{\bar \twar}}
+\newcommand {\tzars}{{\bar \tzar}}
+\newcommand {\ttyps}{{\bar \ttyp}}
+
+% vector of ...
+\newcommand {\tvarc}{{\vec \tvar}}
+\newcommand {\twarc}{{\vec \twar}}
+\newcommand {\tzarc}{{\vec \tzar}}
+\newcommand {\ttypc}{{\vec \ttyp}}
+% FIXME \subst n'est pas jolie employée avec des vecteurs
+
+% Une commande pour combiner vecteur et prime sur une même lettre
+% et que ça reste joli. L'idée est de mettre le vecteur sur un
+% fantôme non primé et de superposer ensuite la lettre primée.
+% Problem with \phantom below interfere with \iffalse
+\newcommand{\vecp}[1]{{\rlap{$\vec{\phantom#1}$}}#1'}
+\newcommand{\tvarcp}{{\vecp\tvar}}
+\newcommand{\twarcp}{{\vecp\twar}}
+\newcommand{\ttypcp}{{\vecp\ttyp}}
+\newcommand{\gtypcp}{{\vecp\gtyp}}
+
+\newcommand{\vecpi}[2]{{\hbox to0mm{$\vec{\phantom{#1}}$\hfilneg}}#1_{#2}'}
+\newcommand{\tvarcpi}[1]{\vecpi\tvar{#1}}
+\newcommand{\twarcpz}{\vecpi\twar{0}}
+\newcommand{\ttypcpi}[1]{\vecpi\ttyp{#1}}
+
+% Unification.
+\newcommand{\mc}{U}
+\newcommand{\occurs}{occurs check}
+\newcommand{\standard}{standard}
+
+% Constraint solving.
+\newcommand{\st}{S} % Solver stack.
+\newcommand{\xc}{\mathcal{X}} % Existential constraint context.
+
+% a few constants
+\newcommand {\tint}{{\kwd {int}}}       % Type of integers
+\newcommand {\tbool}{{\kwd {bool}}}       % Type of Booleans
+\newcommand {\eproj}[1]{\mathopen{}\mathrel{\pi_{#1}}} % Fst
+\newcommand {\fst}{\eproj{1}}
+\newcommand {\snd}{\eproj{2}} % Snd
+\newcommand {\etrue}{\kwtt {true}}
+\newcommand {\efalse}{\kwtt {false}}
+\newcommand {\eifc}{\kwtt {if}}
+\newcommand {\ecase}{\kwtt {case}}
+\newcommand {\emake}{\kwtt {make}}
+\newcommand {\efix}{\kwtt {fix}}
+\newcommand {\ebfix}[4]{\efix\;#1:#2.\efun{#3}{#4}}
+\newcommand {\eif}[3]{\kwtt {if}\;#1\;\kwtt{then}\;#2\;\kwtt{else}\;#3}
+\newcommand {\eref}{\mathopen{}\mathrel{\kwtt{ref}}}
+\newcommand {\ederef}{!}
+\newcommand {\eassign}[2]{#1\mathrel{:=}#2}
+\newcommand {\eunit}{()}
+\newcommand {\tunit}{\kwd {unit}}
+\newcommand {\eseq}[2]{#1; #2}
+\newcommand {\eannot}[2]{(#1 : #2)}
+\newcommand {\ann}[1]{\eannot{#1}{\exists\tvars.\ttyp}}
+\newcommand {\fann}[1]{\eannot{#1}{\forall\tvars.\ttyp}}
+\newcommand {\einj}[1]{\mathopen{}\mathrel{\kwtt{inj}_{#1}}}
+
+\newcommand{\euopen}[1]{\kwtt{open}_{#1}}
+\newcommand{\kupack}[1]{\kwtt{pack}_{#1}}
+\newcommand{\eupack}[2]{\kupack{#1}\;#2}
+
+\newcommand{\expack}[1]{\kwtt{pack}_{#1}}
+\newcommand{\kxopen}[1]{\kwtt{open}_{#1}}
+\newcommand{\exopen}[3]{\kxopen{#1}\;#2\;#3}
+
+\newcommand{\rng}{\rho}                   % Renaming (of type variables).
+\newcommand{\ga}{\phi}                    % Ground assignment.
+\newcommand{\gtyp}{t}                     % Ground type.
+\newcommand{\gs}{s}                       % Ground type scheme.
+\newcommand{\genv}{\psi}                  % Ground type environment (maps identifiers to ground type schemes).
+\newcommand{\schi}[3]{(#1,#2)#3}          % Notation pour l'interprétation des schémas.
+\newcommand{\dgtyp}{T}                    % Direction-indexed tuple of ground types.
+\newcommand{\gtyps}{{\bar\gtyp}}
+\newcommand{\gtypc}{{\vec\gtyp}}
+\newcommand{\unifier}{\theta}             % Substitution.
+\newcommand{\refiner}{\varphi}
+\newcommand{\env}{\Gamma}                 % Environment.
+\newcommand{\tycon}{F}                    % Type constructor. 
+\newcommand{\ttycon}{G}                   % Alternative type constructor
+\newcommand{\ptycon}{H}                   % Alternative type constructor
+\newcommand{\predicate}{P}                % Predicate.
+\newcommand{\ccon}{\mathcal{C}}           % Constraint context.
+\newcommand{\ucon}{\mathcal{U}}           % Unification constraint context.
+\newcommand{\pushcon}[2]{#1\bullet#2}     % Pushing an environment into a context.
+\newcommand{\ts}{\sigma}                  % Type scheme.
+\newcommand{\scheme}[3]{\forall#1[#2].#3} % Notation for type schemes.
+
+% Sets.
+\newcommand{\tyvarset}{\mathcal{V}}       % The set of type variables.
+\newcommand{\tyvarsetk}[1]{\tyvarset_{#1}}% The set of type variables of a certain kind.
+
+% Functions.
+%% There is a problem with \kw that does not work in syperscript
+\newcommand{\KW}[1]{\mathit{#1}}
+%% could \kw be redefined by Benli?
+
+\newcommand{\arityname}{a}
+\newcommand{\arity}[1]{\arityname(#1)}       % Arity.
+\newcommand{\Dom}[1]{\KW{dom}(#1)}               % Domain.
+\newcommand{\Range}[1]{\range(#1)}           % Range.
+\newcommand{\cardinal}[1]{\mathord\mid\,#1\,\mathord\mid} % Cardinal.
+%% Changed  \operatorname to \kw in the next 5 lines. 
+\newcommand{\fgv}[1]{\kw{fv\/}(#1)} % Used in the preliminaries.
+\newcommand{\ftv}[1]{\kw{ftv\/}(#1)} % Free type variables.
+\newcommand{\dtv}[1]{\kw{dtv\/}(#1)} % Defined type variables.
+\newcommand{\fpv}[1]{\kw{fpi\/}(#1)} % Free constraint abstraction variables.
+\newcommand{\dpv}[1]{\kw{dpi\/}(#1)} % Defined constraint abstraction variables.
+\newcommand{\dfpv}[1]{\kw{dfpi}(#1)} % Both defined and free.
+\newcommand{\etend}[3]{#1[#2\mapsto#3]}      % Extending a function.
+\newcommand{\restrict}[2]{#1\mathord\mid_{#2}}
+\newcommand{\corestrict}[2]{#1\setminus#2}
+
+% NOTE sur la syntaxe des contraintes.
+% Henglein, Niss et Makholm suggèrent:
+%   "def x: sigma in C": This
+%   is confusing syntax since here x is intended to be equal to sigma
+%   where x: sigma in other contexts is interpreted as [the meaning of]
+%   x being an element of [the meaning of] sigma.  What about "def x =
+%   sigma in C" instead?
+% En principe, leur suggestion est intéressante, mais le problème est
+% que nous utilisons également la notation ``def Gamma in C'', et que
+% les environnements Gamma sont habituellement notés comme une série
+% d'associations de la forme x : sigma.
+
+% Constraints.
+\newcommand{\ctrue}{\kwd{true}}
+\newcommand{\cfalse}{\kwd{false}}
+\newcommand{\cplet}[2]{\kwd{def}\;#1\;\kwd{in}\;#2} % Primitive let.
+\newcommand{\cxlet}[2]{\kwd{let}\;#1\;\kwd{in}\;#2} % Refined let.
+\newcommand{\clambda}[3]{\kwd{let}\;#1:#2\;\kwd{in}\;#3}
+\newcommand{\ccall}[2]{#1\preceq #2}
+\newcommand{\ccallbelow}[2]{\ccall{#2}{#1}}
+\newcommand{\cexists}[2]{\exists#1.#2}
+\newcommand{\sat}[3]{#2\satisfies\cplet{#1}{#3}} % TEMPORARY deprecate
+\newcommand{\satdef}[3]{#1\satisfies\cplet{#2}{#3}}
+\newcommand{\satisfies}{\models}
+\newcommand{\entails}{\Vdash}             % Notions of entailment.
+\newcommand{\csubsume}[3]{#1\entails#2\preceq#3}
+\newcommand{\csubsumeq}[3]{#1\entails#2\logeq#3}
+\newcommand{\logeq}{\equiv}               % Logical equivalence.
+\newcommand{\chole}{[]}                   % The hole in constraint contexts.
+\newcommand{\subtype}{\leq}               % Subtyping contraints
+\newcommand{\isdominated}[1]{\prec_{#1}}
+\newcommand{\isdominatedstar}[1]{\prec^\star_{#1}}
+\newcommand{\chemin}{\pi}                 % Path in a tree.
+\newcommand{\symleq}{\leqslant}           % Ordering on type constructors.
+\newcommand{\symgeq}{\geqslant}
+
+% Judgments.
+\newcommand{\judge}[2]{#1:#2}
+\newcommand{\calcule}[2]{\llbracket\judge{#1}{#2}\rrbracket}
+\newcommand{\calculehmx}[3]{\llbracket#1\vdash\judge{#2}{#3}\rrbracket}
+\newcommand{\sound}[2]{$\prj{\calcule{#1}{#2}}{#1}{#2}$}
+\newcommand{\soundhmx}[3]{$\hmj{\calculehmx{#1}{#2}{#3}}{#1}{#2}{#3}$}
+\newcommand{\erasure}[1]{\lfloor#1\rfloor}
+
+% Cas de preuve.
+\newcommand{\proofskip}{\par\smallskip}%\medskip
+\newcommand{\proofitem}[2]{$\circ$\kern 1mm\textit{#1} #2}
+\newcommand{\proofcase}[1]{\proofskip\proofitem{Case}{#1}}
+\newcommand{\proofcases}[1]{\proofskip\proofitem{Cases}{#1}}
+\newcommand{\proofsubcase}[1]{\par\textit{Subcase} #1}
+
+
+% Signatures.
+\newcommand{\sig}{{\mathcal{S}}} % Signature.
+\newcommand{\tcsignature}{signature} % Signature of a type constructor.
+\newcommand{\psignature}{signature} % Signature of a predicate.
+
+\newcommand{\typicalpredicatesig}{\kind_1\kindprod\ldots\kindprod\kind_n\kindarrow\cdot}
+
+% Notations for ML.
+\newcommand{\lc}{$\lambda$-calculus\xspace}
+\newcommand{\stlc}{simply-typed \lc}
+\newcommand{\MLlang}{ML-the-programming-language\xspace}
+\newcommand{\MLcalc}{ML-the-calculus\xspace}
+\newcommand{\MLtype}{ML-the-type-system\xspace}
+\newcommand{\kwlet}{\kwtt{let}\xspace}
+\newcommand{\kwmatch}{\kwtt{match}\xspace}
+\newcommand{\kwletrec}{\kwtt{letrec}\xspace}
+\newcommand{\letpoly}{\kwtt{let}-polymorphism\xspace}
+\newcommand{\aconv}{$\alpha$-conversion\xspace}
+\newcommand{\aequiv}{$\alpha$-equivalence\xspace}
+
+% Notations for Damas-Milner's system.
+\newcommand{\dm}{DM\xspace}             % The system's name.
+\newcommand{\dms}{{\kwtt S}}           % Type scheme.
+\newcommand{\dmj}[3]{#1\vdash#2:#3}     % Judgment.
+\newcommand{\dmscheme}[2]{\forall#1.#2} % Scheme notation.
+
+% Notations used in the correspondence between DM and HM.
+\newcommand{\dmtrans}[2]{\llbracket#1\rrbracket_{#2}}
+\newcommand{\dmt}[1]{\dmtrans{#1}\unifier} % Shorthand.
+
+% Notations for the HM(X)-like system.
+\newcommand{\hmx}{HM$(X)$\xspace}
+\newcommand{\hmeq}{HM$(\mathord{=})$\xspace}
+\newcommand{\hmj}[4]{#1,#2\vdash#3:#4}      % Judgment.
+\newcommand{\hmdj}[4]{#1,#2\vdash_{\bullet}#3:#4}      % Judgment.
+
+% Notations for the let-constraint-based system (``Pottier-Rémy'').
+\newcommand{\pcb}{PCB$(X)$\xspace} % TEMPORARY trouver mieux
+\newcommand{\prj}[3]{#1\vdash#2:#3}         % Judgment.
+\newcommand{\prjVar}{Var}                   % Rule names.
+\newcommand{\prjAbs}{Abs}
+\newcommand{\prjApp}{App}
+\newcommand{\prjLet}{Let}
+\newcommand{\prjSub}{Sub}
+\newcommand{\prjIntro}{Exists}
+\newcommand{\prjStore}{Store}
+\newcommand{\prjConfig}{Config}
+
+% Various mathematical notations.
+\newcommand{\noenv}{\varnothing}            % Empty environment.
+\newcommand{\ienv}{{\env_0}}                % Initial environment.
+\newcommand{\nostore}{\varnothing}          % Empty store.
+\newcommand{\disjoint}[2]{#1\mathrel{\#}#2} % Disjointness predicate.
+\newcommand{\kth}[1]{$#1^{\text{th}}$}      % th superscript, for use in text.
+
+% Misc.
+\newcommand{\DefRule}[1]{\softtarget{#1}{\textsc{#1}}} % Those are redefined by
+\newcommand{\Rule}[1]{\softlink{#1}{\textsc{#1}}}      % ruleanchors.sty
+
+% To talk to ourselves
+\@ifundefined{ifXXX}{\newif \ifXXX}{}
+\newcommand{\XXX}[2][]{{\ifXXX 
+%XXX Why is this not loaded?
+\@ifundefined{color}{}{\color{blue}} 
+XXX\ifnotempty{#1}{ [{\bf #1}]}:
+{\em #2}\fi}} 
+
+% As long as these do not hurt
+\let \arw \rightarrow
+
+\newcommand {\tell}
+ {\par \noindent \hbox {$\bullet$\space\space}}
+
+\newcommand {\sidecond}[1]
+  {\par\vspace{1mm} \ifinsideTTcomponent \else \leavevmode\fi
+   \hbox to \linewidth {\vbox {\footnotesize If $#1$}}}
+
+\newcommand {\pseudosidecond}
+  {\par\vspace{1mm} \ifinsideTTcomponent \else \leavevmode\fi
+   \hbox to \linewidth {\vbox {\footnotesize $\mathstrut$}}}
+
+\def \longrightarrowblacktriangle {\mathrel{-}\joinrel\mathrel{-}\joinrel
+\mathrel{\blacktriangleright%\triangleright
+}}
+\newcommand {\topreduces}[1][]{\ifthenelse {\equal{#1}{}}
+  {\longrightarrowblacktriangle}
+  {\mathrel{\mathop{\longrightarrowblacktriangle}\limits^{#1}}}}
+
+\newcommand {\reduces}[1][]{\ifthenelse {\equal{#1}{}}{\longrightarrow}
+  {\mathrel{\mathop{\longrightarrow}\limits^{\smash {#1}}}}}
+%  {\mathrel{-{\scriptstyle #1}\mathord{\rightarrow}}}}
+
+\newcommand{\sr}{\sqsubseteq}
+
+\newcommand \ignore[1]{}
+% Dummy definition to detect conflicts...
+% \newcommand {\ie}{}\def \ie.{{\em i.e.}} Supprimé car mauvais style.
+\newcommand {\eg}{}\def \eg.{{\em e.g.}}
+\newcommand {\ie}{}\def \ie.{{\em i.e.}}
+\newcommand {\etc}{}\def \etc.{{\em etc.}}
+\newcommand {\cf}{}\def \cf.{{\em cf.}}
+\newcommand {\etal}{}\def\etal.{{et al.}}
+%% \newcommand {\etal}{}\def\etal.{\emph{et al.}}
+\newcommand{\wrt}{}\def\wrt.{{\emph{w.r.t.}}}
+\newcommand\spdg{{\em w.l.o.g.}}
+\newcommand {\breakfil}{\hfil\penalty 100\hfilneg}
+
+
+\usepackage {array}
+\newcolumntype{L}{>{$}l<{$}}
+\newcolumntype{C}{>{$}c<{$}}
+\newcolumntype{R}{>{$}r<{$}}
+\newcolumntype{:}{@{}}
+\newcolumntype{,}{@{\extracolsep{0em}}}
+\newcolumntype{.}{@{\extracolsep{\fill}}}
+
+\newcommand{\emdef}{\emph}
+\newcommand{\set}[1]{\{#1\}}
+
+%% local labels
+
+\@ifundefined{softlink}{%
+\def \softlink #1#2{#2}
+\def \softtarget #1#2{#2}
+}{}
+
+\newcounter{demo}
+\newcounter{demoref}
+\def \demoref #1{\expandafter \ifx \csname demo-\thedemo-#1\endcsname \relax
+    \message {*** Counter #1 undefined in this context}%
+    \edef \demo@label{??}
+  \else 
+    \edef \demo@label{\csname demo-\thedemo-#1\endcsname}%
+  \fi}
+\def \demomake #1{\expandafter \ifx \csname demo-\thedemo-#1\endcsname \relax
+     \stepcounter{demoref}\relax
+     \edef \demo@label {\thedemoref}\expandafter 
+     \xdef \csname demo-\thedemo-#1\endcsname {\thedemoref}%
+   \else
+     \message {*** Label #1 already defined in this context!}%
+     \edef \demo@label {\csname demo-\thedemo-#1\endcsname ?}%
+   \fi}
+\def \demoreset {\stepcounter {demo}\setcounter {demoref}{0}}
+
+\let \dlab \demomake
+% En gras pour mieux attirer l'oeil.
+\def \dlabel #1{{\demomake {#1}\softtarget
+        {demo-\thedemo-#1}{\textbf{(\demo@label)}}}}
+\def \dref #1{{\demoref {#1}\softlink
+        {demo-\thedemo-#1}{\text{(\demo@label)}}}}
+
+\def \dglabel #1{\dlabel {#1}\dcaption{#1}}
+\def \dcaption#1{{\edef \@currentlabel {(\thedemoref)}\label{#1}}}
+
+%% To flush equations left with some fixed indentation
+\newenvironment {mathleft}
+  {\unskip\vadjust{\smallskip}\hfil\hbox{}\linebreak
+   \begin{tabular}
+       {>{\qquad \setbox0\hbox \bgroup$}r<{{}$\egroup\llap{\box0}},L}}
+  {\end{tabular}\vadjust {\smallskip}\hfil\hbox{}\linebreak}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\typi}{\Pi}
+\newcommand{\tysigma}{\Sigma}
+
+\let \elab \ell
+\newcommand {\elabs}{L}
+\newcommand {\kindset}{{\mathcal K}}
+\newcommand {\rowlabels}{{\mathcal L}}
+\newcommand {\row}[1]{\KW{Row}(#1)}
+\newcommand {\type}{{\KW{Type}}}
+\newcommand {\Pre}{{\kwd{Pre}}}
+\newcommand {\Abs}{{\kwd{Abs}}}
+\newcommand {\pre}{{\kwd{pre}}}
+\newcommand {\abs}{{\kwd{abs}}}
+\newcommand {\rowkind}{s}
+\newcommand {\rowkindset}{{\ext\kindset}}
+\let \kindjoin \diamond
+\newcommand {\dirset} {{\mathcal D}}
+\newcommand {\arityset}  {{\mathcal A}}
+\newcommand {\dird}{d}
+\newcommand {\dk}{K} % Mapping from directions to kinds.
+\newcommand {\dirdomain}{{\text{\emph{domain}}}}
+\newcommand {\dircodomain}{{\text{\emph{codomain}}}}
+\newcommand {\dircontent}{{\text{\emph{content}}}}
+%\def \sem#1{\langle\!\langle #1\rangle\!\rangle}
+\newcommand {\sem}[1]{[\![#1]\!]}
+\newcommand{\rowat}[3][]{{#2}^{#1}\mathbin:#3\mathrel;}
+\let \rowall \partial
+\newcommand {\fpowerset}[1]{{\mathcal P\!_f}(#1)}
+\newcommand {\rkind} {.}\def \lkind {.}
+\newcommand{\tpi}[1]{\tapp\typi{#1}}
+\newcommand{\tsigma}[1]{\tapp\tysigma{#1}}
+\newcommand {\iI}{^{i\in I}}
+\newcommand {\jJ}{^{j\in J}}
+\newcommand {\lL}{^{\elab \in \rowlabels}}
+\newcommand {\inject}[1]{\set{#1}}
+\newcommand {\override}[3]{\set{#3 \mathrel{\kwd{with}} #1 = #2}}
+\newcommand {\project}[2]{#2.\set{#1}}
+\newcommand {\rnil} {\langle \rangle}
+\newcommand {\rinject}[1]{\langle#1\rangle}
+\newcommand {\extend}[3]{\langle #3 \mathrel{\kwd{with}} #1 = #2\rangle}
+\newcommand {\access}[2]{#2.\langle#1\rangle}
+\newcommand {\ecid}{\kwtt{id}}
+\newcommand {\ecseq}{\kwtt{apply}}
+\newcommand {\edest}[1]{{#1}^{-1}}
+\newcommand {\evoid}{[]}
+\newcommand {\etag}[2]{\eapp{#1}{#2}}
+\newcommand {\excase}[3]{[\,#1:#2 \mid #3\,]}
+\newcommand {\appexcase}[4]{\eapp{\excase{#1}{#2}{#3}}{#4}}
+\mathchardef \econcat "2040
+
+\newcommand{\rtyp}{{\kwtt{R}}}            % Row (used only in some examples).
+
+\newcommand{\extension}[3]{#1\subst{#2}{#3}} % Extension de fonction (au sens mathématique)
+
+\newcommand{\rapply}{{\kwtt{rapply}}}
+\newcommand{\erapply}{\eapp[2]\rapply}
