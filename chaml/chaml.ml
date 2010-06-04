@@ -177,6 +177,8 @@ let _ =
       | `Ok ->
           ()
     end;
+    if not !arg_print_typed_ast && not !arg_print_core_ast then
+      exit(0);
     (* Translate to the first intermediate language *)
     let camlx_ast = Translator.translate hterm in
     if !arg_print_typed_ast then begin
