@@ -16,6 +16,7 @@ bookmarks=false}
 \usepackage{xltxtra}
 \usepackage{multicol}
 %\usepackage{microtype}
+\usepackage{float}
 
 
 % ATTAPL
@@ -52,7 +53,7 @@ bookmarks=false}
 
 Type-checking functional languages à la ML is a long-time topic that has been
 well-studied throughout the past 30 years
-(\cite{huet1975unification,gordon1978metalanguage,damas1982principal}). More
+(\cite{gordon1978metalanguage,damas1982principal}). More
 recently, there has been a surge of interest regarding the translation of rich,
 complex, higher languages into simpler, core languages.
 
@@ -61,15 +62,15 @@ type information makes them well-suited for program analysis, program
 transformation and compilation.
 
 Indeed, Haskell now features ``System FC'' \cite{sulzmann2007system}, a core
-language that is both minimalistic and powerful. We have successfully applied
-the same design principles to a translation from OCaml \cite{ocaml} to System
-$F_{\eta}$, that is, System F with coercions \cite{mitchell-88}.
+language that is both minimalistic and powerful. We applied the same design
+principles to a translation from OCaml \cite{ocaml} to System $F_{\eta}$, that
+is, System F with coercions \cite{mitchell-88}.
 
 Our contribution is twofold: firstly, a strategy that builds upon previous work by
 François Pottier \emph{et. al.} \cite{pottier2005essence} and leverages
-constraint solving to build an explicitely typed representation of the original
-program; secondly, a translation process that explicits all the subtyping
-relations and transforms the original, fully-featured program into a System
+constraint solving to build an explicitly typed representation of the original
+program; secondly, a translation process that makes all the subtyping
+relations explicit and transforms the original, fully-featured program into a System
 $F_{\eta}$ term, where all coercions have been made explicit, all redundant
 constructs eliminated, and well-typedness preserved. This final representation
 can be type-checked before going any further, to ensure the consistency of the
@@ -85,7 +86,7 @@ fully-explicit System F term. Finally, we reflect on our work and possible
 extensions.
 
 
-\begin{figure*}[ht]
+\begin{figure*}[t!]
   \begin{center}
     \begin{tikzpicture}
       [node distance = 1cm, auto,font=\footnotesize,
@@ -100,10 +101,10 @@ extensions.
       \node [below of=ast] (phantom) {};
       \node [tool, below=3cm of ast] (unifier) {unifier};
       \node [pass, left of=phantom] (constraint) {Constraint};
-      \node [pass, right of=phantom] (term1) {``Impure'' term};
+      \node [pass, right of=phantom] (term1) {CamlX ``with holes''};
       \node [tool, left=2.2cm of constraint] (solver) {solver};
-      \node [pass, below of=term1] (term2) {``Pure'' term};
-      \node [pass, below of=term2] (core) {Core term};
+      \node [pass, below of=term1] (term2) {CamlX};
+      \node [pass, below of=term2] (core) {Core};
       \node [tool, left of=core] (typechecker) {type checker};
       \node [below=1cm of core] (end) {Rest of the compilation process…};
 
@@ -159,8 +160,8 @@ original ML language, such as
 \end{itemize}
 
 Even if we consider a small subset of the language, some features are somehow
-unusual: for instance, \code{let}-patterns in OCaml are always generalizing,
-unlike Haskell.
+unusual: for instance, OCaml tries to generalize identifiers \emph{inside}
+\code{let}-patterns, unlike Haskell.
 
 The current trend is to prove as much as possible of the compilation process
 \cite{compcert}.  Indeed, it is difficult to fully trust OCaml, because of its
@@ -168,27 +169,35 @@ many features and possibly complex interactions between all the extra features.
 
 Garrigue has been working in this direction (\cite{garrigue-certified}) and has
 successfully extracted a program from a Coq proof that runs a small subset of
-OCaml, but it seems hard to prove a full, real-world type inferencer. Imperative
-structures used by classical union-find algorithms are not well-suited to formal
-proofs, and extracting a program from a Coq proof would most certainly result in
-a functional-style, less efficient program.
+OCaml, but it seems hard to prove a full, real-world type inferencer. Specifying
+and proving a union-find algorithm has been done before, but specifying and
+proving a whole type-inferencer is another order of magnitude.
 
 To strike a middle ground, \textbf{we propose to translate any OCaml program
 into an equivalent program written in a System F-like core language}.
 
-The idea is to decompose complex, ``hard-to-trust'' features\footnote{We're
-specifically thinking about generalizing patterns and the value restriction
-here.} into simpler, core building blocks. That way, instead of reasoning on
-the full OCaml language, we type-check a simple, core language. And this core
-language, we trust. Thus, we are \emph{sure} that the program we are about to
-compile is, if not semantically correct, at least type-sound and won't crash.
+The idea is to decompose complex, ``hard-to-trust'' features into simpler, core
+building blocks. As an example, the value restriction \emph{à la} Garrigue
+\cite{garrigue2004relaxing} relies on \emph{subtyping}. If a type variable only
+appears in covariant position, than it can be safely replaced with any of its
+supertypes. Garrigue introduces a supertype called \code{zero}, which then can
+be subtyped into \code{'a} wherever needed. This is precisely the kind of
+operations we would like to translate in an explicit manner, with very basic
+constructs, so that the type-checker can later assert the correctness of what we
+did.
+
+Ultimately, what we want to do is, instead of proving the well-typedness of a
+program written in full OCaml, is type-check \emph{a posteriori} an equivalent,
+\emph{core} program. And because we trust this core language, we can be sure
+that the program we are about to compile is, if not semantically correct, at
+least type-sound and won't crash.
 
 The motto is, to quote Milner \cite{milner1978theory}, ``Well-typed programs
 can't go wrong'', and our aim is to enforce that.
 
 \section{A high-level description of our translator}
 
-Naturally, the tradeoff is that as expressions become simpler, and as we
+Naturally, the trade-off is that as expressions become simpler, and as we
 decompose complex features into a less expressive language, types become
 possibly more complex. However, this is not considered to be a problem, and
 although we end up with complex types, the type-checker for $F_\eta$ remains
@@ -196,19 +205,18 @@ simple and elegant.
 
 Our process is made of the following steps (in chronological order)~:
 \begin{itemize}
-  \item we lex and parse the original source code, in order to obtain a parse
-    tree\footnote{This is done using the parser and lexer from the OCaml
-    compiler, as we didn't want to waste time on this part.};
+  \item we lex and parse the original OCaml source code, in order to obtain a
+    parse tree;
   \item we generate constraints, and build an AST decorated with empty
-    union-find structures;
-  \item we solve the constraints; as a side-effect, this fills the union-find
-    structures in the decorated AST with relevant information;
-  \item we translate the ``impure'', decorated AST into a pure AST where
-    union-find structures have disappeared and types are now using De Bruijn
-    indices;
-  \item we desugar this complex AST into a core one, and generate coercions to
-    justify some steps on-the-fly;
-  \item we type-check the resulting CoreML term and ensure well-typedness before
+    union-find structures: this is the CamlX term ``with holes'';
+  \item we solve the constraints; as a side-effect, this fills the empty
+    union-find structures in the decorated AST with relevant information;
+  \item we translate the ``impure'', decorated CamlX term into a pure CamlX term
+    where union-find structures have disappeared and types are now using De
+    Bruijn indices;
+  \item we desugar this complex CamlX AST into a Core one, and generate
+    coercions to justify some steps on-the-fly;
+  \item we type-check the resulting Core term and ensure well-typedness before
     going further.
 \end{itemize}
 
@@ -221,6 +229,63 @@ OCaml is painful\footnote{We're thinking about the numerous parsing subtleties:
 we needed to compare the output of our tool with OCaml's, we decided to just use
 OCaml's \code{parsing/} subdirectory. All the other pieces of code in our tool
 are original work.
+
+\begin{TTCOMPONENT}{Syntax of type schemes and constraints\label{fig:constraints_syntax}}{}
+  \let \\ \TTSyntaxAlternative%
+
+  \TTSyntaxCategoryNamed{\ts}{}        {type scheme} \\
+  {\scheme\tvars\co\ttyp}              {}
+
+  \TTSyntaxCategoryNamed{\co,\cp}{}    {constraint} \\
+  {\ctrue}                             {truth} \\
+  {\cfalse}                            {falsity} \\
+  {\predicate\,\ttyp_1\,\ldots\ttyp_n} {predicate application} \\
+  {\co \wedge \co}                     {conjunction} \\
+  {\cexists\tvars\co}                  {existential quantification} \\
+  {\cplet{\evid:\ts}\co}               {type scheme introduction} \\
+  {\ccall\evid\ttyp}                   {type scheme instantiation}
+
+  \columnbreak % Wastes some space, but avoids a widow.
+
+  \TTSyntaxCategoryNamed{\co,\cp}{}     {Syntactic sugar for constraints} \\
+  {\ldots}                              {As before} \\
+  {\ccall{\ts}{\ttyp}}                  {\code{T} is an instance of $\sigma$} \\
+  {\cxlet {\evid:\ts}\co}               {def + \code{x} has an instance} \\
+  {\exists \ts}                         {$\sigma$ has an instance} \\
+  {\cplet {\env}\co}                    {as before} \\
+  {\cxlet {\env}\co}                    {as before} \\
+  {\exists \env}                        {as before} 
+
+  \extraspacehack{.07in}
+\end{TTCOMPONENT}
+
+\begin{figure*}[t!]
+  \TTtoprule
+  \vspace*{-2ex}
+  \begin{bnf}
+      \calcule\evid\ttyp
+  \eq \ccall\evid\ttyp
+  \\
+  \calcule{\efun\evar\et}\ttyp
+  \eq \exists\tvar_1\tvar_2.(
+        \clambda\evar{\tvar_1}{\calcule\et{\tvar_2}}
+        \wedge
+        \tvar_1\arw\tvar_2\subtype\ttyp 
+  ) \\
+  \calcule{\eapp{\et_1}{\et_2}}\ttyp
+  \eq \exists\tvar_2.(
+         \calcule{\et_1}{\tvar_2\arw\ttyp} 
+         \wedge
+         \calcule{\et_2}{\tvar_2}
+  ) \\
+  \calcule{\elet\evar{\et_1}{\et_2}}\ttyp
+  \eq \cxlet{\evar:\scheme\tvar{\calcule{\et_1}\tvar}\tvar}{\calcule{\et_2}\ttyp}
+  \end{bnf}%
+  \vspace*{-3ex}
+  \TTbottomrule
+  \vspace*{-1ex}
+  \caption{\label{fig:constraint_generation}Constraint generation}
+\end{figure*}
 
 \part[1]{Constraint solving and decorated ASTs}
 
@@ -254,7 +319,7 @@ runs a second pass to solve the constraints. The final result is an environment
 with all the top-level bindings and their types, or an error if the program
 cannot be type-checked.
 
-This is far from a fully annotated AST, and some work was needed in order to
+This is nothing like a fully annotated AST, and some work was needed in order to
 transform this process into one suitable for generating a fully annotated AST.
 This is the first part of our work: adapting constraint-solving to our needs.
 
@@ -264,88 +329,42 @@ The main advantage of constraint-based type inference is the clean, elegant
 separation between constraint generation and constraint solving. Whereas
 traditional unification algorithms generate constraints and solve them
 on-the-fly, constraint-based type inference first generates constraints and then
-solves them in a separate pass.
+solves them in a separate pass. The key component that makes it possible is the
+\code{let}-binding on type variables.
 
-This allows one to change the semantics of the original program (for instance,
-make some constructs more generalizing) without ever touching the solver. This
-clean separation is a feature we have tried to keep in our tool.
-
-\begin{TTCOMPONENT}{Syntax of type schemes and constraints\label{fig:constraints_syntax}}{}
-  \let \\ \TTSyntaxAlternative%
-
-  \TTSyntaxCategoryNamed{\ts}{}        {type scheme} \\
-  {\scheme\tvars\co\ttyp}              {}
-
-  \TTSyntaxCategoryNamed{\co,\cp}{}    {constraint} \\
-  {\ctrue}                             {truth} \\
-  {\cfalse}                            {falsity} \\
-  {\predicate\,\ttyp_1\,\ldots\ttyp_n} {predicate application} \\
-  {\co \wedge \co}                     {conjunction} \\
-  {\cexists\tvars\co}                  {existential quantification} \\
-  {\cplet{\evid:\ts}\co}               {type scheme introduction} \\
-  {\ccall\evid\ttyp}                   {type scheme instantiation}
-
-  \columnbreak % Wastes some space, but avoids a widow.
-
-  \TTSyntaxCategoryNamed{\co,\cp}{}     {Syntactic sugar for constraints} \\
-  {\ldots}                              {As before} \\
-  {\ccall{\ts}{\ttyp}}                  {\code{T} is an instance of $\sigma$} \\
-  {\cxlet {\evid:\ts}\co}               {def + \code{x} has an instance} \\
-  {\exists \ts}                         {$\sigma$ has an instance} \\
-  {\cplet {\env}\co}                    {as before} \\
-  {\cxlet {\env}\co}                    {as before} \\
-  {\exists \env}                        {as before} 
-
-  \extraspacehack{.07in}
-\end{TTCOMPONENT}
-
-\begin{figure*}[ht]
-  \TTtoprule
-  \vspace*{-2ex}
-  \begin{bnf}
-      \calcule\evid\ttyp
-  \eq \ccall\evid\ttyp
-  \\
-  \calcule{\efun\evar\et}\ttyp
-  \eq \exists\tvar_1\tvar_2.(
-        \clambda\evar{\tvar_1}{\calcule\et{\tvar_2}}
-        \wedge
-        \tvar_1\arw\tvar_2\subtype\ttyp 
-  ) \\
-  \calcule{\eapp{\et_1}{\et_2}}\ttyp
-  \eq \exists\tvar_2.(
-         \calcule{\et_1}{\tvar_2\arw\ttyp} 
-         \wedge
-         \calcule{\et_2}{\tvar_2}
-  ) \\
-  \calcule{\elet\evar{\et_1}{\et_2}}\ttyp
-  \eq \cxlet{\evar:\scheme\tvar{\calcule{\et_1}\tvar}\tvar}{\calcule{\et_2}\ttyp}
-  \end{bnf}%
-  \vspace*{-3ex}
-  \TTbottomrule
-  \vspace*{-1ex}
-  \caption{\label{fig:constraint_generation}Constraint generation}
-\end{figure*}
+This design allows one to change the semantics of the original program without
+ever touching the solver. For instance, the \code{match} is not generalizing in
+OCaml. Turning it into a generalizing \code{match} was simply a matter of
+changing a few lines in the constraint generator to insert a
+\code{let}-constraint in the right place. This clean separation is a feature we
+have tried to keep in our tool.
 
 The reference paper for constraint-based type inference is
 \cite{pottier2005essence}. The whole process is described in great detail, and
 this is what our implementation used as a reference. Without giving too much
-detail, let us just show the syntax of constraints (figure \vref{fig:constraints_syntax}) and
-the rules for constraint generation (figure \vref{fig:constraint_generation}).
+detail, let us just show the syntax of constraints (figure
+\vref{fig:constraints_syntax}) and the rules for constraint generation (figure
+\vref{fig:constraint_generation}).
+
+The issue with constraint-based type inference is that \emph{this process
+answers yes or no}. It does not add any annotation to the original AST, it does
+not build another AST, it discards information as it goes, and when it reaches
+the end of the constraint solving process, \emph{the best it can do is print the
+inferred types for all the top-level bindings}.
+
+This is in contradiction with our goal, which is to build an explicitly typed
+representation of the original AST. The following section details how we dealt
+with this issue.
 
 \section{Generating an explicitly-typed term}
 
-Because the original syntax of constraints does not mirror that of the
-expressions, we have no way to recover the original term from a constraint. For
-instance, a \code{fun x ->} expression in the AST, a \code{match} in the AST, a
-\code{let} in the AST all result in a \code{let}-constraint (see figure
-\vref{fig:constraint_generation}). How can we rebuild the expression from the
-constraint?
-
-\subsection{Encode the term in the syntax of constraints}
-
-A first idea we explored was to extend the syntax of constraints so that they
-convey enough information to allow us to recover the expression.
+The key question is: \textbf{how do we obtain an annotated AST?} One might think
+of examining the generated constraints to rebuild the original AST. But because
+the syntax of constraints does not mirror that of the expressions, we have no
+way to recover the original term from a constraint. For instance, a \code{fun x
+->} expression in the AST, a \code{match} in the AST, a \code{let} in the AST
+all result in a \code{let}-constraint (see figure
+\vref{fig:constraint_generation}).
 
 \begin{TTCOMPONENT}{Alternative encoding of expressions in constraints\label{fig:bad_idea}}{}
   \let \\ \TTSyntaxAlternative%
@@ -372,23 +391,22 @@ convey enough information to allow us to recover the expression.
   \extraspacehack{.07in}
 \end{TTCOMPONENT}
 
-As one can see from figure \vref{fig:bad_idea}, this process was quite tedious:
-there were on the one hand constraints that do not originate from any expression
-in particular, and constraints that correspond to a specific expression in the
-AST. In this figure, \underline{underlined} constraints are labeled with the
-corresponding expression.
+\subsection{Encode the term in the syntax of constraints}
 
-In this scenario, it was up to the solver to rebuild the fully typed AST when
-solving the constraints. Because the solver walks down the constraints tree, the
-idea was to make it rebuild the term on-the-fly: for instance, in the case of
-the application, the solver would run two recursive calls, solve both
-constraints, obtain two terms, and apply the first to the second one, hence
-building a new term that can be returned.
+The syntax of constraints has a strong notion of \emph{scope}: a type variable is
+defined through a \code{let}-binding, and is only available below it. Similarly,
+type schemes are defined through a \code{let}-binding, and are available below
+this binding. The natural extension of this design is to include the expressions
+in this scope as well, so that we can annotate them with the right types.
 
-With regular constraint solving, the solver is defined as an automaton, with a
-set of rewriting / solving rules. The state of the solver is a triple, which
-consists in a \emph{stack}, a \emph{unification environment} and a
-\emph{constraint}. The final state is as follows:
+That is to say, \emph{we want constraints and annotated expressions to share the
+same typing scope}.
+
+In the original design from \cite{pottier2005essence}, the solver is an
+automaton, with a set of rules that describe the process of solving a
+constraint. The state of the solver is a triple, which consists in a
+\emph{stack}, a \emph{unification environment} and a \emph{constraint}. The
+final state is as follows:
 
 $$\cexists\tvars[\dots]; U; \ctrue$$
 
@@ -396,57 +414,58 @@ The first component is the environment with all the top-level bindings, $U$ is
 the unification knowledge obtained so far, and $\ctrue$ is the empty constraint,
 meaning there is nothing left to solve.
 
-In this new scenario, the final state would be:
+In this new scenario, the solver recursively solves constraints and returns
+\emph{terms}. For instance, when solving a \underline{\smash{application}}-constraint,
+the solver obtains two terms annotated with the right types, and returns an AST
+node that applies the first one to the second one. When solving a
+\underline{instance}-constraint, it returns an identifier annotated with the
+right types. 
+
+That way, instead of just obtaining the type of the top-level
+bindings at the end of the process, we end up with:
 
 $$\cexists\tvars[\dots]; U; CT$$
 
 Where $CT$ is the final constraint-as-a-term that corresponds to our annotated AST.
 
-The solution was rather attractive for a number of reasons:
+This idea felt natural for a number of reasons:
 \begin{itemize}
-  \item although tedious, the formalization was clear and more in the spirit of
-    previous work made on constraints,
-  \item the whole process of translating the original language was more linear:
-    constraint generator, then solver, which returns an explicitly typed AST,
-    then translation into System F,
-  \item we would get rid of the imperative, union-find structures used by the
-    solver as soon as the solver was done with solving the constraints.
+  \item although tedious, the formalization had clear semantics and scoping
+    rules, and consisted in an extension of the previous design from
+    \cite{pottier2005essence};
+  \item the whole process, unlike figure \vref{fig:structure}, was not split in
+    two but linear: the decorated AST was obtained as the output of the solver;
+  \item this allows the solver to \emph{hide its internal data structures} and
+    never reveal union-find implementation details to the outside.
 \end{itemize}
 
-However, this solution was discarded. The main reason was that it boiled down to
-making the cartesian product of constraints with expressions, that is, for each
-possible constraint, create a number of variants for each expression it could
-correspond to. The number of constraints was steadily growing, and we gave up
-because this solution was not so elegant anymore.
+Figure \vref{fig:bad_idea} develops this idea and describes a tentative syntax
+for these ``extended constraints''.
 
-Moreover, some parts were quite unclear. Many implementations details were only
-roughly specified, and when trying to implement this in practice, it was not
-easy to follow closely the specification.
+However, this solution was discarded. The main reason was that while attractive
+in theory, this design had no simple implementation. The number of
+term-constraints kept growing, because as we recognized more features, we had to
+extend the syntax of constraints. This led us to abandon this design, and we
+chose a more tractable process instead.
 
 \subsection{Digging holes in terms}
 
-This led us to choose another solution, maybe more down-to-earth, but also much
-more tractable when it comes to implementing it.
+This new idea is the one we implemented in our tool. While we have been unable
+to come up with a formal description of it, we believe it to be well thought-out
+and, in our experience, easy to implement.
 
 The basic idea is for the constraint generator to pre-allocate solver
-structures\footnote{In practice, the constraint generator is a functor that is
-parameterized over the solver types and some solver helpers to create new
-``slots''.}: for instance, when it generates the constraints for a
-\code{let}-binding, it pre-allocates a slot $\sigma$ for the scheme, creates a
-\code{let}-constraint with a pointer to this slot, and creates a
-\code{let}-expression with a pointer to the \emph{exact same slot}.
-
-When the constraint generation is over, the driver has obtained two trees: one
-is the constraint tree, and the other one is the decorated AST.
+structures\footnote{In the implementation, the constraint generator is a functor
+that is parameterized over the solver types and some solver helpers to allocate
+new ``slots''.}: for instance, when it generates the constraints for a
+\code{fun}-binding, it pre-allocates a slot $\sigma$ for the scheme of the
+argument, creates a \code{let}-constraint with a pointer to this slot, and
+creates a \code{fun}-expression with a pointer to the \emph{exact same slot}.
 
 The difference with our previous approach is that now the decorated AST
 and the constraint tree are separate structures. They are generated in parallel
-but are distinct entities; they only share pointers to common structures.
-
-At this point, the common structures are empty, because the constraint generator
-only allocated them. The solver will fill them as it goes. However, as figure
-\vref{fig:good_idea} shows, the type scheme $\sigma$ is \emph{shared} by the
-constraint and the decorated AST.
+but are distinct entities; they only share pointers to common structures (see
+figure \vref{fig:good_idea}).
 
 \begin{figure}[h!]
   \small
@@ -471,7 +490,7 @@ constraint and the decorated AST.
         \kwd{let}\;\underbrace{\evar\mapsto\tvar_1}_\sigma
         \kwd{in}\;{C_1}
         \wedge
-        \tvar_1\arw\tvar_2\subtype\ttyp$ &
+        \tvar_1\arw\tvar_2\subtype\ttyp)$ &
 
       $\kwd{fun}\;(\evar: \sigma) \to E_1$ \\
 
@@ -485,51 +504,60 @@ constraint and the decorated AST.
   \label{fig:good_idea}
 \end{figure}
 
-What happens next is solving: the driver feeds the solver with the constraint it
-just obtained. In the process of solving it, it encounters the same
-\code{let}-constraint we were talking before.  It recursively solves $C_1$ and
-$C_2$, and fills the pre-allocated slot $\sigma$ with all the information
-gathered for this \code{let}.  Finally, because the union-find structures are
-inherently mutable, the decorated expression built by the constraint generator
-now ``magically'' contains all the needed type information in its slot $\sigma$,
-although the solver never touched it!
+Right after the constraint has been generated, the common structures $\sigma$
+are empty, because the constraint generator only allocated them. However, as
+figure \vref{fig:good_idea} shows, the type scheme $\sigma$ is \emph{shared} by
+the constraint and the decorated AST.
 
-\subsection{Formalization}
+What happens next is solving: the driver feeds the solver with the constraint.
+When the solver encounters a \code{let}-constraint, it solves it, generalizes
+variables as it can, and then fills the slot with all the information gathered
+at this \code{let}.
 
-There are two kinds of structures we want to hold on for the rest of the
-translation process.
+We are voluntarily vague regarding the contents of this slot -- this is the
+topic of the next section. Let us just say, for the moment, that because the
+slot is mutable, once the constraint solving is done, and although the solver
+never heard about the term with ``holes'', the holes are now filled with all the
+information required.
+
+\subsection{What are the slots?}
+
+The slots are mutable structures that are shared between the constraint and the
+``term with holes''. The solver fills them in one side, in the constraint. They
+end up on the other side, in the decorated AST. But what do they contain
+exactly?
+
+There are two sorts of information that decorate the AST:
 \begin{itemize}
-  \item instanciation information, that describes all the variables used to
-    instanciate a type scheme;
+  \item instantiation information, that describes all the variables used to
+    instantiate a type scheme;
   \item type scheme information: this can be the type scheme of a whole pattern,
     as in \code{let (x, y) = f e1 e2}, or only the type scheme associated to
-    \code{x}\footnote{Actually, we will need both}.
+    \code{x}.
 \end{itemize}
 
-As an optimization, the solver provides to the constraint generator a function
-for allocating a variable. This means that constraint variables
-$\tvar,\tvar_1,\tvar_2$ we've used before in the examples are actually unifier
-variables. This simplifies a lot of work in the solver,
-although it's not strictly speaking necessary.
+These two kinds of slots are attached to different nodes in the AST and in the
+constraint.
 
-Once again, one must think of the explicit System F that we're targeting: type
-abstraction is explicit, type instanciation is explicit as well, so we're just
-paving the way for the rest of the translation by collecting all the information
-we will need.
+\begin{center}
+  \begin{tabular}{l|p{2.5cm}|l}
+    \textbf{Kind of slot} & \textbf{In the AST} & \textbf{In the constraints} \\
+    \hline
+    type scheme & \code{let}, \code{fun}, \code{function}, \code{match} & \code{let} \\
+    \hline
+    instance    & \code{instance} & \code{instance}
+  \end{tabular}
+\end{center}
 
-To summarize, the constraint generator is provided with:
-\begin{itemize}
-  \item \code{new\_var} to create a fresh type variable,
-  \item \code{new\_scheme\_for\_var} to attach a scheme to a given type
-    variable,
-  \item \code{new\_instance\_for\_var} to attach a list of type variables to a
-    given type variable.
-\end{itemize}
+To understand why we do this, one must think of what is needed to build an
+explicitly typed F-term. We will need type annotations in $\lambda$-bindings. We
+will also need to coerce patterns at \code{let}-bindings and
+\code{function}-bindings.  We might need to coerce generalizing \code{match}es
+as well (more on this later).
 
-The constraint generator creates variables as it goes, attaches schemes to
-capture the information needed, puts the scheme in the explicitely-typed term and in
-\code{let}-constraints, which is where the solver will find them and fill them
-with all the required information.
+In order to properly generate all the coercions and type annotations, the
+translator must access as much type information as it can, which is why we
+decorate the AST. The next part is all about this translation process.
 
 \subsection{About this method}
 
@@ -538,7 +566,7 @@ some formal clarity. When used carefully, it provides a very flexible way to
 forward some information to further parts of the translation process.
 
 The trick is simply to think of what will be needed for the next steps,
-pre-allocate it, and then store it somewhere in the explicitely typed term, so
+pre-allocate it, and then store it somewhere in the explicitly typed term, so
 that the next passes can find it and use it.
 
 \section{Verifying our work}
@@ -567,9 +595,9 @@ A complexity test is also featured. Boris Yakobowski wrote a prototype
 implementation of MLF \cite{boris2008}, that was supposedly faster than the
 prototype implementation for \cite{pottier2005essence}. We compared our
 tool\footnote{\code{make benchs}, assuming you have the relevant packages,
-should plot some nice data} with the two others, and we managed to find evidence
-for a complexity bug in \code{mini}\footnote{Which was fixed later on by F.
-Pottier}.
+should plot some nice data} with the two others, and we managed to confirm the
+issue reported by B. Yakobowski and fix the corresponding complexity bug in
+\code{mini}.
 
 \part{\label{part:translation}System F and coercions…}
 
@@ -607,9 +635,10 @@ Pottier}.
   {\bullet[\tau]}                   {$\forall$ elimination} \\
   {\forall[c]}                      {$\forall$ covariance} \\
   {\forall\times}                   {$\forall$ distributivity} \\
-  {p_i[c]}                          {coercion projection on the $i$-th component}
+  {\times_i[c]}                          {coercion projection on the $i$-th component}
 
   \TTSyntaxCategoryNamed{\tau}{}       {type} \\
+  {\forall.\,\tau}                        {universally quantified type}\\
   {F (\tau_1, \dots, \tau_n)}          {type constructor} \\
   {\alpha}                             {a type variable (an integer)}
 
@@ -619,13 +648,17 @@ Pottier}.
 System F \cite{reynolds1974systemf,girard1972systemf} was introduced at the
 beginning of the '70s. Since then, many extensions have been derived: System
 $F_{<:}$ (``System F-sub'') with subtyping, System $F_\mu$ for recursive types,
-System $F_\omega$ with functions from types to types and, finally, System
+System $F_\omega$ with functions from types to types, and System
 $F_\eta$ \cite{mitchell-88}.
 
 The previous part was all about running type inference on the original ML
 program, and building a decorated AST with all the required type information.
 This part is about translating the decorated AST into a core language, close to
 System $F_\eta$, which is described in figure \vref{fig:systemf}. 
+
+Our translation is targeting the $F_\eta$ language. $F_\omega$ and $F_\mu$ might
+be relevant later on for us, but the subset of OCaml which have chosen has not
+required more power than $F_\eta$.
 
 \section{An overview of the translation}
 
@@ -638,10 +671,10 @@ the important features are.
     \code{match}es.
   \item We're using coercions \emph{inside patterns} -- this will be discussed
     later on.
-  \item The syntax of types does not include $\forall$: indeed, since we're
-    annotating $\lambda$-abstractions only, and since \emph{we're in ML}, the
-    arguments cannot have polymorphic types. Moreover, we're not doing any
-    program transformations that would exhibit such polymorphic arguments.
+  \item The only type annotations are at $\lambda$-bindings: the type of the
+    arguments is provided. The types of the arguments do not use $\forall$:
+    indeed, since \emph{we're in ML}, the arguments cannot have polymorphic
+    types.
   \item $\tau_1 \to \tau_2$ is understood to be the application of the ``arrow''
     type constructor; the same goes for product types. Constant types
     (\code{int}, \code{unit}, …) are type constructors with arity 0.
@@ -657,20 +690,23 @@ mutable structures and a lot of sharing. We cannot work with such a
 representation, which is why a first ``cleanup'' step is needed.
 
 We're using types represented as De Bruijn indices. That is, type variable
-$i$ refers to the $i$-th enclosing $\Lambda$ above the term. This is more
-convenient and makes type-checking easier.
+$i$ refers to the $i$-th enclosing $\Lambda$ above the term. This is one of the
+available representations for types and felt natural in our case.
 
-The first step transforms the union-find structures into those De Bruijn types.
+The first step transforms the union-find structures into these De Bruijn types.
 We still have a syntax of expressions (not described here) that is more or less
 equivalent to that of the original OCaml AST. We're not trying to desugar
-anything. Simply, we're cleaning up the representation of types.
+anything. Simply, we're cleaning up the representation of types. This is the
+step that goes from CamlX ``with holes'' to CamlX in figure \ref{fig:structure}.
 
 The second step is where all the work is actually performed. A number of OCaml
 constructs were redundant: \code{function}, \code{let \dots\;and}, \code{let
 pattern = \dots}. We eliminate all those, and sometimes introduce temporary
 identifiers, or change the original expression a little bit. We also guarantee
 that identifiers are globally unique in the result of this transformation;
-they're \emph{atoms}.
+they're \emph{atoms}. The syntax of this ``Core'' language is described in
+figure \vref{fig:systemf}. This step corresponds to the final arrow from CamlX
+to Core in figure \ref{fig:structure}.
 
 Once we've obtained a System $F_\eta$ term, we can type-check this term to
 ensure the consistency before proceeding with the rest of the compilation
@@ -680,7 +716,7 @@ process.
 
 \newcommand{\forallvec}{\ensuremath{\overline{\forall}}}
 
-\begin{figure*}[ht]
+\begin{figure*}[t!]
   \TTtoprule
   \vspace*{-2ex}
 
@@ -734,7 +770,12 @@ process.
 \end{figure*}
 
 One feature of OCaml is that, as we said previously, patterns are generalizing.
-We discard the value restriction for the sake of clarity in this example.
+We discard the value restriction for the sake of clarity in the following
+examples.
+
+\subsection{The core issue}
+
+Let us consider the following example.
 
 \begin{verbatim}
 let (l, f) = (fun x -> x)([], fun x -> x);;
@@ -742,8 +783,24 @@ val l : 'a list = []
 val f : 'a -> 'a = <fun>
 \end{verbatim}
 
-However, the main problem is that the expression on the right-hand side of the
-equals sign has type $\forall\alpha\beta.\; (\alpha\;\kwd{list},\;\beta\to\beta)$.
+If now think of F-terms, we'll be matching the expression
+$$\Lambda\Lambda \big(\Lambda.\;\lambda (x: 0).\; x\big)
+\;\big[(\kwd{list}[1], 0\to0)\big]
+\;\big(\kwd{Nil}[1], (\Lambda.\;\lambda (x: 0).\; x) [0]\big)
+$$
+against the pattern \code{(l, f)}.
+
+In order to assign type schemes to the identifiers of the pattern, we must
+compute the type of the expression above. We thus obtain:
+$$\forall\forall(\kwd{list}[1],0\to0)$$
+that is to say,
+$$\forall\alpha\beta.\; (\alpha\;\kwd{list},\;\beta\to\beta)$$
+
+The pattern-matching will fail because the pattern on the left-hand
+side has a type that starts with head symbol ``tuple'', and the type on
+the right-hand side starts with an abstraction.
+
+The following example is similar:
 
 \begin{verbatim}
 # type 'a t = A of ('a -> 'a);;
@@ -751,33 +808,19 @@ equals sign has type $\forall\alpha\beta.\; (\alpha\;\kwd{list},\;\beta\to\beta)
 val f : 'a -> 'a = <fun>
 \end{verbatim}
 
-The example above is very similar, as the expression on the right side of the
-equals sign has type $\forall\alpha.\; \kwd{A} (\alpha\to\alpha)$.
+The expression on the right side of the
+equals sign has type $\forall\alpha.\; \kwd{A} (\alpha\to\alpha)$: this pattern matching will also fail.
 
-\subsection{The core issue}
+One might think about changing the expression into an equivalent one, so that
+its type is correct. For instance, one can translate
+$\Lambda.  A(\lambda x. x)$ into $A (\Lambda.\lambda x. x)$ to solve this issue.
 
-If we now consider the expressions on the left-hand side of the equals sign, in
-the first case, if we think now of \emph{F terms}, we'll be matching the pattern
-against the following expression:
-$$\Lambda\Lambda \big(\Lambda.\;\lambda (x: 0).\; x\big)
-\;\big[(\kwd{list}[1], 0\to0)\big]
-\;\big(\kwd{Nil}[1], (\Lambda.\;\lambda (x: 0).\; x) [0]\big)
-$$
+This sounds like a good idea, but this is not applicable in situations such as
+the first example. The expression in the first example is an
+\emph{application}, so there is no way we can push the $\Lambda$ inside the
+application, because this is not possible \emph{syntactically}.
 
-Now to assign types to the identifiers in the pattern, we must compute the type
-of this expression. What comes is\footnote{Please note that we are using De Bruijn
-indices for types, so there's no identifiers after $\forall$}:
-$$\forall\forall(\kwd{list}[1],0\to0)$$
-
-The pattern-matching will most likely fail because the pattern on the left-hand
-side has a type that starts with head symbol ``tuple'', and the type on
-the right-hand side starts with an abstraction.
-
-Similarly, the pattern matching in the second example will fail. One
-might think about changing the original expression, and translating $\Lambda.  A(\lambda x. x)$ into $A
-(\Lambda.\lambda x. x)$ to solve this issue. This sounds like a good idea, but
-this is not applicable in situations such as the first example. We must operate
-on types, and we need \emph{coercions}.
+The conclusion is we must operate on types, and we need \emph{coercions}.
 
 \subsection{What is a coercion?}
 
@@ -789,15 +832,15 @@ expression $e$ can be cast from $\tau$ to $\tau'$. This is where we use coercion
 
 A coercion is a witness for subtyping. We say that a subtyping judgement is
 witnessed by a coercion:
-$$\Gamma \vdash \tau \leq \tau' \leadsto c$$
-For instance, the coercion $(\forall\times)$ witnesses the covariance of the
-tuple with regard to $\forall$.
-$$\Gamma \vdash \forall (\tau_1, \dots, \tau_n) \leq
-(\forall\tau_1,\dots,\forall\tau_n) \leadsto (\forall\times)$$
+$$\Gamma \vdash c: \tau \leq \tau'$$
+For instance, the coercion $(\forall\times)$ witnesses the distributivity of
+$\forall$ with regard to tuples.
+$$\Gamma \vdash (\forall\times): \forall (\tau_1, \dots, \tau_n) \leq
+(\forall\tau_1,\dots,\forall\tau_n)$$
 The typing rule for a coercion thus becomes:
 \begin{prooftree}
   \AxiomC{$\Gamma \vdash e: \tau$}
-  \AxiomC{$\Gamma \vdash \tau \leq \tau' \leadsto c$}
+  \AxiomC{$\Gamma \vdash c: \tau \leq \tau'$}
   \BinaryInfC{$\Gamma \vdash (e \blacktriangleright c): \tau'$}
 \end{prooftree}
 
@@ -805,16 +848,16 @@ Other subtyping rules are pretty standard. Here is the $i$-th projection for a
 tuple.
 
 \begin{prooftree}
-  \AxiomC{$\Gamma \vdash \tau_i \leq \tau_i' \leadsto c$}
-  \UnaryInfC{$\Gamma \vdash (\tau_1, \dots, \tau_i, \dots, \tau_n) \leq
-  (\tau_1, \dots, \tau_i', \dots, \tau_n) \leadsto p_i[c]$}
+  \AxiomC{$\Gamma \vdash c: \tau_i \leq \tau_i'$}
+  \UnaryInfC{$\Gamma \vdash (\times_i[c]): (\tau_1, \dots, \tau_i, \dots, \tau_n) \leq
+  (\tau_1, \dots, \tau_i', \dots, \tau_n)$}
 \end{prooftree}
 
 Or the covariance of $\forall$.
 
 \begin{prooftree}
-  \AxiomC{$\Gamma \vdash \tau \leq \tau' \leadsto c$}
-  \UnaryInfC{$\Gamma \vdash \forall\tau \leq \forall\tau \leadsto \forall[c]$}
+  \AxiomC{$\Gamma \vdash c: \tau \leq \tau'$}
+  \UnaryInfC{$\Gamma \vdash (\forall[c]): \forall\tau \leq \forall\tau$}
 \end{prooftree}
 
 \subsection{Coercions in patterns}
@@ -831,14 +874,14 @@ However, we cannot simply apply a coercion to the expression on the right-hand
 side of the equals sign: the coercions needed on the left side and the right
 side of the or-pattern are not the same.
 \begin{itemize}
-  \item The left side of the or-pattern will require $\forall\times$, which states
-    that $\forall$ can be distributed inside the data type.
+  \item The left side of the or-pattern will require $(\forall t)$, which states
+    that $\forall$ can be distributed inside data type $t$.
   \item The right side will require
-    $\forall\times;\;p_{\kwd{A}}\left[ \forall\times \right]$
+    $(\forall t);\;(t_0\left[ (\forall \kwd{list}) \right])$
     which states
-    that $\forall$ can be distributed inside the $\kwd{t}$ data type, that its
-    constructor $\kwd{A}$ is covariant so we can move the $\forall$ inside the
-    $\kwd{list}$ data type under the $\kwd{A}$ constructor.
+    that $\forall$ can be distributed inside data type $\kwd{t}$, that its
+    $0$-th parameter (it's \code{'a}) is covariant so we can move the $\forall$
+    inside the $\kwd{list}$ data type under the $\kwd{A}$ constructor.
 \end{itemize}
 In the end, we want to assign $\forall.\;0\to\kwd{int}$ to $\evid$.
 
@@ -860,9 +903,10 @@ pattern into $p_1 \blacktriangleright c_1\;|\; p_2 \blacktriangleright c_2$.
 
 \subsection{A set of rules}
 
-What happens now is that, in the process of translating the ``pure'' term (see
-figure \vref{fig:structure}), that has De Bruijn types but complex expressions,
-into System F, we \emph{rewrite} patterns to introduce coercions wherever needed.
+What happens now is that, in the process of translating the ``pure'' CamlX term
+(see figure \vref{fig:structure}), that has De Bruijn types but complex
+expressions, into System F, we \emph{rewrite} patterns to introduce coercions
+wherever needed.
 
 Although the subtyping relation in $F_\eta$ is undecidable \cite{mitchell-88},
 we have a deterministic procedure for adding the required coercions. This is due
@@ -876,13 +920,13 @@ passes. Thus, we just need to apply the rules in figure
 
 Informally, this procedure does only two things: it pushes the $\forall$s inside
 the tuples, and once it hits an identifier in the pattern, it removes all the
-leading $\forall$s in the type that are unused by instanciating them to $\perp$.
+leading $\forall$s in the type that are unused by instantiating them to $\perp$.
 
 \subsection{More on coercions}
 
 One of the goals we haven't achieved yet consists in mapping the value
 restriction \emph{à la} Garrigue into these coercions. Because this just boils
-down to introducing a few $\forall$s and instanciating some of them to $\perp$,
+down to introducing a few $\forall$s and instantiating some of them to $\perp$,
 this should be feasible rather easily.
 
 \section{Other simplifications\label{desugar}}
@@ -890,10 +934,10 @@ this should be feasible rather easily.
 Out of the many constructs that are offered by OCaml, many of them are
 redundant. For instance, the \code{function} keyword can be replaced by
 \code{fun x -> match x with}. We might also want stronger guarantees, such as
-the unicity of identifiers. These many simplifications are all performed in the
-translation from a ``pure'' AST to the Core language.
+the uniqueness of identifiers. These many simplifications are all performed in the
+translation from ``pure'' CamlX to the Core language.
 
-\subsection{Unicity of identifiers}
+\subsection{Uniqueness of identifiers}
 
 Previously, the identifiers were simply scoped strings. That is, one had to
 forward an environment with a mapping when walking the tree, in order to map
@@ -977,7 +1021,7 @@ val fst: ∀ β α. α * β → α
 
 The second line is the output from our solver that prints, as an intermediate
 result, the type of bound identifiers. If one decides to only keep the type
-schemes for indentifiers (that is, keeping the type scheme of \code{x} and
+schemes for identifiers (that is, keeping the type scheme of \code{x} and
 \code{y}), then type information is missing to introduce a temporary identifier.
 
 \begin{verbatim}
@@ -1050,7 +1094,7 @@ representations.
 \subsection{Original OCaml program}
 
 This program demonstrates the following features: \code{let}-patterns,
-generalization, instanciation, coercions.
+generalization, instantiation, coercions.
 
 We do not show the generated constraints below, as they are quite huge and hard
 to understand.
@@ -1070,8 +1114,8 @@ type-checker to assign schemes to individual identifiers, once it has applied
 all the required coercions.
 
 \begin{verbatim}
-let (a, b): ∀. [int * (0 → 0)] =
-  let (g, h): ∀. [int * (0 → 0)] =
+let (a, b): ∀. [int * (0 → 0)] = Λ.
+  let (g, h): ∀. [int * (0 → 0)] = Λ.
     (2, (fun (x: 0) -> x))
   in
   (h [int] 2, h [0])
@@ -1106,7 +1150,7 @@ with
 \end{verbatim}
 
 The resulting \code{match} is actually generalizing, and \code{h} is
-instanciated twice with different arguments.
+instantiated twice with different arguments.
 
 \part{A reflexion on this work}
 
@@ -1190,9 +1234,18 @@ tool. We hope to show with this experiment that a fresh design for type-checking
 is actually doable, and that it helps us augment our trust in the compilation
 process.
 
+\part{Appendix: CamlX syntax}
+
+Blah blah duh duh
+
 \part{Bibliography}
 
 \bibliographystyle{alpha}
 \bibliography{rapport}
 
 \end{document}
+
+%TODO:
+% Bien utiliser tous les noms des langages intermédiaires histoire de clarifier
+% les choses
+% Mettre la syntaxe de CamlX en annexe
