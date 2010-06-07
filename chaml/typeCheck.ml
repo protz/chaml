@@ -39,7 +39,7 @@ let fail msg =
   failwith msg
 
 let to_typ type_term =
-  (type_term: DeBruijn.t Algebra.Core.type_term :> typ)
+  (type_term: DeBruijn.type_term :> typ)
 
 let rec infer env expr: env -> Core.expression -> Algebra.type_term =
   match expr with
@@ -50,13 +50,14 @@ let rec infer env expr: env -> Core.expression -> Algebra.type_term =
   | `TyApp expr t2 ->
       let t1 = infer env expr in
       begin match t1 with
-        | `Forall _ ->
+        | `Forall t1 ->
             DeBruijn.subst t2 0 t1  
         | _ ->
             fail "TyApp"
       end
 
   | `Fun ((`Var x), t, expr) ->
+      let t = to_typ t in
       let env = add x t env in
       type_cons_arrow t (infer env expr)
 

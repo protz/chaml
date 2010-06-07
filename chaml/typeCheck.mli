@@ -17,4 +17,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val check: Core.expression -> bool
+val check: Core.expression -> unit
