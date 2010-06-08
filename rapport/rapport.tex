@@ -114,14 +114,14 @@ extensions.
         text badly centered, minimum height=.8cm, font=\bfseries\footnotesize\sffamily}] 
 
       \node [pass] (source) {\code{.ml}};
-      \node [pass, below of=source] (ast) {AST};
+      \node [pass, below of=source] (ast) {OCaml parse tree};
       \node [below of=ast] (phantom) {};
       \node [tool, below=3cm of ast] (unifier) {unifier};
       \node [pass, left of=phantom] (constraint) {Constraint};
       \node [pass, right of=phantom] (term1) {CamlX ``with holes''};
       \node [tool, left=2.2cm of constraint] (solver) {solver};
       \node [pass, below of=term1] (term2) {CamlX};
-      \node [pass, below of=term2] (core) {Core};
+      \node [pass, below of=term2] (core) {CoreML};
       \node [tool, left of=core] (typechecker) {type checker};
       \node [below=1cm of core] (end) {Rest of the compilation process…};
 
@@ -245,7 +245,7 @@ we needed to compare the output of our tool with OCaml's, we decided to just use
 OCaml's \code{parsing/} subdirectory. All the other pieces of code in our tool
 are original work.
 
-\begin{TTCOMPONENT}{Our syntax for CamlX\label{fig:camlx}}{!b}
+\begin{TTCOMPONENT}{Our syntax for CamlX\label{fig:camlx}}{}{!b}
   \let \\ \TTSyntaxAlternative%
 
   \TTSyntaxCategoryNamed{e}{}                                       {expression} \\
@@ -291,7 +291,7 @@ are original work.
 
 \part[1]{Constraint solving and decorated ASTs}
 
-\begin{TTCOMPONENT}{Syntax of type schemes and constraints\label{fig:constraints_syntax}}{ht}
+\begin{TTCOMPONENT}{Syntax of type schemes and constraints\label{fig:constraints_syntax}}{}{ht}
   \let \\ \TTSyntaxAlternative%
 
   \TTSyntaxCategoryNamed{\ts}{}        {type scheme} \\
@@ -379,9 +379,10 @@ runs a second pass to solve the constraints. The final result is an environment
 with all the top-level bindings and their types, or an error if the program
 cannot be type-checked.
 
-This is nothing like a fully annotated AST, and some work was needed in order to
-transform this process into one suitable for generating a fully annotated AST.
-This is the first part of our work: adapting constraint-solving to our needs.
+The output of the constraint solver is nothing like a fully annotated AST;
+hence, some work was needed to adapt the constraint solving process, and make it
+generate a fully annotated AST. This is the first part of our work: adapting
+constraint-solving to our needs.
 
 \section{Constraint-based type inference}
 
@@ -450,11 +451,11 @@ the unification knowledge obtained so far, and $\ctrue$ is the empty constraint,
 meaning there is nothing left to solve.
 
 In this new scenario, the solver recursively solves constraints and returns
-\emph{terms}. For instance, when solving a \underline{\smash{application}}-constraint,
-the solver obtains two terms annotated with the right types, and returns an AST
-node that applies the first one to the second one. When solving a
-\underline{instance}-constraint, it returns an identifier annotated with the
-right types. 
+\emph{terms}. For instance, when solving an
+\underline{\smash{application}}-constraint, the solver obtains two terms
+annotated with the right types, and returns an AST node that applies the first
+one to the second one. When solving an \underline{instance}-constraint, it
+returns an identifier annotated with the right types. 
 
 That way, instead of just obtaining the type of the top-level
 bindings at the end of the process, we end up with:
@@ -485,7 +486,7 @@ extend the syntax of constraints. This led us to abandon this design, and we
 chose a more tractable process instead.
 
 
-\begin{TTCOMPONENT}{Alternative encoding of expressions in constraints\label{fig:bad_idea}}{!b}
+\begin{TTCOMPONENT}{Alternative encoding of expressions in constraints\label{fig:bad_idea}}{}{!b}
   \let \\ \TTSyntaxAlternative%
 
   \TTSyntaxCategoryNamed{C}{}       {constraint} \\
@@ -519,10 +520,10 @@ and, in our experience, easy to implement.
 The basic idea is for the constraint generator to pre-allocate solver
 structures\footnote{In the implementation, the constraint generator is a functor
 that is parameterized over the solver types and some solver helpers to allocate
-new ``slots''.}: for instance, when it generates the constraints for a
-\code{fun}-binding, it pre-allocates a slot $\sigma$ for the scheme of the
-argument, creates a \code{let}-constraint with a pointer to this slot, and
-creates a \code{fun}-expression with a pointer to the \emph{exact same slot}.
+new ``slots''.}: for instance, when generating the constraints for a
+\code{fun}-binding, we pre-allocate a slot $\sigma$ for the upcoming scheme of
+the argument, we create a \code{let}-constraint with a pointer to this slot, and
+we create a \code{fun}-expression with a pointer to the \emph{exact same slot}.
 
 The difference with our previous approach is that now the decorated AST
 and the constraint tree are separate structures. They are generated in parallel
@@ -566,7 +567,7 @@ figure \vref{fig:good_idea}).
   \label{fig:good_idea}
 \end{figure}
 
-Right after the constraint has been generated, the common structures $\sigma$
+Right after the constraint has been generated, the ``slots'' $\sigma$
 are empty, because the constraint generator only allocated them. However, as
 figure \vref{fig:good_idea} shows, the type scheme $\sigma$ is \emph{shared} by
 the constraint and the CamlX AST ``with holes''.
@@ -623,6 +624,19 @@ In order to properly generate all the coercions and type annotations, the
 translator must access as much type information as it can, which is why we
 decorate the AST. The next part is all about this translation process.
 
+\subsection{The target language: CamlX}
+
+This method allows us to build an explicitly typed ``CamlX'' AST. Its full
+description can be found in figure \vref{fig:camlx}. It is very close to the
+original OCaml language, except that it is decorated with type annotations.
+Coercions are implicit in this language, and the $\Lambda$s are explicitly
+counted. That is to say, at the level of \code{let}-bindings and \code{match}es,
+we keep track of the variables that have been generalized.
+
+The implementation details vary between the representation ``with holes'' and
+the representation with ``clean'' De Bruijn types: the data types are different,
+but the same information is conveyed.
+
 \subsection{About this method}
 
 This method has proved to be easy to implement and work with, although it lacks
@@ -633,17 +647,12 @@ The trick is simply to think of what will be needed for the next steps,
 pre-allocate it, and then store it somewhere in the CamlX term, so
 that the next passes can find it and use it.
 
-One might wonder what is the exact syntax of CamlX. It is very close to the
-original OCaml language, except that is has explicit type annotations, as we
-said. The full syntax of CamlX is described in figure \vref{fig:camlx}.
-
-
 \section{Verifying our work}
 
 Rewriting a type-inferencer and adapting it to our needs is a rather big task, and
 implementing it properly requires some care. To make sure our constraint
-generator and solver were reliable, we successfully developed a series of tests
-to check both the inferred types and the generated constraints.
+generator and solver were reliable, we developed a series of tests to check both
+the inferred types and the generated constraints.
 
 The authors of \cite{pottier2005essence} developed a prototype implementation of
 their work, called \code{mini}. This prototype has a constraint parsing
@@ -670,7 +679,7 @@ issue reported by B. Yakobowski and fix the corresponding complexity bug in
 
 \part{\label{part:translation}System F and coercions…}
 
-\begin{TTCOMPONENT}{Our syntax for System F\label{fig:systemf}}{ht}
+\begin{TTCOMPONENT}{Our syntax for CoreML\label{fig:systemf}}{}{ht}
   \let \\ \TTSyntaxAlternative%
 
   \TTSyntaxCategoryNamed{x}{}       {identifier} \\
@@ -725,7 +734,7 @@ This part is about translating the CamlX AST into the CoreML language, close to
 System $F_\eta$, which is described in figure \vref{fig:systemf}. 
 
 Our translation is targeting the $F_\eta$ language. $F_\omega$ and $F_\mu$ might
-be relevant later on for us, but the subset of OCaml which have chosen has not
+be relevant later on for us, but the subset of OCaml we have chosen has not
 required more power than $F_\eta$.
 
 \section{An overview of the translation}
@@ -763,10 +772,11 @@ $i$ refers to the $i$-th enclosing $\Lambda$ above the term. This is one of the
 available representations for types and felt natural in our case.
 
 The first step transforms the union-find structures into these De Bruijn types.
-We still have a syntax of expressions (not described here) that is more or less
-equivalent to that of the original OCaml AST. We're not trying to desugar
-anything. Simply, we're cleaning up the representation of types. This is the
-step that goes from CamlX ``with holes'' to CamlX in figure \ref{fig:structure}.
+We still have a syntax of expressions (see figure \vref{fig:camlx}) that is
+more or less equivalent to that of the original OCaml AST. We're not trying to
+desugar anything. Simply, we're cleaning up the representation of types. This
+is the step that goes from CamlX ``with holes'' to CamlX in figure
+\ref{fig:structure}.
 
 The second step is where all the work is actually performed. A number of OCaml
 constructs were redundant: \code{function}, \code{let \dots\;and}, \code{let
@@ -932,9 +942,14 @@ side of the or-pattern are not the same.
   \item The right side will require
     $(\forall t);\;(t_0\left[ (\forall \kwd{list}) \right])$
     which states
-    that $\forall$ can be distributed inside data type $\kwd{t}$, that its
-    $0$-th parameter (it's \code{'a}) is covariant so we can move the $\forall$
-    inside the $\kwd{t}$ data type under the $\kwd{A}$ constructor.
+    that 
+    \begin{itemize}
+      \item $\forall$ can be distributed inside data type $\kwd{t}$
+      \item the $0$-th parameter \code{'a} of data type $\kwd{t}$ is covariant
+        so we can move the $\forall$ inside the $\kwd{t}$ data type under the
+        $\kwd{A}$ constructor and 
+      \item $\forall$ can be pushed inside data type $\kwd{list}$.
+    \end{itemize}
 \end{itemize}
 In the end, we want to assign $\forall.\;0\to\kwd{int}$ to $\evid$.
 
@@ -1183,8 +1198,8 @@ let s, f = match ("", fun x -> x) with
 Because \code{f} needs to be polymorphic, we must generalize \code{e} in
 \code{match e with\dots}. However, OCaml does not perform such a generalization.
 This was originally started as a proof that such trivial changes only require
-tweaking the constraint generator, but we decided to keep it as the required
-changes to make it work in System F were minimal.
+tweaking the constraint generator (and not the solver), but we decided to keep
+it as the required changes to make it work in System F were minimal.
 
 The important part is that because \code{match}es now can operate on
 expressions with polymorphism inside, we need to apply coercions inside

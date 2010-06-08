@@ -126,7 +126,7 @@
 \def\hackyinsertmulticolbugspace{}
 \def\extraspacehack#1{\gdef\hackyinsertmulticolbugspace{\vskip #1}}
 
-\newenvironment{TTCOMPONENT}[3][\empty]{%
+\newenvironment{TTCOMPONENT}[4][\empty]{%
   % Arg 1 (optional) = conventional symbol
   % Arg 2            = written-out name
   % Arg 3            = features
@@ -138,7 +138,7 @@
   \fi
   \begingroup
   \ifttfigures 
-    \begin{figure*}[#3!]%
+    \begin{figure*}[#4!]%
   \fi
   %\iftttwocol
     \begin{list}{}{\advance\leftmargin -15pt}\item
@@ -146,6 +146,7 @@
   \relax
       \makebox[\linewidth]{%
        \it
+       #3
        \gdef\ttcomponentlabel{#2}%
        \hfill 
        #1\relax
@@ -230,9 +231,9 @@
     \ifthenelse{\equal{#2}{}}{\hskip 0em minus 1em}{}}%
     #2 \hfil 
     \iftttwocol
-      {\it:}%
+      {\it #3:}%
     \else
-      \hbox to 1.4in{{\it}\hfil}%
+      \hbox to 1.4in{{\it #3}\hfil}%
     \fi
    }
  }
