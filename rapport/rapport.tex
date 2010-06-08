@@ -18,6 +18,7 @@ bookmarks=false}
 \usepackage{multicol}
 %\usepackage{microtype}
 \usepackage{float}
+\usepackage{usefulstuff/mathpartir}
 
 
 % ATTAPL
@@ -634,7 +635,7 @@ that the next passes can find it and use it.
 
 One might wonder what is the exact syntax of CamlX. It is very close to the
 original OCaml language, except that is has explicit type annotations, as we
-said. The full syntax of CamlX is describe in figure \vref{fig:camlx}.
+said. The full syntax of CamlX is described in figure \vref{fig:camlx}.
 
 
 \section{Verifying our work}
@@ -699,7 +700,6 @@ issue reported by B. Yakobowski and fix the corresponding complexity bug in
   \TTSyntaxCategoryNamed{c}{}       {coercion} \\
   {\kwd{id}}                        {identity} \\
   {c_1; c_2}                        {composition} \\
-  {\forall}                         {$\forall$ introduction} \\
   {\bullet[\tau]}                   {$\forall$ elimination} \\
   {\forall[c]}                      {$\forall$ covariance} \\
   {\forall\times}                   {$\forall$ distributivity} \\
@@ -858,21 +858,7 @@ The typing rule for a coercion thus becomes:
   \BinaryInfC{$\Gamma \vdash (e \blacktriangleright c): \tau'$}
 \end{prooftree}
 
-Other subtyping rules are pretty standard. Here is the $i$-th projection for a
-tuple.
-
-\begin{prooftree}
-  \AxiomC{$\Gamma \vdash c: \tau_i \leq \tau_i'$}
-  \UnaryInfC{$\Gamma \vdash (\times_i[c]): (\tau_1, \dots, \tau_i, \dots, \tau_n) \leq
-  (\tau_1, \dots, \tau_i', \dots, \tau_n)$}
-\end{prooftree}
-
-Or the covariance of $\forall$.
-
-\begin{prooftree}
-  \AxiomC{$\Gamma \vdash c: \tau \leq \tau'$}
-  \UnaryInfC{$\Gamma \vdash (\forall[c]): \forall\tau \leq \forall\tau$}
-\end{prooftree}
+Other subtyping rules are pretty standard and are described in figure \vref{fig:subtyping_rules}.
 
 \subsection{Coercions in patterns}
 
@@ -1019,6 +1005,51 @@ restriction \emph{à la} Garrigue into these coercions. Because this just boils
 down to introducing a few $\forall$s and instantiating some of them to $\perp$,
 this should be feasible rather easily. This kind of manipulation on types is
 a perfect candidate for a translation in terms of coercions.
+
+\begin{figure*}[t!]
+  \TTtoprule
+  \begin{mathpar}
+
+    \inferrule
+      {\Gamma \vdash c: \tau_i \leq \tau_i'}
+      {\Gamma \vdash (\times_i[c]): (\tau_1, \dots, \tau_i, \dots, \tau_n) \leq
+        (\tau_1, \dots, \tau_i', \dots, \tau_n)}
+    \quad(\textsc{tuple projection})
+
+    \and
+
+    \inferrule
+      {\Gamma \vdash c: \tau \leq \tau'}
+      {\Gamma \vdash (\forall[c]): \forall\tau \leq \forall\tau}
+    \quad(\textsc{$\forall$ covariance})
+
+    \and
+
+    \inferrule
+      {\Gamma \vdash c_1: \tau \leq \tau'\\
+       \Gamma \vdash c_2: \tau' \leq \tau''}
+      {\Gamma \vdash c_1; c_2: \tau \leq \tau''}
+    \quad(\textsc{transitivity})
+
+    \and
+
+    \inferrule
+      {\quad}
+      {\Gamma \vdash \bullet[\sigma]: \forall\tau \leq [\sigma/0]\tau}
+    \quad(\textsc{$\forall$ elimination})
+
+    \and
+
+    \inferrule
+      {\quad}
+      {\Gamma \vdash (\forall\times): \forall (\tau_1, \dots, \tau_n) \leq
+        (\forall \tau_1, \dots, \forall \tau_n)}
+    \quad(\textsc{$\forall$ distributivity})
+
+  \end{mathpar}
+  \TTbottomrule
+  \caption{\label{fig:subtyping_rules}Subtyping rules for our system of coercions}
+\end{figure*}
 
 \section{Other simplifications\label{desugar}}
 
@@ -1330,9 +1361,3 @@ process.
 \bibliography{rapport}
 
 \end{document}
-
-%TODO:
-% Bien utiliser tous les noms des langages intermédiaires histoire de clarifier
-% les choses
-% Mettre la syntaxe de CamlX en annexe
-% Faire une figure avec toutes les règles de sous-typage
