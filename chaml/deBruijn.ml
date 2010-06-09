@@ -63,19 +63,12 @@ let string_of_t x = string_of_int x.index
 
 let string_of_type_term scheme =
   let open TypePrinter in
-  let rec wrap acc = function
-    | `Forall t ->
-        wrap ("∀"::acc) t
-    | scheme ->
-      let scheme =
-        (Obj.magic scheme: t inspected_var)
-      in
-      let scheme = string_of_type
-        ~string_of_key:(`Custom string_of_t)
-        scheme
-      in
-      let pre = if List.length acc > 0 then ". " else "" in
-      (String.concat "" (acc @ [pre; scheme]))
-  in 
-  wrap [] scheme
+  let scheme =
+    (scheme: type_term :> t inspected_var)
+  in
+  let scheme = string_of_type
+    ~string_of_key:(`Custom string_of_t)
+    scheme
+  in
+  scheme
 

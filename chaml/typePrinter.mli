@@ -32,6 +32,7 @@ type 'var inspected_var = [
     'var type_var
   | `Cons of type_cons * 'var inspected_var list
   | `Alias of 'var inspected_var * 'var type_var
+  | `Forall of 'var inspected_var
 ]
 
 (** When printing a type, you can choose to provide the conversion function from

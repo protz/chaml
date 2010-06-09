@@ -24,6 +24,7 @@ type 'var inspected_var = [
     'var type_var
   | `Cons of type_cons * 'var inspected_var list
   | `Alias of 'var inspected_var * 'var type_var
+  | `Forall of 'var inspected_var
 ]
 
 type ('var, 'uniq) var_printer = [
@@ -81,12 +82,25 @@ let string_of_types
   in
   let rec print_type paren uvar =
     match uvar with
+      | `Forall _ as t ->
+          let rec wrap acc = function
+            | `Forall t ->
+                wrap ("∀"::acc) t
+            | t ->
+                let pre = if List.length acc > 0 then ". " else "" in
+                let s = print_type paren t in
+                (String.concat "" (acc @ [pre; s]))
+          in 
+          wrap [] t
+
       | `Alias (uvar, key) ->
           Printf.sprintf "(%s as %s)"
             (print_type false uvar)
             (print_type false (key :> 'var inspected_var))
+
       | `Var key ->
           string_of_key key
+
       | `Cons (cons_name, cons_args) ->
           if cons_name = Algebra.TypeCons.head_symbol_arrow then
             let op =
