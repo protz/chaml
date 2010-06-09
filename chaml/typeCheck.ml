@@ -85,6 +85,9 @@ let rec infer: env -> Core.expression -> DeBruijn.type_term =
         let t0 = infer env expr in
         let ti = List.map (infer env) exprs in
         let apply t0 t =
+          Error.debug "[OApp] Function %s argument %s\n"
+            (DeBruijn.string_of_type_term t0)
+            (DeBruijn.string_of_type_term t);
           match t0 with
           | `Cons (head_symbol, [t1; t2])
           when head_symbol = Algebra.TypeCons.head_symbol_arrow ->

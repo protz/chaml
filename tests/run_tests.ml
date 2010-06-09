@@ -172,13 +172,13 @@ let _ =
   let test2' () =
     print_endline (Bash.box "Constraint Solving - recursive types");
     let o = Ocamlbuild_plugin.run_and_read
-      "./chaml.native --enable recursive-types --enable caml-types --disable generalize-match tests/good/tests_recursive_types.ml"
+      "./chaml.native --enable recursive-types --im-feeling-lucky --enable caml-types --disable generalize-match tests/good/tests_recursive_types.ml"
     in
     let o' = Ocamlbuild_plugin.run_and_read
       "ocamlc -rectypes -i -w a tests/good/tests_recursive_types.ml"
     in
     let o'' = Ocamlbuild_plugin.run_and_read
-      "./chaml.native --enable recursive-types --enable caml-types tests/good/tests_recursive_types.ml"
+      "./chaml.native --enable recursive-types --im-feeling-lucky --enable caml-types tests/good/tests_recursive_types.ml"
     in
     compare [o'; o''; o];
   in
@@ -186,14 +186,14 @@ let _ =
     print_endline (Bash.box "Constraint Generation - first series of tests");
     let o = Ocamlbuild_plugin.run_and_read
       ("./chaml.native --dont-print-types --disable generalize-match " ^
-      "--disable default-bindings --print-constraint tests/good/test_constraint.ml")
+      "--im-feeling-lucky --disable default-bindings --print-constraint tests/good/test_constraint.ml")
     in
     let fd = open_out "_constraint" in
     output_string fd o;
     close_out fd;
     let o = Ocamlbuild_plugin.run_and_read
       ("./chaml.native --dont-print-types \
-       --disable default-bindings --print-constraint tests/good/test_constraint.ml")
+       --im-feeling-lucky --disable default-bindings --print-constraint tests/good/test_constraint.ml")
     in
     let fd = open_out "_constraint2" in
     output_string fd o;

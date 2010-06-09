@@ -111,6 +111,7 @@ let _ =
   let arg_print_types = ref true in
   let arg_print_typed_ast = ref false in
   let arg_print_core_ast = ref false in
+  let arg_type_check = ref true in
   let add_opt v k = Options.set_opt k v in
   let usage = String.concat ""
                 ["ChaML: a type-checker for OCaml programs.\n";
@@ -126,6 +127,7 @@ let _ =
       "--dont-print-types", Arg.Clear arg_print_types, "don't print the inferred types, à la ocamlc -i";
       "--print-typed-ast", Arg.Set arg_print_typed_ast, "print the AST annotated with the types found by the solver";
       "--print-core-ast", Arg.Set arg_print_core_ast, "print the System F generated term";
+      "--im-feeling-lucky", Arg.Clear arg_type_check, "don't type-check";
       "--enable", Arg.String (add_opt true), "enable one of the features above";
       "--disable", Arg.String (add_opt false), "disable one of the features above";
     ]
@@ -177,7 +179,7 @@ let _ =
       | `Ok ->
           ()
     end;
-    if not !arg_print_typed_ast && not !arg_print_core_ast then
+    if not !arg_type_check then
       exit(0);
     (* Translate to the first intermediate language *)
     let camlx_ast = Translator.translate hterm in
