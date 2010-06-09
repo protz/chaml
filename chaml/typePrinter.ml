@@ -88,39 +88,37 @@ let string_of_types
       | `Var key ->
           string_of_key key
       | `Cons (cons_name, cons_args) ->
-          begin match cons_name with
-            | { cons_name = "->"; _ } ->
-                let op =
-                  if opt_caml_types then "->" else "→"
-                in
-                let arg1 = List.nth cons_args 0 in
-                let arg2 = List.nth cons_args 1 in
-                let p1 = match arg1 with
-                  | `Cons ({ cons_name; _ }, _) ->
-                      prec cons_name <= prec "->"
-                  | _ -> true
-                in
-                let t1 = print_type p1 arg1 in
-                let t2 = print_type false arg2 in
-                if paren then
-                  Printf.sprintf "(%s %s %s)" t1 op t2
-                else
+          if cons_name = Algebra.TypeCons.head_symbol_arrow then
+            let op =
+              if opt_caml_types then "->" else "→"
+            in
+            let arg1 = List.nth cons_args 0 in
+            let arg2 = List.nth cons_args 1 in
+            let p1 = match arg1 with
+              | `Cons ({ cons_name; _ }, _) ->
+                  prec cons_name <= prec "->"
+              | _ -> true
+            in
+            let t1 = print_type p1 arg1 in
+            let t2 = print_type false arg2 in
+            if paren then
+              Printf.sprintf "(%s %s %s)" t1 op t2
+            else
                   Printf.sprintf "%s %s %s" t1 op t2
-            | { cons_name = "*"; _ } ->
-                let types = List.map (print_type true) cons_args in
-                let types = (String.concat " * " types) in
-                if paren then
-                  Printf.sprintf "(%s)" types
-                else
-                  types
-            | { cons_name; _ } ->
-                let types = List.map (print_type true) cons_args in
-                let args = String.concat ", " types in
-                if List.length types > 0 then
-                  Printf.sprintf "(%s (%s))" cons_name args
-                else
-                  Printf.sprintf "%s" cons_name
-          end
+          else if cons_name = Algebra.TypeCons.head_symbol_tuple (List.length cons_args) then
+            let types = List.map (print_type true) cons_args in
+            let types = (String.concat " * " types) in
+            if paren then
+              Printf.sprintf "(%s)" types
+            else
+              types
+          else
+            let types = List.map (print_type true) cons_args in
+            let args = String.concat ", " types in
+            if List.length types > 0 then
+              Printf.sprintf "(%s (%s))" cons_name.cons_name args
+            else
+              Printf.sprintf "%s" cons_name.cons_name
   in
   let print_with_scheme uvar =
     let typ = print_type false uvar in

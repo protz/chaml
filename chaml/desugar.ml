@@ -474,7 +474,7 @@ and doc_of_coerc: Core.coercion -> Pprint.document =
 
     | `ForallCovar c ->
         let c = doc_of_coerc c in
-        (fancystring "∀co" 3) ^^ lbracket ^^ c ^^ rbracket
+        (fancystring "∀" 3) ^^ lbracket ^^ c ^^ rbracket
 
     | `ForallElim arg ->
         let arg = string (DeBruijn.string_of_type_term arg) in
@@ -483,7 +483,7 @@ and doc_of_coerc: Core.coercion -> Pprint.document =
     | `CovarTuple (i, coercion) ->
         let coercion = doc_of_coerc coercion in
         let i = string (string_of_int i) in
-        (string "p") ^^ i ^^ lbracket ^^ coercion ^^ rbracket
+        (string "×") ^^ i ^^ lbracket ^^ coercion ^^ rbracket
 
     | `DistribTuple ->
         fancystring "∀×" 2

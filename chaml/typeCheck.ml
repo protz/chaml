@@ -71,6 +71,8 @@ let rec infer: env -> Core.expression -> DeBruijn.type_term =
         let t1 = infer env e1 in
         let env = add x t1 env in
         let t2 = infer env e2 in
+        Error.debug
+          "[OLet] %s: %s" (Atom.string_of_atom x) (DeBruijn.string_of_type_term t2);
         t2
 
     | `App (expr, exprs) ->
