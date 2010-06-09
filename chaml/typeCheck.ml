@@ -17,18 +17,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Algebra
-
 module AtomMap = Map.Make(Atom)
 
-type typ = [
-  | `Cons of TypeCons.type_cons * typ list
-  | `Forall of typ
-  | `Var of DeBruijn.t
-]
-
 type env = {
-  type_of_atom: typ AtomMap.t;
+  type_of_atom: DeBruijn.type_term AtomMap.t;
 }
 
 let find atom { type_of_atom } =
@@ -40,10 +32,7 @@ let add atom typ { type_of_atom } =
 let fail msg =
   failwith msg
 
-let to_typ type_term =
-  (type_term: DeBruijn.type_term :> typ)
-
-let rec infer: env -> Core.expression -> Algebra.type_term =
+let rec infer: env -> Core.expression -> DeBruijn.type_term =
   fun env expr ->
     match expr with
     | `TyAbs expr ->
@@ -54,15 +43,14 @@ let rec infer: env -> Core.expression -> Algebra.type_term =
         let t1 = infer env expr in
         begin match t1 with
           | `Forall t1 ->
-              DeBruijn.subst t2 0 t1  
+              DeBruijn.subst t2 DeBruijn.zero t1  
           | _ ->
               fail "TyApp"
         end
 
     | `Fun ((`Var x), t, expr) ->
-        let t = to_typ t in
         let env = add x t env in
-        type_cons_arrow t (infer env expr)
+        Algebra.TypeCons.type_cons_arrow t (infer env expr)
 
     | `Match (e1, pat_exprs) ->
         let t1 = infer env e1 in
@@ -91,7 +79,7 @@ let rec infer: env -> Core.expression -> Algebra.type_term =
         let apply t0 t =
           match t0 with
           | `Cons (head_symbol, [t1; t2])
-          when head_symbol = TypeCons.head_symbol_arrow ->
+          when head_symbol = Algebra.TypeCons.head_symbol_arrow ->
               if t <> t1 then
                 fail "App(1)";
               t2
@@ -105,12 +93,12 @@ let rec infer: env -> Core.expression -> Algebra.type_term =
         t
 
     | `Tuple exprs ->
-        type_cons_tuple (List.map (infer env) exprs)
+        Algebra.TypeCons.type_cons_tuple (List.map (infer env) exprs)
 
     | `Const const ->
         infer_const const
 
-and infer_pat: pat -> typ -> (atom * typ) list =
+and infer_pat: Core.pattern -> DeBruijn.type_term -> (Atom.t * DeBruijn.type_term) list =
   fun pat t ->
     match pat with
     | `Coerce (pat, coerc) ->
@@ -135,7 +123,7 @@ and infer_pat: pat -> typ -> (atom * typ) list =
     | `Tuple patterns ->
         match t with
         | `Cons (head_symbol, typs)
-        when head_symbol = TypeCons.head_symbol_tuple (List.length typs) ->
+        when head_symbol = Algebra.TypeCons.head_symbol_tuple (List.length typs) ->
             let bound = List.map2 infer_pat patterns typs in
             (* Do a assert here *)
             let bound = List.flatten bound in
@@ -143,19 +131,21 @@ and infer_pat: pat -> typ -> (atom * typ) list =
         | _ ->
             fail "Tuple"
 
-and infer_const: Core.const -> typ = function
-  | `Char ->
+and infer_const: Core.const -> DeBruijn.type_term =
+  let open Algebra.TypeCons in
+  function
+  | `Char _ ->
       type_cons_char
-  | `Int ->
+  | `Int _ ->
       type_cons_int
-  | `Float ->
+  | `Float _ ->
       type_cons_float
-  | `String ->
+  | `String _ ->
       type_cons_string
   | `Unit ->
       type_cons_unit
 
-and apply_coerc: typ -> Core.coercion -> typ =
+and apply_coerc: DeBruijn.type_term -> Core.coercion -> DeBruijn.type_term =
   fun typ coerc ->
     match coerc with
     | `Id ->
@@ -179,7 +169,7 @@ and apply_coerc: typ -> Core.coercion -> typ =
     | `ForallElim t2 ->
         begin match typ with
         | `Forall t1 ->
-            DeBruijn.subst t2 0 t1
+            DeBruijn.subst t2 DeBruijn.zero t1
         | _ ->
             fail "Bad coercion"
         end
@@ -187,13 +177,13 @@ and apply_coerc: typ -> Core.coercion -> typ =
     | `CovarTuple (i, coerc) ->
         begin match typ with
         | `Cons (head_symbol, types)
-        when head_symbol = TypeCons.head_symbol_tuple (List.length types) ->
+        when head_symbol = Algebra.TypeCons.head_symbol_tuple (List.length types) ->
             let types =
               Jlist.mapi
                 (fun i' t -> if i = i' then apply_coerc t coerc else t)
                 types
             in
-            TypeCons.type_cons_tuple types
+            Algebra.TypeCons.type_cons_tuple types
         | _ ->
             fail "Bad coercion"
         end
@@ -201,8 +191,13 @@ and apply_coerc: typ -> Core.coercion -> typ =
     | `DistribTuple ->
         begin match typ with
         | `Forall (`Cons (head_symbol, types))
-        when head_symbol = TypeCons.head_symbol_tuple (List.length types) ->
-            TypeCons.type_cons_tuple (List.map (fun t -> `Forall t) types)
+        when head_symbol = Algebra.TypeCons.head_symbol_tuple (List.length types) ->
+            Algebra.TypeCons.type_cons_tuple (List.map (fun t -> `Forall t) types)
         | _ ->
             fail "Bad coercion"
         end
+
+let check expr =
+  let env = { type_of_atom = AtomMap.empty } in
+  let typ = infer env expr in
+  assert (typ = Algebra.TypeCons.type_cons_unit)

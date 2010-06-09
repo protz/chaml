@@ -52,3 +52,7 @@ val make: int -> 'a -> 'a list
 
 (** Same as [map2] but pass an extra parameter that represents the index *)
 val map2i: (int -> 'a -> 'b -> 'c) -> 'a list -> 'b list -> 'c list
+
+(** Same as [map] but pass an extra parameter that represents the index *)
+val mapi: (int -> 'a -> 'b) -> 'a list -> 'b list
+

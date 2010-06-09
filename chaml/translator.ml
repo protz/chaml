@@ -34,7 +34,7 @@ type env = {
 
 let lift_add env uvar =
   let new_map =
-    IntMap.map DeBruijn.lift env.fvar_of_uvar
+    IntMap.map DeBruijn.lift_t env.fvar_of_uvar
   in
   let new_map =
     IntMap.add (id uvar) DeBruijn.zero new_map

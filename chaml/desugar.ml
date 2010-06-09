@@ -268,6 +268,8 @@ and generate_coerc env cenv =
                     seen.(DeBruijn.index v) <- true
               | `Cons (_cons_name, cons_args) ->
                   List.iter walk cons_args
+              | `Forall _ ->
+                  assert false
           in
           walk type_term;
           (* We remove quantifiers we don't use *)

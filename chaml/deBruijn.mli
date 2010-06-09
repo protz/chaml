@@ -25,11 +25,15 @@ type type_var = t Algebra.Core.type_var
 type type_term = [
     type_var
   | `Cons of Algebra.TypeCons.type_cons * type_term list
+  | `Forall of type_term
 ]
 
-val lift: t -> t
+val lift_t: t -> t
+val lift: type_term -> type_term
 val index: t -> int
 val zero: t
+val subst: type_term -> t -> type_term -> type_term
+val lift: type_term -> type_term
 
 val string_of_t: t -> string
 val string_of_type_term: type_term -> string

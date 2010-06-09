@@ -98,3 +98,16 @@ let map2i f l1 l2 =
         raise (Failure "map2i")
   in
   map2i [] 0 l1 l2
+
+let mapi f l1 =
+  let rec mapi acc i l1 =
+    match l1 with
+    | x :: xs ->
+        mapi
+          ((f i x) :: acc)
+          (i + 1)
+          xs
+    | [] ->
+        List.rev acc
+  in
+  mapi [] 0 l1
