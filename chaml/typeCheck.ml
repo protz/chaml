@@ -41,11 +41,16 @@ let rec infer: env -> Core.expression -> DeBruijn.type_term =
 
     | `TyApp (expr, t2) ->
         let t1 = infer env expr in
+        Error.debug "[OTyApp] Applying type %s to type %s\n"
+          (DeBruijn.string_of_type_term t2)
+          (DeBruijn.string_of_type_term t1);
         begin match t1 with
           | `Forall t1 ->
-              DeBruijn.subst t2 DeBruijn.zero t1  
+              let r = DeBruijn.subst t2 DeBruijn.zero t1 in
+              Error.debug "[OTyApp] This gives us %s\n" (DeBruijn.string_of_type_term r);
+              r
           | _ ->
-              fail "TyApp"
+              failwith "TyApp"
         end
 
     | `Fun ((`Var x), t, expr) ->
@@ -69,10 +74,11 @@ let rec infer: env -> Core.expression -> DeBruijn.type_term =
 
     | `Let (`Var x, e1, e2) ->
         let t1 = infer env e1 in
+        Error.debug
+          "[OLet] %s: %s\n" (Atom.string_of_atom x)
+          (DeBruijn.string_of_type_term t1);
         let env = add x t1 env in
         let t2 = infer env e2 in
-        Error.debug
-          "[OLet] %s: %s" (Atom.string_of_atom x) (DeBruijn.string_of_type_term t2);
         t2
 
     | `App (expr, exprs) ->
@@ -92,6 +98,9 @@ let rec infer: env -> Core.expression -> DeBruijn.type_term =
 
     | `Instance x ->
         let t = find x env in
+        Error.debug "[OInstance] Scheme for %s is %s\n"
+          (Atom.string_of_atom x)
+          (DeBruijn.string_of_type_term t);
         t
 
     | `Tuple exprs ->

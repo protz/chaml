@@ -55,7 +55,7 @@ let rec subst t2 { index = i } t1 =
     | `Cons (cons_name, cons_args) ->
         `Cons (cons_name, List.map (subst t2 i) cons_args)
     | `Forall t1 ->
-        subst (lift t2) (i + 1) t1
+        `Forall (subst (lift t2) (i + 1) t1)
   in
   subst t2 i t1
 
