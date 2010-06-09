@@ -17,23 +17,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Algebra
+
 module AtomMap = Map.Make(Atom)
 
+type typ = [
+  | `Cons of TypeCons.type_cons * typ list
+  | `Forall of typ
+  | `Var of DeBruijn.t
+]
+
 type env = {
-  type_of_atom: AtomMap.t;
+  type_of_atom: typ AtomMap.t;
 }
 
 let find atom { type_of_atom } =
   AtomMap.find atom type_of_atom
 
 let add atom typ { type_of_atom } =
-  { AtomMap.add atom typ type_of_atom }
-
-type typ = [
-  | `Cons of Algebra.TypeCons.type_cons * typ list
-  | `Forall of typ
-  | `Var of DeBruijn.t
-]
+  { type_of_atom = AtomMap.add atom typ type_of_atom }
 
 let fail msg =
   failwith msg
@@ -41,70 +43,72 @@ let fail msg =
 let to_typ type_term =
   (type_term: DeBruijn.type_term :> typ)
 
-let rec infer env expr: env -> Core.expression -> Algebra.type_term =
-  match expr with
-  | `TyAbs expr ->
-      let typ = infer env expr in
-      `Forall typ
+let rec infer: env -> Core.expression -> Algebra.type_term =
+  fun env expr ->
+    match expr with
+    | `TyAbs expr ->
+        let typ = infer env expr in
+        `Forall typ
 
-  | `TyApp expr t2 ->
-      let t1 = infer env expr in
-      begin match t1 with
-        | `Forall t1 ->
-            DeBruijn.subst t2 0 t1  
-        | _ ->
-            fail "TyApp"
-      end
+    | `TyApp (expr, t2) ->
+        let t1 = infer env expr in
+        begin match t1 with
+          | `Forall t1 ->
+              DeBruijn.subst t2 0 t1  
+          | _ ->
+              fail "TyApp"
+        end
 
-  | `Fun ((`Var x), t, expr) ->
-      let t = to_typ t in
-      let env = add x t env in
-      type_cons_arrow t (infer env expr)
+    | `Fun ((`Var x), t, expr) ->
+        let t = to_typ t in
+        let env = add x t env in
+        type_cons_arrow t (infer env expr)
 
-  | `Match (e1, pat_exprs) ->
-      let t1 = infer env e1 in
-      let infer_branch (pat, expr) =
-        let bound_identifiers = infer_pat pat t1 in
-        let env =
-          List.fold_left (fun env (atom, t) -> add atom t env) env bound_identifiers
+    | `Match (e1, pat_exprs) ->
+        let t1 = infer env e1 in
+        let infer_branch (pat, expr) =
+          let bound_identifiers = infer_pat pat t1 in
+          let env =
+            List.fold_left (fun env (atom, t) -> add atom t env) env bound_identifiers
+          in
+          infer env expr
         in
-        infer env expr
-      in
-      let ti = List.map infer_branch pat_exprs in
-      let t0 = List.hd ti in
-      if (List.exists ((<>) t0) ti) then
-        fail "Match";
-      t0
+        let ti = List.map infer_branch pat_exprs in
+        let t0 = List.hd ti in
+        if (List.exists ((<>) t0) ti) then
+          fail "Match";
+        t0
 
-  | `Let (`Var x, e1, e2) ->
-      let t1 = infer env e1 in
-      let env = add x t1 env in
-      let t2 = infer env e2 in
-      t2
+    | `Let (`Var x, e1, e2) ->
+        let t1 = infer env e1 in
+        let env = add x t1 env in
+        let t2 = infer env e2 in
+        t2
 
-  | `App (expr, exprs) ->
-      let t0 = infer env expr in
-      let ti = List.map (infer env) exprs in
-      let apply t0 t =
-        match t0 with
-        | `Cons (TypeCons.type_cons_arrow, [t1; t2]) ->
-            if t <> t1 then
-              fail "App(1)";
-            t2
-        | _ ->
-            fail "App(2)"
-      in
-      List.fold_left apply t0 ti
+    | `App (expr, exprs) ->
+        let t0 = infer env expr in
+        let ti = List.map (infer env) exprs in
+        let apply t0 t =
+          match t0 with
+          | `Cons (head_symbol, [t1; t2])
+          when head_symbol = TypeCons.head_symbol_arrow ->
+              if t <> t1 then
+                fail "App(1)";
+              t2
+          | _ ->
+              fail "App(2)"
+        in
+        List.fold_left apply t0 ti
 
-  | `Instance x ->
-      let t = find x env in
-      t
+    | `Instance x ->
+        let t = find x env in
+        t
 
-  | `Tuple exprs ->
-      type_cons_tuple (List.map (infer env) exprs)
+    | `Tuple exprs ->
+        type_cons_tuple (List.map (infer env) exprs)
 
-  | `Const const ->
-      infer_const const
+    | `Const const ->
+        infer_const const
 
 and infer_pat: pat -> typ -> (atom * typ) list =
   fun pat t ->
@@ -124,13 +128,14 @@ and infer_pat: pat -> typ -> (atom * typ) list =
         let bound2 = infer_pat p2 t in
         assert (List.length bound1 <> List.length bound2);
         let tbl = Hashtbl.create 2 in
-        List.iter (fun (atom, typ) -> Hashtbl.add atom typ) bound1;
-        List.iter (fun (atom, typ) -> assert Hashtbl.find atom = typ) bound2;
+        List.iter (fun (atom, typ) -> Hashtbl.add tbl atom typ) bound1;
+        List.iter (fun (atom, typ) -> assert (Hashtbl.find tbl atom = typ)) bound2;
         bound1
 
     | `Tuple patterns ->
         match t with
-        | `Cons (TypeCons.type_cons_tuple typs) ->
+        | `Cons (head_symbol, typs)
+        when head_symbol = TypeCons.head_symbol_tuple (List.length typs) ->
             let bound = List.map2 infer_pat patterns typs in
             (* Do a assert here *)
             let bound = List.flatten bound in
@@ -181,21 +186,23 @@ and apply_coerc: typ -> Core.coercion -> typ =
 
     | `CovarTuple (i, coerc) ->
         begin match typ with
-        | `Cons (TypeCons.type_cons_tuple, types) ->
+        | `Cons (head_symbol, types)
+        when head_symbol = TypeCons.head_symbol_tuple (List.length types) ->
             let types =
               Jlist.mapi
                 (fun i' t -> if i = i' then apply_coerc t coerc else t)
                 types
             in
-            `Cons (TypeCons.type_cons_tuple, types)
+            TypeCons.type_cons_tuple types
         | _ ->
             fail "Bad coercion"
         end
 
     | `DistribTuple ->
         begin match typ with
-        | `Forall (`Cons (TypeCons.type_cons_tuple, types)) ->
-            `Cons (TypeCons.type_cons_tuple, List.map (fun t -> `Forall t) types)
+        | `Forall (`Cons (head_symbol, types))
+        when head_symbol = TypeCons.head_symbol_tuple (List.length types) ->
+            TypeCons.type_cons_tuple (List.map (fun t -> `Forall t) types)
         | _ ->
             fail "Bad coercion"
         end

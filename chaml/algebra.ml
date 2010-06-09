@@ -157,6 +157,10 @@ module TypeCons = struct
   let type_cons_float = type_cons "float" []
   let type_cons_unit = type_cons "unit" []
   let type_cons_bottom = type_cons "_bottom" []
+  
+  let head_symbol_arrow = Hashtbl.find global_constructor_table "->"
+  let head_symbol_tuple cons_arity =
+    Hashtbl.find global_constructor_table (Printf.sprintf "*%d" cons_arity)
 
 end
 

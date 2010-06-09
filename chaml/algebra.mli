@@ -100,6 +100,12 @@ module TypeCons: sig
   (** The bottom type is a internal type, not to be used by others! *)
   val type_cons_bottom : [> `Cons of type_cons * 'a list ]
 
+  (** Get the head symbol for the arrow type *)
+  val head_symbol_arrow: type_cons
+
+  (** And for n-ary tuples *)
+  val head_symbol_tuple: int -> type_cons
+
 end
 
 (** Once again, putting this in a separate module is not necessary strictly
