@@ -5,7 +5,7 @@
 \usepackage{url}
 \usepackage[naturalnames,breaklinks]{hyperref}
 \usepackage{graphicx}
-\hypersetup{pdftitle={Jonathan Protzenko - Translating OCaml into System F}
+\hypersetup{pdftitle={Jonathan Protzenko - Translating OCaml into System F},
 pdfauthor={Jonathan Protzenko},
 bookmarks=false}
 \usepackage{varioref}
@@ -58,7 +58,7 @@ bookmarks=false}
 
 \newcommand{\wf}[1]{{\fontspec[Colour=888888, Ligatures=Rare, Fractions=On, Contextuals={WordFinal}]{MEgalopolis Extra}#1}}
 \title{Translating a Subset of OCaml into System F}
-\author{Jonatha\wf{n} Protzenk\wf{o}}
+\author{Jonatha\wf{n} Protzenk\wf{o}\\under the direction of François Pottier}
 \date{\today}
 
 \begin{document}
@@ -80,8 +80,10 @@ transformation and compilation.
 
 Indeed, Haskell now features ``System FC'' \cite{sulzmann2007system}, a core
 language that is both minimalistic and powerful. We applied the same design
-principles to a translation from OCaml \cite{ocaml} to System $F_{\eta}$, that
-is, System F with coercions \cite{mitchell-88}.
+principles to a translation from OCaml \cite{ocaml} to a variant of System
+$F_{\eta}$. System $F_\eta$ is System F with coercions \cite{mitchell-88}; we
+augmented it with some coercions of our own. We call this language ``FE+'', as
+in ``System $F_\eta$ plus'' extra coercions.
 
 Our contribution is twofold: firstly, a strategy that builds upon previous work by
 François Pottier \emph{et. al.} \cite{pottier2005essence} and leverages
@@ -121,7 +123,7 @@ extensions.
       \node [pass, right of=phantom] (term1) {CamlX ``with holes''};
       \node [tool, left=2.2cm of constraint] (solver) {solver};
       \node [pass, below of=term1] (term2) {CamlX};
-      \node [pass, below of=term2] (core) {CoreML};
+      \node [pass, below of=term2] (core) {FE+};
       \node [tool, left of=core] (typechecker) {type checker};
       \node [below=1cm of core] (end) {Rest of the compilation process…};
 
@@ -213,7 +215,7 @@ can't go wrong'', and our aim is to enforce that.
 
 \section{A high-level description of our translator}
 
-Naturally, the trade-off is that as expressions become simpler in the ``CoreML''
+Naturally, the trade-off is that as expressions become simpler in the ``FE+''
 language, types become possibly more complex. However, this is not considered to
 be a problem, and although we end up with complex types, the type-checker for
 $F_\eta$ remains simple and elegant.
@@ -229,9 +231,9 @@ Our process is made of the following steps (in chronological order)~:
   \item we translate the ``impure'', decorated CamlX term into a pure CamlX term
     where ``slots'' have disappeared and types are now represented using De
     Bruijn indices;
-  \item we desugar this complex CamlX AST into a CoreML one, and generate
+  \item we desugar this complex CamlX AST into a FE+ one, and generate
     coercions to justify some steps on-the-fly;
-  \item we type-check the resulting CoreML term and ensure well-typedness before
+  \item we type-check the resulting FE+ term and ensure well-typedness before
     going further.
 \end{itemize}
 
@@ -615,7 +617,7 @@ constraint, as is shown in the table below.
 \end{center}
 
 To understand why we do this, one must think of what is needed to build an
-explicitly typed CoreML term. We will need type annotations in
+explicitly typed FE+ term. We will need type annotations in
 $\lambda$-bindings. We will also need to coerce patterns at \code{let}-bindings
 and \code{function}-bindings.  We might need to coerce generalizing
 \code{match}es as well (more on this later).
@@ -679,7 +681,7 @@ issue reported by B. Yakobowski and fix the corresponding complexity bug in
 
 \part{\label{part:translation}System F and coercions…}
 
-\begin{TTCOMPONENT}{Our syntax for CoreML\label{fig:systemf}}{}{ht}
+\begin{TTCOMPONENT}{Our syntax for FE+\label{fig:systemf}}{}{ht}
   \let \\ \TTSyntaxAlternative%
 
   \TTSyntaxCategoryNamed{x}{}       {identifier} \\
@@ -730,7 +732,7 @@ System $F_\eta$ \cite{mitchell-88}.
 
 The previous part was all about running type inference on the original OCaml
 program, and building a decorated CamlX AST with all the required type information.
-This part is about translating the CamlX AST into the CoreML language, close to
+This part is about translating the CamlX AST into the FE+ language, close to
 System $F_\eta$, which is described in figure \vref{fig:systemf}. 
 
 Our translation is targeting the $F_\eta$ language. $F_\omega$ and $F_\mu$ might
@@ -741,7 +743,7 @@ required more power than $F_\eta$.
 
 \subsection{Our version of System F}
 
-We're using our own flavour of System $F_\eta$, called ``CoreML'', and
+We're using our own flavour of System $F_\eta$, called ``FE+'', and
 there are a few important features.
 \begin{itemize}
   \item We're using patterns, and these patterns are used only in
@@ -783,9 +785,9 @@ constructs were redundant: \code{function}, \code{let \dots\;and}, \code{let
 pattern = \dots}. We eliminate all those, and sometimes introduce temporary
 identifiers, or change the original expression a little bit. We also guarantee
 that identifiers are globally unique in the result of this transformation;
-they're \emph{atoms}. The syntax of this ``CoreML'' language is described in
+they're \emph{atoms}. The syntax of this ``FE+'' language is described in
 figure \vref{fig:systemf}. This step corresponds to the final arrow from CamlX
-to CoreML in figure \ref{fig:structure}.
+to FE+ in figure \ref{fig:structure}.
 
 Once we've obtained a System $F_\eta$ term, we can type-check this term to
 ensure the consistency before proceeding with the rest of the compilation
@@ -929,29 +931,33 @@ One feature of OCaml is that \emph{or}-patterns can be nested arbitrarily deep.
 The following piece of code is valid:
 
 \begin{verbatim}
-type 'a t = A of ('a -> int) | B of ('a -> int) list;;
-let (y, (A x | B [x])) = ...;;
+type 'a t = (('a -> 'a), ('a -> 'a) list);;
+let (_, (x, _) | (_, [x])) =
+  (* Some polymorphic expression
+     with type (unit * 'a t) *)
+;;
 \end{verbatim}
 
 However, we cannot simply apply a coercion to the expression on the right-hand
 side of the equals sign: the coercions needed on the left side and the right
 side of the or-pattern are not the same.
+
+After applying $\forall\times$ once, which states that we can push the $\forall$
+inside the tuple, what will happen in the right side of the outermost pair is:
 \begin{itemize}
-  \item The left side of the or-pattern will require $(\forall t)$, which states
-    that $\forall$ can be distributed inside data type $t$.
+  \item The left side of the or-pattern will require $(\forall\times)$, which states
+    that $\forall$ can be distributed inside tuples once more.
   \item The right side will require
-    $(\forall t);\;(t_0\left[ (\forall \kwd{list}) \right])$
+    $(\forall\times);\;(\times_1\left[ (\forall \kwd{list}) \right])$
     which states
     that 
     \begin{itemize}
-      \item $\forall$ can be distributed inside data type $\kwd{t}$
-      \item the $0$-th parameter \code{'a} of data type $\kwd{t}$ is covariant
-        so we can move the $\forall$ inside the $\kwd{t}$ data type under the
-        $\kwd{A}$ constructor and 
+      \item $\forall$ can be distributed inside the tuple of type $\kwd{t}$
+      \item we can apply a coercion on the second branch of the tuple,
       \item $\forall$ can be pushed inside data type $\kwd{list}$.
     \end{itemize}
 \end{itemize}
-In the end, we want to assign $\forall.\;0\to\kwd{int}$ to $\evid$.
+In the end, we want to assign $\forall.\;0\to0$ to $\evid$.
 
 One cannot simply add a or-coercion, that is, a coercion $c_1\;|\;c_2$ that
 mirrors the or-pattern and distributes $c_1$ and $c_2$ on the left side and the
@@ -1120,7 +1126,7 @@ would be semantically wrong\footnote{One might wonder why the \code{let \_} is
 treated as an identifier and not a pattern. This is because the \code{let \_}
 has a special status. The OCaml AST has a special \code{Pstr\_value} node for
 it. We map it to a \code{let}-pattern in our ``term with holes''. Finally, for
-the translation to CoreML, we translate it to a fresh identifier to avoid
+the translation to FE+, we translate it to a fresh identifier to avoid
 introducing a useless \code{match}.}!
 
 \subsection{Desugaring}
@@ -1204,7 +1210,7 @@ it as the required changes to make it work in System F were minimal.
 The important part is that because \code{match}es now can operate on
 expressions with polymorphism inside, we need to apply coercions inside
 \code{match}es. As we said previously, because we chose to attach coercions to
-patterns, this generalizing match translates naturally in CoreML.
+patterns, this generalizing match translates naturally in FE+.
 
 \begin{verbatim}
 match
@@ -1304,7 +1310,7 @@ finish this soon before the final presentation.
 \subsection{Enriching the language}
 
 Algebraic data types are missing, and we hope to add them soon, both in CamlX
-and CoreML. The coercions shouldn't be changed very much, though, except adding
+and FE+. The coercions shouldn't be changed very much, though, except adding
 the coercions that witness the covariance of algebraic data types and the
 distributivity of $\forall$ with regard to them.
 

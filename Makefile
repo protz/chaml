@@ -1,7 +1,7 @@
 PATH := /home/yquem/cristal/protzenk/Code/mini-trunk/trunk/src/:$(PATH)
 BUILDFLAGS=-I stdlib -I utils -I parsing -I pprint -cflag -strict-sequence
 
-.PHONY: tests doc
+.PHONY: tests doc benchs
 
 all:
 	./yacchack.sh
@@ -92,3 +92,6 @@ doc: build_graph
 	sed -i 's/iso-8859-1/utf-8/g' doc/*.html
 	sed -i 's/<\/body>/<img src="..\/graph.png" \/><\/body>/' doc/index.html
 	cp -f ocamlstyle.css doc/style.css
+
+benchs:
+	cd benchs && ./boris.sh
