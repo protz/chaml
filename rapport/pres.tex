@@ -25,6 +25,8 @@
 %\usepackage{pgfpages}
 %\pgfpagesuselayout{2 on 1}[a4paper,border shrink=5mm]
 
+\usepackage{amssymb,amsmath}
+\usepackage{xcolor}
 \usepackage{wrapfig}
 \usepackage{tikz}
 \usetikzlibrary{shapes,arrows}
@@ -33,13 +35,23 @@
 %\usepackage[]{graphicx}
 %\usepackage[french,noend]{algorithm2e}
 \tikzstyle{background}=[rectangle, fill=gray!10, inner sep=0.2cm, rounded corners=5mm]
+\tikzstyle{pass}=[shade, shading=axis, rounded rectangle, draw, fill=black!10,
+        inner sep=5pt, text width=2cm,
+        text badly centered, minimum height=1.2cm,
+        font=\bfseries\scriptsize\sffamily]
+\tikzstyle{tool}=[rectangle, draw, thick, fill=black!10, inner sep=5pt, text
+        width=1.5cm,
+        text badly centered, minimum height=.8cm,
+        font=\bfseries\scriptsize\sffamily] 
 
+\usepackage{stmaryrd}
 \usepackage{fontspec}
 \usepackage{xunicode}
 \usepackage{xltxtra}
 \defaultfontfeatures{Mapping=tex-text}
 \setsansfont{Museo Sans}
 \setromanfont{Museo}
+\setmonofont[Scale=.88]{DejaVu Sans Mono}
 
 \mode<presentation> {
   \usetheme{Singapore}
@@ -105,14 +117,7 @@
 \begin{frame}{Dans les grandes lignes…}
   \begin{center}
     \begin{tikzpicture}
-      [node distance = 1cm, auto,
-      every node/.style={node distance=3cm},
-      pass/.style={shade, shading=axis, rounded rectangle, draw, fill=black!10,
-        inner sep=5pt, text width=2cm,
-        text badly centered, minimum height=1.2cm, font=\bfseries\scriptsize\sffamily},
-      tool/.style={rectangle, draw, thick, fill=black!10, inner sep=5pt, text
-        width=1.5cm,
-        text badly centered, minimum height=.8cm, font=\bfseries\scriptsize\sffamily}] 
+      [node distance = 1cm, auto, every node/.style={node distance=3cm}]
       % Place nodes
       \node [pass] (solve) {Résolution de contraintes};
       \node [left of=solve, node distance=3.5cm] (phantom) {};
@@ -162,49 +167,188 @@
 
 \subsection{Le cœur du problème}
 
-\begin{frame}{Présentation de l'inférence par contraintes}
+\begin{frame}{L'inférence par contraintes}
   \begin{itemize}
     \item Nouvelle présentation d'un algorithme <<~classique~>>
     \item Séparation claire et élégante entre génération et résolution
-    \item 
-  \end{itemize}<++>
+    \item Préférable à l'implémentation OCaml, performante mais difficile
+      d'accès
+  \end{itemize}
+  Exemple: $$
+  \llbracket \lambda z.t : T \rrbracket \quad = \quad
+  \exists X_1 X_2.\left(\text{let }z: X_1 \text{ in } \llbracket t: X_2
+  \rrbracket \wedge X_1 \to X_2 \leq T\right)
+  $$
 \end{frame}
 
-\begin{frame}{<++>}
-<++>
+\begin{frame}[fragile]{Que fait l'inférence par contraintes?}
+  L'inférence par contraintes répond \underline{oui ou non}.
+
+  Au mieux, affiche les types inférés des \underline{\smash{définitions
+  top-level}}.
+  \begin{verbatim}
+let (x, y) = (fun x -> x) (1, fun x -> x)
+
+val x: int
+val y: ∀ α. α → α
+  \end{verbatim}
+
+  Comment l'adapter pour afficher un AST annoté?
+
+  \begin{flushright}
+    \footnotesize(Pas de value restriction dans les exemples)
+  \end{flushright}
 \end{frame}
 
-\begin{frame}{<++>}
-<++>
+\subsection{Garder les annotations à portée de main}
+
+\tikzstyle{lang}=[rounded rectangle, draw,
+        inner sep=5pt,
+        text badly centered]
+
+\newcommand{\redsigma}{\ensuremath{\textcolor[HTML]{a40000}{\boldsymbol\sigma}}}
+
+\begin{frame}{Une méthode ad-hoc}
+  \begin{center}
+    \footnotesize
+    \begin{tikzpicture}
+      \node [lang, pin=80:OCaml] (caml) {\texttt{let x = fun x -> x in …}};
+      \node [below of=caml, node distance=2.5cm] (phantom) {};
+      \node [lang, left of=phantom, node distance=3cm, pin=120:Contrainte] (constraint)
+        {$\text{let } z: \underbrace{\forall X.\big[ \llbracket t_1 : X
+        \rrbracket \big]. X}_{\redsigma}
+        \text{ in } \llbracket t_2 : T\rrbracket$};
+      \node [lang, right of=phantom, node distance=3cm, pin=80:CamlX <<~à
+      trous~>>] (camlx) {\texttt{let x: $\redsigma$ = fun x -> x
+        in …}};
+
+      \draw [->, thick] (caml) -- node [text width=2.5cm, below=.2cm, right=.2cm] {Générateur de contraintes} (constraint);
+      \draw [->, thick] (caml) -- (camlx);
+    \end{tikzpicture}
+  \end{center}
+  Idée: le générateur de contraintes renvoie \emph{deux} arbres qui
+  \emph{partagent} des structures $\sigma$ décrivant les schémas de type.
 \end{frame}
 
-\begin{frame}{<++>}
-<++>
+\begin{frame}{Fonctionnement de cette méthode}
+  \begin{itemize}
+    \item Le générateur de contraintes \emph{pré-alloue} des <<~boîtes vides~>>
+      correspondant aux futurs résultats du solveur de contraintes.
+    \item Le solveur résout la contrainte, et remplit au passage les boîtes.
+    \item Les boîtes sont \underline{\smash{partagées}}: après la résolution des
+      contraintes, les trous sont remplies, et l'AST <<~CamlX~>> est désormais annoté.
+  \end{itemize}
 \end{frame}
 
-\begin{frame}{<++>}
-<++>
+\begin{frame}{Avec un peu de recul…}
+  \begin{itemize}
+    \item Simple et efficace~: il s'agit de <<~faire suivre~>> les informations
+      nécessaires.
+    \item Facile à implémenter~: solution d'une remarquable flexibilité.
+    \item Peu élégant~: le contenu des boîtes expose les structures internes du
+      solveur.
+    \item Pas de scope: les schémas de type sont extrudés, sortis de leur
+      contexte.
+    \item Formalisation difficile.
+  \end{itemize}
+  Il faudrait arriver à une forme plus propre et plus propice aux
+  transformations…
 \end{frame}
 
-\begin{frame}{<++>}
-<++>
+\section{Traduction(s)}
+
+\subsection{Quelles traductions~?}
+
+\begin{frame}[fragile]{De CamlX <<~à trous~>>…}
+
+  … vers CamlX <<~tout court~>>
+
+  \begin{itemize}
+    \item Se passer des champs mutables et des classes d'équivalence
+    \item Types en indices de De Bruijn
+    \item Ne pas changer les expressions, simplement les types
+  \end{itemize}
+
+  \begin{verbatim}
+let (x, y): Λ. [int * (0 → 0)] =
+  (fun (x: int * (0 → 0)) -> x)
+  (1, (fun (x: 0) -> x))
+in
+()
+  \end{verbatim}
 \end{frame}
 
-\begin{frame}{<++>}
-<++>
+\begin{frame}[fragile]{Désucrer CamlX vers…}
+
+… Système FE+
+
+  \begin{itemize}
+    \item Enlever les constructions redondantes d'OCaml
+    \item Offrir de meilleures garanties (unicité des identifiants)
+    \item Une vraie syntaxe des expressions Système F
+    \item Et des coercions (\emph{more on this later})
+  \end{itemize}
+
+  \begin{verbatim}
+match
+  Λ. (λ (x/41: int * (0 → 0)) -> x/41)
+     (1, (λ (x/42: 0) -> x/42))
+with
+  | (x/39, y/40) ▸ ∀×; ×0[•[bottom]] ->
+      ()
+  \end{verbatim}
+
 \end{frame}
 
-\begin{frame}{<++>}
-<++>
+\subsection{Le décodeur}
+
+\begin{frame}{Remplissage des boîtes…}
+  Sont conservées les \underline{\smash{schémas de types}} et les
+  \underline{\smash{variables d'instanciation}}.
+
+  \begin{center}
+    \fbox{Les schémas sont résolus au niveau des contraintes \texttt{let}.}
+  \end{center}
+
+  \texttt{function, fun, let, match} $\to$ contrainte \texttt{let}. Donc :
+  \begin{itemize}
+    \item créer une boîte ;
+    \item l'attacher à la contrainte \texttt{let} ;
+    \item l'attacher au nœud CamlX correspondant.
+  \end{itemize}
 \end{frame}
 
-\begin{frame}{<++>}
-<++>
+\begin{frame}{… et nettoyage}
+ les structures union-find sont mutables et contiennent du partage. On utilise
+ des types avec des indices de De Bruijn.
+
+ \begin{itemize}
+   \item La généralisation se fait au niveau des \texttt{let}~: pas de nœud
+     $\Lambda$ dans la syntaxe des expressions ;
+   \item L'application de type se fait au niveau des instanciations~: pas de
+     nœud <<~application de type~>> ;
+   \item les patterns sont présents dans les \texttt{let} et \texttt{function} ;
+   \item les \texttt{let} sont multiples.
+ \end{itemize}
+
+ C'est une représentation avec des types clairs mais des expressions complexes.
 \end{frame}
 
-\begin{frame}{<++>}
-<++>
+\subsection{Le désucreur}
+
+\begin{frame}{Rôle du désucreur}
+  \begin{itemize}
+    \item Les patterns sont utilisés à de nombreux endroits en OCaml: on les
+      restreint aux \texttt{match} uniquement.
+    \item Les \texttt{let and} peuvent définir simultanément plusieurs motifs:
+      on utilise des identifiants uniques pour s'en passer.
+    \item Les $\Lambda$ et les applications de types deviennent des nœuds
+      normaux de la syntaxe des expressions.
+  \end{itemize}
+  … et surtout, sont ajoutées des \underline{coercions}.
 \end{frame}
+
+\section{Système F plus coercions}
 
 \begin{frame}{<++>}
 <++>

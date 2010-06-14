@@ -1,3 +1,1 @@
-let s x y z = x z (y z)
-let k x y = x
-let i = s k k
+let (x, y) = (fun x -> x) (1, fun x -> x)
