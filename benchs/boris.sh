@@ -15,7 +15,7 @@ while [ $x -le $max ]; do
   t1=0
   #t1=$(/usr/bin/time --format "%U" ocamlc.opt boris.ml 2>&1 > /dev/null)
   t2=0
-  t2=$(/usr/bin/time --format "%U" ../chaml.native --dont-print-types boris.ml 2>&1 > /dev/null)
+  t2=$(/usr/bin/time --format "%U" ../chaml.native --dont-print-types --im-feeling-lucky boris.ml 2>&1 > /dev/null)
   t3=0
   t3=$(/usr/bin/time --format "%U" mini --end solve-constraint boris_attapl.ml 2>&1 > /dev/null)
   t4=0

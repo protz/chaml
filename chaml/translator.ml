@@ -172,14 +172,15 @@ let translate =
   translate_expr { fvar_of_uvar = IntMap.empty }
 
 (* Just generate as many uppercase lambdas as needed *)
-let gen_lambdas n = 
+let make lambda n = 
   let open Bash in
   let open Pprint in
-  let lambda = "Λ" in
   let lambdas = String.concat "" (Jlist.make n lambda) in
   let lambdas = color colors.blue "%s" lambdas in
   let lambdas = fancystring lambdas n in
   lambdas
+
+let gen_lambdas = make "Λ"
 
 (* Pretty-printing stuff *)
 let rec doc_of_expr: f_expression -> Pprint.document = 
@@ -193,9 +194,11 @@ let rec doc_of_expr: f_expression -> Pprint.document =
           let lb' = fancystring (color colors.blue "[") 1 in
           let rb' = fancystring (color colors.blue "]") 1 in
           let ldoc = gen_lambdas nlambdas in
+          let fdoc = make "∀" nlambdas in
           let scheme = string (DeBruijn.string_of_type_term scheme) in
           pdoc ^^ colon ^^ space ^^
-          ldoc ^^ dot ^^ space ^^ lb' ^^ scheme ^^ rb' ^^ space ^^ equals ^^
+          fdoc ^^ dot ^^ space ^^ lb' ^^ scheme ^^ rb' ^^ space ^^ equals ^^
+          space ^^ ldoc ^^
             (nest 2 (break1 ^^ edoc)
           )
         in

@@ -26,6 +26,7 @@
 %\pgfpagesuselayout{2 on 1}[a4paper,border shrink=5mm]
 
 \usepackage{amssymb,amsmath}
+\usepackage{mathpartir}
 \usepackage{xcolor}
 \usepackage{wrapfig}
 \usepackage{tikz}
@@ -181,6 +182,8 @@
   $$
 \end{frame}
 
+\newcommand{\red}[1]{\textcolor[HTML]{a40000}{#1}}
+
 \begin{frame}[fragile]{Que fait l'inférence par contraintes?}
   L'inférence par contraintes répond \underline{oui ou non}.
 
@@ -193,7 +196,7 @@ val x: int
 val y: ∀ α. α → α
   \end{verbatim}
 
-  Comment l'adapter pour afficher un AST annoté?
+  \textcolor[HTML]{a40000}{Comment l'adapter pour afficher un AST annoté?}
 
   \begin{flushright}
     \footnotesize(Pas de value restriction dans les exemples)
@@ -206,7 +209,7 @@ val y: ∀ α. α → α
         inner sep=5pt,
         text badly centered]
 
-\newcommand{\redsigma}{\ensuremath{\textcolor[HTML]{a40000}{\boldsymbol\sigma}}}
+\newcommand{\redsigma}{\ensuremath{\red{\boldsymbol\sigma}}}
 
 \begin{frame}{Une méthode ad-hoc}
   \begin{center}
@@ -215,9 +218,9 @@ val y: ∀ α. α → α
       \node [lang, pin=80:OCaml] (caml) {\texttt{let x = fun x -> x in …}};
       \node [below of=caml, node distance=2.5cm] (phantom) {};
       \node [lang, left of=phantom, node distance=3cm, pin=120:Contrainte] (constraint)
-        {$\text{let } z: \underbrace{\forall X.\big[ \llbracket t_1 : X
+        {$\text{let } x: \underbrace{\forall X.\big[ \llbracket e_1 : X
         \rrbracket \big]. X}_{\redsigma}
-        \text{ in } \llbracket t_2 : T\rrbracket$};
+        \text{ in } \llbracket e_2 : T\rrbracket$};
       \node [lang, right of=phantom, node distance=3cm, pin=80:CamlX <<~à
       trous~>>] (camlx) {\texttt{let x: $\redsigma$ = fun x -> x
         in …}};
@@ -227,7 +230,7 @@ val y: ∀ α. α → α
     \end{tikzpicture}
   \end{center}
   Idée: le générateur de contraintes renvoie \emph{deux} arbres qui
-  \emph{partagent} des structures $\sigma$ décrivant les schémas de type.
+  \emph{\red{partagent}} des structures $\sigma$ décrivant les schémas de type.
 \end{frame}
 
 \begin{frame}{Fonctionnement de cette méthode}
@@ -236,7 +239,7 @@ val y: ∀ α. α → α
       correspondant aux futurs résultats du solveur de contraintes.
     \item Le solveur résout la contrainte, et remplit au passage les boîtes.
     \item Les boîtes sont \underline{\smash{partagées}}: après la résolution des
-      contraintes, les trous sont remplies, et l'AST <<~CamlX~>> est désormais annoté.
+      contraintes, les trous sont remplis, et l'AST <<~CamlX~>> est désormais annoté.
   \end{itemize}
 \end{frame}
 
@@ -270,7 +273,7 @@ val y: ∀ α. α → α
   \end{itemize}
 
   \begin{verbatim}
-let (x, y): Λ. [int * (0 → 0)] =
+let (x, y): ∀. [int * (0 → 0)] = Λ. 
   (fun (x: int * (0 → 0)) -> x)
   (1, (fun (x: 0) -> x))
 in
@@ -350,32 +353,179 @@ with
 
 \section{Système F plus coercions}
 
-\begin{frame}{<++>}
-<++>
+\subsection{Présentation des coercions}
+
+\begin{frame}[fragile]{Aperçu du problème}
+Reprenons l'exemple initial.
+
+\begin{verbatim}
+let (x, y) = (fun x -> x) (1, fun x -> x)
+\end{verbatim}
+
+\begin{tabular}{l|l}
+  À gauche & À droite\\
+\hline
+$(x, y)$ & $\forall \alpha.\; (\mathsf{int}, \alpha \to \alpha)$ \\
+\texttt{PCons(Tuple, [x; y])} &
+\texttt{Forall (TCons (Tuple, [int; …]))}
+\end{tabular}
+
+\vspace{2ex}
+
+\red{Head symbol mismatch: type $\forall \alpha.\;
+(\mathsf{int}, \alpha \to \alpha)$ does not match pattern: Tuple…}
+
+\begin{flushright}
+  (c'est une erreur de type)
+\end{flushright}
+
 \end{frame}
 
-\begin{frame}{<++>}
-<++>
+\begin{frame}{Du sous-typage}
+  Solution: Système $F_\eta$, ou <<~Système F avec sous-typage~>>.
+
+  \begin{itemize}
+    \item Par exemple, $\forall \alpha.\; (\tau_1, \tau_2) \leq (\forall
+      \alpha.\; \tau_1, \forall \alpha.\; \tau_2)$.
+      \pause
+    \item … mais la relation de sous-typage est indécidable!
+      \pause
+    \item Solution: attacher des coercions aux patterns.
+  \end{itemize}
+
+  \begin{center}
+    \fbox{$p \blacktriangleright c$: avant de filtrer sur $p$, appliquer la
+  coercion $c$}
+  \end{center}
 \end{frame}
 
-\begin{frame}{<++>}
-<++>
+\begin{frame}{Qu'est-ce qu'une coercion?}
+  Une coercion est un \underline{\smash{témoin de sous-typage}}.
+
+  \footnotesize
+
+  \begin{mathpar}
+    \inferrule
+      {\Gamma \vdash c: \tau_i \leq \tau_i'}
+      {\Gamma \vdash (\times_i[c]): (\tau_1, \dots, \tau_i, \dots, \tau_n) \leq
+        (\tau_1, \dots, \tau_i', \dots, \tau_n)}
+    \quad(\textsc{projection-tuple})
+
+    \and
+
+    \inferrule
+      {\Gamma \vdash c: \tau \leq \tau'}
+      {\Gamma \vdash (\forall[c]): \forall\tau \leq \forall\tau'}
+    \quad(\textsc{$\forall$-covariance})
+
+    \and
+
+    \inferrule
+      {\Gamma \vdash c_1: \tau \leq \tau'\\
+       \Gamma \vdash c_2: \tau' \leq \tau''}
+      {\Gamma \vdash c_1; c_2: \tau \leq \tau''}
+    \quad(\textsc{transitivité})
+
+    \and
+
+    \inferrule
+      {\quad}
+      {\Gamma \vdash \bullet[\sigma]: \forall\tau \leq [\sigma/0]\tau}
+    \quad(\textsc{$\forall$-élimination})
+
+    \and
+
+    \inferrule
+      {\quad}
+      {\Gamma \vdash (\forall\times): \forall (\tau_1, \dots, \tau_n) \leq
+        (\forall \tau_1, \dots, \forall \tau_n)}
+    \quad(\textsc{$\forall$-distributivité})
+  \end{mathpar}
+
 \end{frame}
 
-\begin{frame}{<++>}
-<++>
+\subsection{Règles de génération de coercions}
+
+\begin{frame}{Comment générer les coercions ?}
+Un ensemble de règles statiques permet de générer les coercions adaptées à
+chaque situation, \emph{par filtrage sur le type et le pattern}.
+
+\begin{itemize}
+  \item Rentrer récursivement les $\forall$ dans les tuples, grâce à
+    $(\forall\times)$ et $(\forall[\bullet])$).
+  \item Éliminer les quantifications $\forall$ inutiles pour les identifiants
+    grâce à $(\bullet[\perp])$ et $(\forall[\bullet])$.
+\end{itemize}
+
+Au moment du type-checking, on a une fonction \texttt{apply\_coercion: typ ->
+coercion -> typ}.
+
+\begin{flushright}
+  \footnotesize (exemple au tableau)
+\end{flushright}
+
 \end{frame}
 
-\begin{frame}{<++>}
-<++>
+\begin{frame}{Vu de loin}
+  La relation de sous-typage dans $F_\eta$ est indécidable mais…
+  \begin{itemize}
+    \item on ne demande jamais: $\tau \leq \tau'$?,
+    \item on génère des coercions \emph{au préalable},
+    \item on sait toujours \emph{comment} coercer et vers quel type,
+    \item on opère sur un sous-ensemble des situations de sous-typage.
+  \end{itemize}
 \end{frame}
 
-\begin{frame}{<++>}
-<++>
+\begin{frame}[fragile]{L'exemple initial}
+
+  \begin{verbatim}
+let (x, y) = (fun x -> x) (1, fun x -> x)
+  \end{verbatim}
+
+  … devient
+
+  \begin{verbatim}
+match
+  Λ. (λ (x/41: int * (0 → 0)) -> x/41)
+     (1, (λ (x/42: 0) -> x/42))
+with
+  | (x/39, y/40) ▸ ∀×; ×0[•[bottom]] ->
+      ()
+  \end{verbatim}
+
 \end{frame}
 
-\begin{frame}{<++>}
-<++>
+\begin{frame}{Phase finale}
+  \begin{center}
+On vérifie le langage <<~core~>>…
+
+\vspace{5ex}
+
+… répond toujours oui (\red{ouf !}).
+  \end{center}
+\end{frame}
+
+\section{Conclusion}
+
+\subsection{Conclusion}
+
+\begin{frame}{Une expérience intéressante}
+  \begin{itemize}
+    \item Poser les bases a été le plus difficile
+    \item Dans le pipeline : value restriction, types algébriques
+    \item Plus tard : variantes polymorphes (qu'ajouter dans le langage de
+      base?), autres…
+  \end{itemize}
+
+  Peut-être beaucoup d'implémentation à venir.
+\end{frame}
+
+\begin{frame}{L'inférence de types comme un framework}
+  \begin{itemize}
+    \item Adapter l'inférence par contraintes a été un gros travail
+    \item … en faire une bibliothèque d'inférence à la ML?
+    \item Offrir une interface claire pour examiner les résultats du solveur. 
+  \end{itemize}
 \end{frame}
 
 \end{document}
