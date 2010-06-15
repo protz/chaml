@@ -4,9 +4,7 @@
   \setbeamertemplate{navigation symbols}{}%
   \setbeamertemplate{background}{}%
   \setbeamertemplate{background canvas}{%
-    \hfill%
     #1
-    \hfill%
    }%
    \frame[plain]{}%
 }}
@@ -260,7 +258,7 @@ val y: ∀ α. α → α
 
 \section{Traduction(s)}
 
-\subsection{Quelles traductions~?}
+\subsection{Le décodeur}
 
 \begin{frame}[fragile]{De CamlX <<~à trous~>>…}
 
@@ -280,30 +278,6 @@ in
 ()
   \end{verbatim}
 \end{frame}
-
-\begin{frame}[fragile]{Désucrer CamlX vers…}
-
-… Système FE+
-
-  \begin{itemize}
-    \item Enlever les constructions redondantes d'OCaml
-    \item Offrir de meilleures garanties (unicité des identifiants)
-    \item Une vraie syntaxe des expressions Système F
-    \item Et des coercions (\emph{more on this later})
-  \end{itemize}
-
-  \begin{verbatim}
-match
-  Λ. (λ (x/41: int * (0 → 0)) -> x/41)
-     (1, (λ (x/42: 0) -> x/42))
-with
-  | (x/39, y/40) ▸ ∀×; ×0[•[bottom]] ->
-      ()
-  \end{verbatim}
-
-\end{frame}
-
-\subsection{Le décodeur}
 
 \begin{frame}{Remplissage des boîtes…}
   Sont conservées les \underline{\smash{schémas de types}} et les
@@ -339,7 +313,23 @@ with
 
 \subsection{Le désucreur}
 
-\begin{frame}{Rôle du désucreur}
+\begin{frame}[fragile]{Désucrer CamlX vers…}
+
+… Système FE+
+
+  \begin{verbatim}
+match
+  Λ. (λ (x/41: int * (0 → 0)) -> x/41)
+     (1, (λ (x/42: 0) -> x/42))
+with
+  | (x/39, y/40) ▸ ∀×; ×0[•[bottom]] ->
+      ()
+  \end{verbatim}
+
+\end{frame}
+
+\begin{frame}{Liste des modifications}
+
   \begin{itemize}
     \item Les patterns sont utilisés à de nombreux endroits en OCaml: on les
       restreint aux \texttt{match} uniquement.
@@ -349,6 +339,7 @@ with
       normaux de la syntaxe des expressions.
   \end{itemize}
   … et surtout, sont ajoutées des \underline{coercions}.
+
 \end{frame}
 
 \section{Système F plus coercions}
@@ -520,12 +511,26 @@ On vérifie le langage <<~core~>>…
   Peut-être beaucoup d'implémentation à venir.
 \end{frame}
 
-\begin{frame}{L'inférence de types comme un framework}
+\begin{frame}{Un \emph{framework} pour l'inférence de types}
   \begin{itemize}
     \item Adapter l'inférence par contraintes a été un gros travail
     \item … en faire une bibliothèque d'inférence à la ML?
     \item Offrir une interface claire pour examiner les résultats du solveur. 
   \end{itemize}
 \end{frame}
+
+
+{{%
+  \setbeamertemplate{navigation symbols}{}%
+  \setbeamertemplate{background}{}%
+  \setbeamertemplate{background canvas}{}%
+  \frame[plain]{
+  \begin{center}
+    \Huge
+    \fontspec[Colour=888888, Ligatures=Rare, Fractions=On]{MEgalopolis Extra}
+    Questions ?
+  \end{center}
+  }%
+}}
 
 \end{document}
