@@ -83,7 +83,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
         (* The pattern has already been translated in a first pass. Now check if
          * it's just an identifier (we can use a regular let-binding) or a
          * pattern (then, we use a match) *)
-        match pat with
+        match new_pat with
         | `Var atom ->
             Error.debug "[DLet] Found a regular let\n";
             `Let (`Var atom, e1, e2)
