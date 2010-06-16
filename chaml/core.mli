@@ -57,6 +57,7 @@ type const = [
   | `Int of int
   | `Float of float
   | `String of string
+  | `Magic of type_term
   | `Unit
 ]
 

@@ -128,7 +128,7 @@ and infer_pat: Core.pattern -> DeBruijn.type_term -> (Atom.t * DeBruijn.type_ter
     | `Or (p1, p2) ->
         let bound1 = infer_pat p1 t in
         let bound2 = infer_pat p2 t in
-        assert (List.length bound1 <> List.length bound2);
+        assert (List.length bound1 = List.length bound2);
         let tbl = Hashtbl.create 2 in
         List.iter (fun (atom, typ) -> Hashtbl.add tbl atom typ) bound1;
         List.iter (fun (atom, typ) -> assert (Hashtbl.find tbl atom = typ)) bound2;
@@ -158,6 +158,8 @@ and infer_const: Core.const -> DeBruijn.type_term =
       type_cons_string
   | `Unit ->
       type_cons_unit
+  | `Magic t ->
+      t
 
 and apply_coerc: DeBruijn.type_term -> Core.coercion -> DeBruijn.type_term =
   fun typ coerc ->

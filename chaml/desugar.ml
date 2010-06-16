@@ -307,17 +307,11 @@ and desugar_const const =
   | `Float f ->
       let f = float_of_string f in
       `Float f
-  | `Char _ | `Int _ | `String _ | `Unit as x ->
+  | `Char _ | `Int _ | `String _ | `Unit | `Magic _ as x ->
       x
 
 let desugar expr =
-  let add map op =
-    let ident' = ident (Printf.sprintf "(%s)" op) Location.none in
-    let ident = ident op Location.none in
-    IdentMap.add ident (Atom.fresh ident') map
-  in
-  let atom_of_ident = List.fold_left add IdentMap.empty ["-"; "+"; "*"] in
-  let env = { atom_of_ident } in
+  let env = { atom_of_ident = IdentMap.empty } in
   desugar_expr env expr
 
 
@@ -457,6 +451,8 @@ and doc_of_const: Core.const -> Pprint.document =
         dquote ^^ (string s) ^^ dquote
     | `Unit ->
         string "()"
+    | `Magic t ->
+        (string "%magic: ") ^^ (string (DeBruijn.string_of_type_term t))
 
 and doc_of_coerc: Core.coercion -> Pprint.document =
   let open Pprint in

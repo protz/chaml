@@ -55,6 +55,7 @@ module Make (S: Algebra.SOLVER): sig
     | `Float of string
     | `String of string
     | `Unit
+    | `Magic (* For builtins, gets a special treatment later on *)
   ]
 
 end
@@ -89,6 +90,8 @@ and f_const = [
   | `Float of string
       (** This will have to be converted too *)
   | `String of string
+  | `Magic of f_type_term
+      (** For builtins, gets a special treatment later on *)
   | `Unit
       (** This will eventually be removed when we have data types *)
 ]

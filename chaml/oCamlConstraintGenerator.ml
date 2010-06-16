@@ -512,7 +512,7 @@ module Make(S: Algebra.SOLVER) = struct
           | _ ->
               raise_error (NotImplemented ("some structure item", pstr_loc))
         in
-        let default_bindings: type_scheme list =
+        let default_bindings, default_let_bindings =
           let plus_scheme =
             let plus_var = fresh_type_var ~letter:'z' () in
             let plus_type =
@@ -521,8 +521,10 @@ module Make(S: Algebra.SOLVER) = struct
             let pos = Location.none in
             let solver_scheme = new_scheme plus_var in
             let solver_pscheme = new_pscheme plus_var in
-            let plus_map = IdentMap.add (ident "+" pos) (plus_var, solver_scheme) IdentMap.empty in
-            [plus_var], `Equals (plus_var, plus_type), plus_map, Some solver_pscheme
+            let ident = ident "+" pos in
+            let plus_map = IdentMap.add ident (plus_var, solver_scheme) IdentMap.empty in
+            ([plus_var], `Equals (plus_var, plus_type), plus_map, Some solver_pscheme),
+            (`Var (ident, solver_scheme), solver_pscheme, `Const `Magic)
           in
           let minus_scheme =
             let minus_var = fresh_type_var ~letter:'z' () in
@@ -532,8 +534,10 @@ module Make(S: Algebra.SOLVER) = struct
             let pos = Location.none in
             let solver_scheme = new_scheme minus_var in
             let solver_pscheme = new_pscheme minus_var in
-            let minus_map = IdentMap.add (ident "-" pos) (minus_var, solver_scheme) IdentMap.empty in
-            [minus_var], `Equals (minus_var, minus_type), minus_map, Some solver_pscheme
+            let ident = ident "-" pos in
+            let minus_map = IdentMap.add ident (minus_var, solver_scheme) IdentMap.empty in
+            ([minus_var], `Equals (minus_var, minus_type), minus_map, Some solver_pscheme),
+            (`Var (ident, solver_scheme), solver_pscheme, `Const `Magic)
           in
           let mult_scheme =
             let mult_var = fresh_type_var ~letter:'z' () in
@@ -543,10 +547,12 @@ module Make(S: Algebra.SOLVER) = struct
             let pos = Location.none in
             let solver_scheme = new_scheme mult_var in
             let solver_pscheme = new_pscheme mult_var in
-            let mult_map = IdentMap.add (ident "*" pos) (mult_var, solver_scheme) IdentMap.empty in
-            [mult_var], `Equals (mult_var, mult_type), mult_map, Some solver_pscheme
+            let ident = ident "*" pos in
+            let mult_map = IdentMap.add ident (mult_var, solver_scheme) IdentMap.empty in
+            ([mult_var], `Equals (mult_var, mult_type), mult_map, Some solver_pscheme),
+            (`Var (ident, solver_scheme), solver_pscheme, `Const `Magic)
           in
-          [plus_scheme; minus_scheme; mult_scheme]
+          List.split [plus_scheme; minus_scheme; mult_scheme]
         in
         let topmost_expression =
           let finish = {
@@ -560,7 +566,8 @@ module Make(S: Algebra.SOLVER) = struct
         let constraint_expression = generate_constraint_expression t topmost_expression in
         let { e_constraint = topmost_constraint; expr = topmost_expression } = constraint_expression in
         if opt_default_bindings then
-          { e_constraint = `Let (default_bindings, topmost_constraint); expr = topmost_expression; }
+          { e_constraint = `Let (default_bindings, topmost_constraint);
+            expr = `Let (default_let_bindings, topmost_expression) }
         else
           constraint_expression
 

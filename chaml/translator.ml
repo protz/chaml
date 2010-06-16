@@ -61,6 +61,8 @@ let type_term_of_uvar env uvar =
 
 (* The core functions *)
 
+exception Magic
+
 let translate =
   let rec translate_expr: env -> CamlX.Make(BaseSolver).expression -> f_expression = 
     fun env uexpr ->
@@ -81,7 +83,12 @@ let translate =
                   young_vars;
                   f_type_term;
                 } in
-                let fexpr = translate_expr new_env uexpr in
+                let fexpr =
+                  try
+                    translate_expr new_env uexpr
+                  with Magic ->
+                    `Const (`Magic f_type_term)
+                in
                 (fpat, clblock, fexpr)
               )
               pat_expr_list
@@ -141,8 +148,21 @@ let translate =
       | `Tuple (exprs) ->
           `Tuple (List.map (translate_expr env) exprs)
 
-      | `Const _ as r ->
-          r
+      | `Const x ->
+          `Const (translate_const x)
+
+  and translate_const: CamlX.Make(BaseSolver).const -> f_const =
+    function
+      | `Char _
+      | `Int _
+      | `Float _
+      | `String _
+      | `Unit as x ->
+          x
+      | `Magic ->
+          raise Magic
+            
+
 
   (* [translate_pat] just generates patterns as needed. It doesn't try to
    * assign schemes to variables if those are on the left-hand side of a pattern. *)
@@ -194,10 +214,15 @@ let rec doc_of_expr: f_expression -> Pprint.document =
           let lb' = fancystring (color colors.blue "[") 1 in
           let rb' = fancystring (color colors.blue "]") 1 in
           let ldoc = gen_lambdas nlambdas in
-          let fdoc = make "∀" nlambdas in
+          let fdoc =
+            if nlambdas > 0 then
+              (make "∀" nlambdas) ^^ dot ^^ space
+            else
+              empty
+          in
           let scheme = string (DeBruijn.string_of_type_term scheme) in
           pdoc ^^ colon ^^ space ^^
-          fdoc ^^ dot ^^ space ^^ lb' ^^ scheme ^^ rb' ^^ space ^^ equals ^^
+          fdoc ^^ lb' ^^ scheme ^^ rb' ^^ space ^^ equals ^^
           space ^^ ldoc ^^
             (nest 2 (break1 ^^ edoc)
           )
@@ -333,6 +358,8 @@ and doc_of_const: f_const -> Pprint.document =
         dquote ^^ (string s) ^^ dquote
     | `Unit ->
         string "()"
+    | `Magic t ->
+        (string "%magic: ") ^^ (string (DeBruijn.string_of_type_term t))
 
 let string_of_expr expr =
   let buf = Buffer.create 16 in
