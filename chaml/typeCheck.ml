@@ -36,7 +36,10 @@ let rec infer: env -> Core.expression -> DeBruijn.type_term =
   fun env expr ->
     match expr with
     | `TyAbs expr ->
-        let typ = infer env expr in
+        let new_env =
+          { type_of_atom = AtomMap.map DeBruijn.lift env.type_of_atom }
+        in
+        let typ = infer new_env expr in
         `Forall typ
 
     | `TyApp (expr, t2) ->

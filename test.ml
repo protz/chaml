@@ -1,1 +1,6 @@
-let a = 2 + 2
+let bug g h =
+  let f =
+    let h = fun x -> g x in
+    fun y -> h
+  in
+  2
