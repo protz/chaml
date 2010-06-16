@@ -195,4 +195,5 @@ let _ =
     end;
     (* The final type-checking part *)
     TypeCheck.check core_ast;
+    Error.debug "[Driver] Done.\n";
   end

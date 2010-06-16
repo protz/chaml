@@ -288,8 +288,23 @@ let fresh_copy unifier_env { scheme_var = scheme_uvar } =
   in
   let scheme_var = fresh_copy scheme_uvar in
   Error.debug "[UCopy] Mapping: %a\n" debug_pairs mapping;
-  let young_vars = Uhashtbl.map_list mapping (fun repr uvar -> if repr.term = None then Some uvar else None) in
+  let young_vars =
+    Uhashtbl.map_list
+    mapping
+    (fun repr uvar -> if repr.term = None then Some (repr.id, uvar) else None)
+  in
+  (* The code below ensures that the copied variables are in the exact same
+   * order as the original variables. The following case might happen:
+   * - variables are unified, which changes things
+   * - the global order for the scheme variables is different from the DFS order
+   * - we copy variables in the scheme depth-first, so their ids are in the same
+   * order as the depth-first order
+   * - we sort them according to the global order --> WRONG
+   *
+   * So we must do the manipulations below *)
   let young_vars = Jlist.filter_some young_vars in
+  let young_vars = List.sort (fun (a, _) (b, _) -> a - b) young_vars in
+  let young_vars = List.map snd young_vars in
   { scheme_var; }, young_vars
 
 let is_not_ready repr = repr.rank = (-2)

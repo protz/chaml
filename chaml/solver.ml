@@ -179,7 +179,7 @@ let solve =
           Error.debug
               "[SInstance] Taking an instance of %s: %a\n" ident_s uvar_name instance;
           unify_or_raise unifier_env instance uvar;
-          solver_instance := sort_global young_vars;
+          solver_instance := young_vars;
       | `Conj (c1, c2) ->
           (* Do *NOT* forward _unifier_env! Algebra.Identifiers in c1's scope must not
            * go through c2's scope, this would be fatal. *)
@@ -291,7 +291,6 @@ let solve =
           )
           pool_vars
         in
-        Error.debug "%a" debug_inpool (None, young_vars, sub_env);
         begin match pscheme with
           | None ->
               assert (List.length young_vars = 0)
@@ -301,7 +300,9 @@ let solve =
                 (List.length young_vars);
               (* Maintain the invariant that these variables are sorted in the
                * global order. *)
-              pscheme.p_young_vars <- sort_global young_vars
+              let young_vars = sort_global young_vars in
+              Error.debug "%a" debug_inpool (None, young_vars, sub_env);
+              pscheme.p_young_vars <- young_vars
         end;
 
         (* The schemes have already been allocated when generating a CamlX term,
