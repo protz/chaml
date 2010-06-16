@@ -23,6 +23,9 @@ module type S = sig
   (** Get a list of all keys in a map. *)
   val keys : 'a t -> key list
 
+  (** Get a list of all values in a map *)
+  val values: 'a t -> 'a list
+
   (** [union m1 m2] keeps the values from [m1] *)
   val union : 'a t -> 'a t -> 'a t
 
@@ -50,6 +53,9 @@ module Make = functor (Ord: Map.OrderedType) -> struct
 
   let keys m =
     Map.fold (fun k _ acc -> k :: acc) m []
+
+  let values m =
+    Map.fold (fun _ v acc -> v :: acc) m []
 
   (* m1's values are kept *)
   let union m1 m2 =
