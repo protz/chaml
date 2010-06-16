@@ -247,21 +247,8 @@ let solve =
         Error.debug "%a" debug_inpool (None, pool_vars, sub_env);
         let prev_ranks = List.map rank pool_vars in
         let occurs_check = not opt_recursive_types in
-        let reachable = run_dfs ~occurs_check pool_vars in
+        let _reachable = run_dfs ~occurs_check pool_vars in
         Error.debug "%a" debug_inpool (Some prev_ranks, pool_vars, sub_env);
-
-        (* This step unifies unreachable variables (that is, that will
-         * never be instanciated), with the unhabited bottom type constructor.
-         * *)
-        let deal_with_unreachable uvar =
-          let repr = find uvar in
-          if (repr.term = None && not (Uhashtbl.mem reachable repr)) then begin
-            Error.debug "%s"
-              (Bash.color 144 "[Unreachable] %a\n" uvar_name uvar);
-            repr.term <- Some Algebra.TypeCons.type_cons_bottom;
-          end
-        in
-        List.iter deal_with_unreachable pool_vars;
 
         (* Young variables are marked as belonging to a scheme, they are
          * generalized. Old variables are sent back to their pools.
