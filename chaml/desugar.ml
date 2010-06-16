@@ -175,6 +175,9 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
       let c = desugar_const c in
       `Const c
 
+  | `Magic _ as x ->
+      x
+
 and desugar_pat env ?rebind pat =
   match pat with
   | `Var (ident, _typ) ->
@@ -307,7 +310,7 @@ and desugar_const const =
   | `Float f ->
       let f = float_of_string f in
       `Float f
-  | `Char _ | `Int _ | `String _ | `Unit | `Magic _ as x ->
+  | `Char _ | `Int _ | `String _ | `Unit as x ->
       x
 
 let desugar expr =
@@ -412,6 +415,9 @@ let rec doc_of_expr: Core.expression -> Pprint.document =
     | `Const c ->
         doc_of_const c
 
+    | `Magic t ->
+        (string "%magic: ") ^^ (string (DeBruijn.string_of_type_term t))
+
 and doc_of_pat: Core.pattern -> Pprint.document =
   let open Pprint in
   let open Bash in
@@ -451,8 +457,6 @@ and doc_of_const: Core.const -> Pprint.document =
         dquote ^^ (string s) ^^ dquote
     | `Unit ->
         string "()"
-    | `Magic t ->
-        (string "%magic: ") ^^ (string (DeBruijn.string_of_type_term t))
 
 and doc_of_coerc: Core.coercion -> Pprint.document =
   let open Pprint in

@@ -57,7 +57,6 @@ type const = [
   | `Int of int
   | `Float of float
   | `String of string
-  | `Magic of type_term
   | `Unit
 ]
 
@@ -74,4 +73,6 @@ type expression = [
   | `Tuple of expression list
   | `Instance of Atom.t
   | `Const of const
+
+  | `Magic of type_term
 ]

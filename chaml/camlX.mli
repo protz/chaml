@@ -42,6 +42,7 @@ module Make (S: Algebra.SOLVER): sig
           * rebuild the F-term properly. *)
     | `Tuple of expression list
     | `Const of const
+    | `Magic (** For builtins, gets a special treatment later on *)
   ]
   and pattern = [
     | `Var of ident * S.scheme
@@ -55,7 +56,6 @@ module Make (S: Algebra.SOLVER): sig
     | `Float of string
     | `String of string
     | `Unit
-    | `Magic (* For builtins, gets a special treatment later on *)
   ]
 
 end
@@ -77,6 +77,8 @@ type f_expression = [
          needed for each branch of the generalizing match. **)
   | `Tuple of f_expression list
   | `Const of f_const
+  | `Magic of f_type_term
+      (** For builtins, gets a special treatment later on *)
 ]
 and f_pattern = [
   | `Var of ident * f_type_term option
@@ -90,8 +92,6 @@ and f_const = [
   | `Float of string
       (** This will have to be converted too *)
   | `String of string
-  | `Magic of f_type_term
-      (** For builtins, gets a special treatment later on *)
   | `Unit
       (** This will eventually be removed when we have data types *)
 ]

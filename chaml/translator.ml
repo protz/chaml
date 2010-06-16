@@ -87,7 +87,7 @@ let translate =
                   try
                     translate_expr new_env uexpr
                   with Magic ->
-                    `Const (`Magic f_type_term)
+                    `Magic f_type_term
                 in
                 (fpat, clblock, fexpr)
               )
@@ -148,21 +148,11 @@ let translate =
       | `Tuple (exprs) ->
           `Tuple (List.map (translate_expr env) exprs)
 
-      | `Const x ->
-          `Const (translate_const x)
-
-  and translate_const: CamlX.Make(BaseSolver).const -> f_const =
-    function
-      | `Char _
-      | `Int _
-      | `Float _
-      | `String _
-      | `Unit as x ->
+      | `Const _ as x ->
           x
+
       | `Magic ->
           raise Magic
-            
-
 
   (* [translate_pat] just generates patterns as needed. It doesn't try to
    * assign schemes to variables if those are on the left-hand side of a pattern. *)
@@ -316,6 +306,9 @@ let rec doc_of_expr: f_expression -> Pprint.document =
     | `Const c ->
         doc_of_const c
 
+    | `Magic t ->
+        (string "%magic: ") ^^ (string (DeBruijn.string_of_type_term t))
+
 and doc_of_pat: f_pattern -> Pprint.document =
   let open Pprint in
   function
@@ -358,8 +351,6 @@ and doc_of_const: f_const -> Pprint.document =
         dquote ^^ (string s) ^^ dquote
     | `Unit ->
         string "()"
-    | `Magic t ->
-        (string "%magic: ") ^^ (string (DeBruijn.string_of_type_term t))
 
 let string_of_expr expr =
   let buf = Buffer.create 16 in

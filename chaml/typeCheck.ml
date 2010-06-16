@@ -115,6 +115,9 @@ let rec infer: env -> Core.expression -> DeBruijn.type_term =
     | `Const const ->
         infer_const const
 
+    | `Magic t ->
+        t
+
 and infer_pat: Core.pattern -> DeBruijn.type_term -> (Atom.t * DeBruijn.type_term) list =
   fun pat t ->
     match pat with
@@ -161,8 +164,6 @@ and infer_const: Core.const -> DeBruijn.type_term =
       type_cons_string
   | `Unit ->
       type_cons_unit
-  | `Magic t ->
-      t
 
 and apply_coerc: DeBruijn.type_term -> Core.coercion -> DeBruijn.type_term =
   fun typ coerc ->
