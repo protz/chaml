@@ -38,7 +38,7 @@ let prec =
   Hashtbl.add tbl "*" 2;
   List.iter
     (fun x -> Hashtbl.add tbl x 3)
-    ["int"; "char"; "float"; "string"; "unit"; "⟂"];
+    ["int"; "char"; "float"; "string"; "unit"];
   fun op ->
     Hashtbl.find tbl op
 
@@ -99,11 +99,7 @@ let string_of_types
             (print_type false (key :> 'var inspected_var))
 
       | `Var key ->
-          begin try
-            string_of_key key
-          with Not_found ->
-            "⟂"
-          end
+          string_of_key key
 
       | `Cons (cons_name, cons_args) ->
           if cons_name = Algebra.TypeCons.head_symbol_arrow then

@@ -247,11 +247,7 @@ let solve =
         Error.debug "%a" debug_inpool (None, pool_vars, sub_env);
         let prev_ranks = List.map rank pool_vars in
         let occurs_check = not opt_recursive_types in
-        let reachable =
-          run_dfs
-            ~occurs_check
-            (List.map (function (`Var x), _ -> x) (IdentMap.values var_map))
-        in
+        let reachable = run_dfs ~occurs_check pool_vars in
         Error.debug "%a" debug_inpool (Some prev_ranks, pool_vars, sub_env);
 
         (* This step unifies unreachable variables (that is, that will
@@ -259,8 +255,6 @@ let solve =
          * *)
         let deal_with_unreachable uvar =
           let repr = find uvar in
-          if repr.rank = (-2) then
-            ensure_ready sub_env uvar;
           if (repr.term = None && not (Uhashtbl.mem reachable repr)) then begin
             Error.debug "%s"
               (Bash.color 144 "[Unreachable] %a\n" uvar_name uvar);

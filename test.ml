@@ -1,4 +1,6 @@
-let s x y z = x z (y z)
-let k x y = x
-let i = s k k
-let e = i i
+let bug g h =
+  let f =
+    let h = fun x -> g x in
+    fun y -> h
+  in
+  2

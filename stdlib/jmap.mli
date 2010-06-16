@@ -25,9 +25,6 @@ module type S = sig
   (** Get a list of all keys in a map. *)
   val keys : 'a t -> key list
 
-  (** Get a list of all values in a map *)
-  val values: 'a t -> 'a list
-
   (** [union m1 m2] keeps the values from [m1] *)
   val union : 'a t -> 'a t -> 'a t
 
