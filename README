@@ -1,15 +1,23 @@
 ChaML - a type-checker that uses constraints and a kernel language
 ==================================================================
 
-Requires OCaml 3.12 or higher, as well as ocamlbuild.
+Requires OCaml 3.12 alpha1 or higher (hint: use SVN branch ocaml-3.12), as well
+as ocamlbuild.
 
 Run make to build the executable.
 Run make tests to launch the test suite.
 Run make clean to clean.
+Run make debug to see the constraints contained in test.ml.
+Run make debug_ast to run the tool on test.ml and print the various intermediate
+  languages.
 
-As of 2010-03-31, the OCaml parser has been modified to work with Menhir.
-However, only part of the locations have meaningful contents. There is still
-some work needed to convert the whole parser to $startpos and $endpos.
+WARNING: you are strongly advised to use a shell with a black background.
+WARNING: the type-checker doesn't work yet, so you will have exceptions after
+  the FC+ term is pretty-printed.
+WARNING: because ocamlbuild cannot handle menhir and ocamlyacc at the same time,
+  there is a horrible ./yacchack.sh and ./noyacchack.sh that basically move
+  OCaml's parser.mly out of the build tree. BE SURE TO RUN MANUALLY
+  ./noyacchack.sh AFTERWARDS IF YOUR BUILD FAILED.
 
 The following folders are imports from the OCaml source tree.
 - driver
