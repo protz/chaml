@@ -68,7 +68,7 @@
       \tableofcontents[sectionstyle=show/shaded,subsectionstyle=show/shaded/hide]
     \end{frame}}
 }
-\setbeamertemplate{navigation symbols}{}
+%\setbeamertemplate{navigation symbols}{}
 
 \title{\textsc{Traduction d'OCaml vers une variante de Système F}}
 \author{Jonathan Protzenko\\sous la direction de François Pottier}
@@ -150,7 +150,8 @@
   \begin{columns}
     \column{.5\columnwidth}
       \begin{itemize}
-        \item Récrire un système d'inférence par contraintes, et l'adapter pour
+        \item Récrire un système d'inférence par contraintes (générateur de
+          contraintes \emph{et} solveur), et l'adapter pour
           donner un \emph{AST annoté}.
         \item Élaborer un processus de traduction d'un fragment d'OCaml vers un
           langage minimaliste
@@ -162,13 +163,26 @@
   \end{columns}
 \end{frame}
 
+\begin{frame}{Trois langages}
+
+  Les langages suivants sont utilisés:
+  \begin{itemize}
+    \item CamlX <<~à trous~>> (OCaml annoté)
+    \item CamlX <<~tout court~>> (OCaml annoté en De Bruijn)
+    \item Système FE+
+  \end{itemize}
+
+  Système FE+ est Système $F_\eta$ augmenté avec des coercions explicites, des
+  expressions supplémentaires (tuples), des patterns\dots
+\end{frame}
+
 \section{Décoration d'ASTs}
 
 \subsection{Le cœur du problème}
 
 \begin{frame}{L'inférence par contraintes}
   \begin{itemize}
-    \item Nouvelle présentation d'un algorithme <<~classique~>>
+    \item Présentation revue d'un algorithme <<~classique~>> (Pottier, Rémy, 2005)
     \item Séparation claire et élégante entre génération et résolution
     \item Préférable à l'implémentation OCaml, performante mais difficile
       d'accès
@@ -176,7 +190,7 @@
   Exemple: $$
   \llbracket \lambda z.t : T \rrbracket \quad = \quad
   \exists X_1 X_2.\left(\text{let }z: X_1 \text{ in } \llbracket t: X_2
-  \rrbracket \wedge X_1 \to X_2 \leq T\right)
+  \rrbracket \wedge X_1 \to X_2 = T\right)
   $$
 \end{frame}
 
@@ -232,6 +246,7 @@ val y: ∀ α. α → α
 \end{frame}
 
 \begin{frame}{Fonctionnement de cette méthode}
+  Le générateur de contraintes et le solveur ont dû être récrits.
   \begin{itemize}
     \item Le générateur de contraintes \emph{pré-alloue} des <<~boîtes vides~>>
       correspondant aux futurs résultats du solveur de contraintes.
@@ -242,19 +257,23 @@ val y: ∀ α. α → α
 \end{frame}
 
 \begin{frame}{Remplissage des boîtes}
-  Sont conservées les \underline{\smash{schémas de types}} et les
-  \underline{\smash{variables d'instanciation}}.
+  Système F annote les variables introduites par un $\lambda$. Il faut aussi
+  conserver les types utilisés pour instancier les schémas.
 
   \begin{center}
     \fbox{Les schémas sont résolus au niveau des contraintes \texttt{let}.}
   \end{center}
 
-  \texttt{function, fun, let, match} $\to$ contrainte \texttt{let}. Donc :
+  \texttt{function, fun, let, match} génèrent une contrainte \texttt{let}. Donc :
   \begin{itemize}
     \item créer une boîte ;
     \item l'attacher à la contrainte \texttt{let} ;
     \item l'attacher au nœud CamlX correspondant.
   \end{itemize}
+
+  \begin{flushright}
+    (idem pour les instances de schémas)
+  \end{flushright}
 \end{frame}
 
 \begin{frame}{Avec un peu de recul…}
@@ -266,7 +285,8 @@ val y: ∀ α. α → α
       solveur.
     \item Pas de scope: les schémas de type sont extrudés, sortis de leur
       contexte.
-    \item Formalisation difficile.
+    \item Formalisation difficile (la formalisation correcte est connue, mais
+      n'est pas bonne pour une implémentation).
   \end{itemize}
   Il faudrait arriver à une forme plus propre et plus propice aux
   transformations…
@@ -321,10 +341,10 @@ in
 
   \begin{verbatim}
 match
-  Λ. (λ (x/41: int * (0 → 0)) -> x/41)
-     (1, (λ (x/42: 0) -> x/42))
+  Λ. (λ (x: int * (0 → 0)) -> x)
+     (1, (λ (x: 0) -> x))
 with
-  | (x/39, y/40) ▸ ∀×; ×0[•[bottom]] ->
+  | (x, y) ▸ ∀×; ×0[•[bottom]] ->
       ()
   \end{verbatim}
 
@@ -355,6 +375,27 @@ Reprenons l'exemple initial.
 let (x, y) = (fun x -> x) (1, fun x -> x)
 \end{verbatim}
 
+OCaml répond:
+
+\begin{verbatim}
+val x: int
+val y: 'a -> 'a
+\end{verbatim}
+
+Comprendre:
+
+\begin{verbatim}
+val x: int
+val y: ∀ α. α → α
+\end{verbatim}
+
+\red{Comment justifier ce jugement de typage ?}
+
+\end{frame}
+
+
+\begin{frame}{Où le type-checking échoue}
+
 \begin{tabular}{l|l}
   À gauche & À droite\\
 \hline
@@ -374,15 +415,19 @@ $(x, y)$ & $\forall \alpha.\; (\mathsf{int} \times \alpha \to \alpha)$ \\
 
 \end{frame}
 
+
 \begin{frame}{Du sous-typage}
   Solution: Système $F_\eta$, ou <<~Système F avec sous-typage~>>.
 
   \begin{itemize}
-    \item Par exemple, $\forall \alpha.\; (\tau_1, \tau_2) \leq (\forall
-      \alpha.\; \tau_1, \forall \alpha.\; \tau_2)$.
-    \item Solution: attacher des coercions aux patterns.
+    \item Faire rentrer le quantificateur~:
+      $\forall \alpha.\; (\mathsf{int}\times \alpha\to\alpha) \leq (\forall \alpha.\; \mathsf{int}\times \forall \alpha.\; \alpha\to\alpha)$.
+    \item Éliminer dans la première branche :
+      $(\forall \alpha.\; \mathsf{int}\times \forall \alpha.\; \alpha\to\alpha) \leq
+      (\mathsf{int}\times \forall \alpha.\; \alpha\to\alpha)$.
   \end{itemize}
 
+  On attache des coercions aux motifs :
   \begin{center}
     \fbox{$p \blacktriangleright c$: avant de filtrer sur $p$, appliquer la
   coercion $c$}
@@ -476,10 +521,10 @@ let (x, y) = (fun x -> x) (1, fun x -> x)
 
   \begin{verbatim}
 match
-  Λ. (λ (x/41: int * (0 → 0)) -> x/41)
-     (1, (λ (x/42: 0) -> x/42))
+  Λ. (λ (x: int * (0 → 0)) -> x)
+     (1, (λ (x: 0) -> x))
 with
-  | (x/39, y/40) ▸ ∀×; ×0[•[bottom]] ->
+  | (x, y) ▸ ∀×; ×0[•[bottom]] ->
       ()
   \end{verbatim}
 
@@ -493,18 +538,65 @@ On vérifie le langage <<~core~>>…
 
 … répond toujours oui (\red{ouf !}).
   \end{center}
+
+  \vspace{2em}
+
+  Le typeur est court (\textasciitilde 200 lignes de code), et a été terminé entre
+  le rapport et la présentation.
 \end{frame}
 
 \section{Conclusion}
+
+\subsection{Tableau récapitulatif}
+
+\begin{frame}{Une belle implémentation}
+
+  \footnotesize
+
+  \begin{tabular}{rl}
+    199 & \texttt{chaml/chaml.ml} \\
+    184 & \texttt{chaml/algebra.ml} \\
+    601 & \texttt{chaml/oCamlConstraintGenerator.ml} \\
+    183 & \texttt{chaml/constraint.ml} \\
+    332 & \texttt{chaml/solver.ml} \\
+    402 & \texttt{chaml/unify.ml} \\
+    346 & \texttt{chaml/translator.ml} \\
+    495 & \texttt{chaml/desugar.ml} \\
+    37 & \texttt{chaml/atom.ml} \\
+    74 & \texttt{chaml/deBruijn.ml} \\
+    224 & \texttt{chaml/typeCheck.ml} \\
+    156 & \texttt{chaml/typePrinter.ml} \\
+    473 & \texttt{stdlib/*.ml} \\
+    500 & \texttt{tests/run\_tests.ml} \\
+    \dots & \dots \\
+  6000+ & total (avec les \texttt{.mli})
+  \end{tabular}
+
+\end{frame}
+
+\begin{frame}{Par rapport aux objectifs originaux\dots}
+
+  Sont actuellement traduits :
+  \begin{itemize}
+    \item ML de base,
+    \item patterns généralisants,
+    \item patterns en profondeur.
+  \end{itemize}
+
+  Trouver le bon langage cible et gérer les coercions a occupé une bonne partie
+  du temps !
+
+\end{frame}
 
 \subsection{Conclusion}
 
 \begin{frame}{Une expérience intéressante}
   \begin{itemize}
     \item Poser les bases a été le plus difficile
-    \item Dans le pipeline : value restriction, types algébriques
+    \item Dans le pipeline : value restriction, types algébriques (sans
+      modifications du langage cible !)
     \item Plus tard : variantes polymorphes (qu'ajouter dans le langage de
-      base?), autres…
+      base ?), autres…
   \end{itemize}
 
   Peut-être beaucoup d'implémentation à venir.

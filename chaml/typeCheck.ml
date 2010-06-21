@@ -56,7 +56,7 @@ let rec infer: env -> Core.expression -> DeBruijn.type_term =
               failwith "TyApp"
         end
 
-    | `Fun ((`Var x), t, expr) ->
+    | `Fun (`Var x, t, expr) ->
         let env = add x t env in
         Algebra.TypeCons.type_cons_arrow t (infer env expr)
 
@@ -145,7 +145,8 @@ and infer_pat: Core.pattern -> DeBruijn.type_term -> (Atom.t * DeBruijn.type_ter
         | `Cons (head_symbol, typs)
         when head_symbol = Algebra.TypeCons.head_symbol_tuple (List.length typs) ->
             let bound = List.map2 infer_pat patterns typs in
-            (* Do a assert here *)
+            (* TODO: assert that identifiers are all distinct (enforced in
+               oCamlConstraintGenerator). *)
             let bound = List.flatten bound in
             bound
         | _ ->

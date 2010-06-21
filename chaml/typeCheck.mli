@@ -17,4 +17,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This is the final step of the translation process. It type-checks the
+    {!Core} expression. *)
+
 val check: Core.expression -> unit

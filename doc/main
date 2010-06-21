@@ -11,14 +11,15 @@ These are the modules called by the main driver [ChaML] (in order).
 {!modules:
 OCamlConstraintGenerator Solver 
 Translator Desugar 
+TypeCheck
 }
 
 These core modules depend on some types and data structures.
-{!modules: Constraint Unify CamlX Core Algebra
+{!modules: Constraint Unify CamlX Core Algebra Atom DeBruijn
 }
 
 {2 Helper modules}
-{!modules: TypePrinter Pprint Bash Error UnionFind InfiniteArray Mark Atom DeBruijn
+{!modules: TypePrinter Pprint Bash Error UnionFind InfiniteArray Mark
 }
 
 {2 Standard library}
