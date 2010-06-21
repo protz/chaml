@@ -72,7 +72,7 @@ let translate =
             List.map
               (fun (upat, pscheme, uexpr) ->
                 (* The patterns are translated in the current environment *)
-                let fpat = translate_pat env ~assign_schemes:false upat in
+                let fpat = translate_pat env upat in
                 (* Then we move to the rigt of let p1 = e1, this is where we
                  * introduce the new type variables *)
                 let new_env = List.fold_left lift_add env pscheme.p_young_vars in
@@ -99,7 +99,7 @@ let translate =
       | `Function (pscheme, pat_expr_list) ->
            let pat_expr_list = List.map
             (fun (upat, uexpr) ->
-              let fpat = translate_pat env ~assign_schemes:true upat in
+              let fpat = translate_pat env upat in
               let fexpr = translate_expr env uexpr in
               fpat, fexpr
             )
@@ -132,7 +132,7 @@ let translate =
           let fexpr = translate_expr new_env expr in
           (* Generate patterns and expressions properly *)
           let gen (pat, pscheme, expr) =
-            let fpat = translate_pat env ~assign_schemes:false pat in
+            let fpat = translate_pat env pat in
             let fexpr = translate_expr env expr in
             begin match pscheme with
               | Some pscheme ->
@@ -156,26 +156,20 @@ let translate =
 
   (* [translate_pat] just generates patterns as needed. It doesn't try to
    * assign schemes to variables if those are on the left-hand side of a pattern. *)
-  and translate_pat: env -> assign_schemes:bool -> CamlX.Make(BaseSolver).pattern -> f_pattern =
-    fun env ~assign_schemes upat ->
+  and translate_pat: env -> CamlX.Make(BaseSolver).pattern -> f_pattern =
+    fun env upat ->
     match upat with
       | `Any as r ->
           r
 
       | `Tuple patterns ->
-          `Tuple (List.map (translate_pat env ~assign_schemes) patterns)
+          `Tuple (List.map (translate_pat env) patterns)
 
       | `Or (p1, p2) ->
-          `Or (translate_pat env ~assign_schemes p1, translate_pat env ~assign_schemes p2)
+          `Or (translate_pat env p1, translate_pat env p2)
 
-      | `Var (ident, { scheme_var = scheme }) ->
-          let scheme =
-            if assign_schemes then
-              Some (type_term_of_uvar env scheme)
-            else
-              None
-          in
-          `Var (ident, scheme)
+      | `Var ident ->
+          `Var ident
 
   in
 
@@ -230,15 +224,17 @@ let rec doc_of_expr: f_expression -> Pprint.document =
         indoc ^^ break1 ^^
         e2
 
-    | `Function (_type_term, pat_expr_list) ->
+    | `Function (type_term, pat_expr_list) ->
         (* type_term of the argument as a whole; it might be a pattern so
          * we have the type of the whole first argument. This is needed for
          * [Desugar] to translate this `Function into a `Fun (`Match...) *)
+        let tdoc = string (DeBruijn.string_of_type_term type_term) in
         if (List.length pat_expr_list > 1) then
           let gen (pat, expr) =
             let pdoc = doc_of_pat pat in
             let edoc = doc_of_expr expr in
-            bar ^^ space ^^ pdoc ^^ space ^^ minus ^^ rangle ^^ (nest 4 (break1 ^^ edoc))
+            bar ^^ space ^^ lparen ^^ pdoc ^^ colon ^^ space ^^ tdoc ^^
+            rparen ^^ space ^^ minus ^^ rangle ^^ (nest 4 (break1 ^^ edoc))
           in
           let pat_expr_list = List.map gen pat_expr_list in
           let pat_expr_list = concat
@@ -250,7 +246,8 @@ let rec doc_of_expr: f_expression -> Pprint.document =
           let pat, expr = List.hd pat_expr_list in
           let pdoc = doc_of_pat pat in
           let edoc = doc_of_expr expr in
-          (string "fun") ^^ space ^^ pdoc ^^ space ^^ minus ^^ rangle ^^ space ^^ edoc
+          (string "fun") ^^ space ^^ lparen ^^ pdoc ^^ colon ^^ space ^^
+          tdoc ^^ rparen ^^ space ^^ minus ^^ rangle ^^ space ^^ edoc
 
     | `Instance (ident, instance) ->
         let ident = string (string_of_ident ident) in
@@ -325,18 +322,8 @@ and doc_of_pat: f_pattern -> Pprint.document =
         let pdoc2 = doc_of_pat p2 in
         pdoc1 ^^ space ^^ bar ^^ space ^^ pdoc2
 
-    | `Var (ident, (scheme: f_type_term option)) ->
-        match scheme with
-        | None ->
-            string (string_of_ident ident)
-        | Some scheme ->
-            let scheme = DeBruijn.string_of_type_term scheme in
-            let scheme = fancystring
-              (Bash.color Bash.colors.Bash.red "%s" scheme)
-              (String.length scheme)
-            in
-            lparen ^^ (string (string_of_ident ident)) ^^ colon ^^ space
-            ^^ scheme ^^ rparen
+    | `Var ident ->
+        string (string_of_ident ident)
 
 and doc_of_const: f_const -> Pprint.document =
   let open Pprint in

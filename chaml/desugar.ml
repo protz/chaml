@@ -180,7 +180,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
 
 and desugar_pat env ?rebind pat =
   match pat with
-  | `Var (ident, _typ) ->
+  | `Var ident ->
       if Option.unit_bool rebind then
         `Var (find ident env), []
       else

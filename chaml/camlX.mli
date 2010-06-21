@@ -45,7 +45,7 @@ module Make (S: Algebra.SOLVER): sig
     | `Magic (** For builtins, gets a special treatment later on *)
   ]
   and pattern = [
-    | `Var of ident * S.scheme
+    | `Var of ident
     | `Tuple of pattern list
     | `Or of pattern * pattern
     | `Any
@@ -81,7 +81,7 @@ type f_expression = [
       (** For builtins, gets a special treatment later on *)
 ]
 and f_pattern = [
-  | `Var of ident * f_type_term option
+  | `Var of ident
   | `Tuple of f_pattern list
   | `Or of f_pattern * f_pattern
   | `Any

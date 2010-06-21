@@ -241,6 +241,22 @@ val y: ∀ α. α → α
   \end{itemize}
 \end{frame}
 
+\begin{frame}{Remplissage des boîtes}
+  Sont conservées les \underline{\smash{schémas de types}} et les
+  \underline{\smash{variables d'instanciation}}.
+
+  \begin{center}
+    \fbox{Les schémas sont résolus au niveau des contraintes \texttt{let}.}
+  \end{center}
+
+  \texttt{function, fun, let, match} $\to$ contrainte \texttt{let}. Donc :
+  \begin{itemize}
+    \item créer une boîte ;
+    \item l'attacher à la contrainte \texttt{let} ;
+    \item l'attacher au nœud CamlX correspondant.
+  \end{itemize}
+\end{frame}
+
 \begin{frame}{Avec un peu de recul…}
   \begin{itemize}
     \item Simple et efficace~: il s'agit de <<~faire suivre~>> les informations
@@ -279,23 +295,7 @@ in
   \end{verbatim}
 \end{frame}
 
-\begin{frame}{Remplissage des boîtes…}
-  Sont conservées les \underline{\smash{schémas de types}} et les
-  \underline{\smash{variables d'instanciation}}.
-
-  \begin{center}
-    \fbox{Les schémas sont résolus au niveau des contraintes \texttt{let}.}
-  \end{center}
-
-  \texttt{function, fun, let, match} $\to$ contrainte \texttt{let}. Donc :
-  \begin{itemize}
-    \item créer une boîte ;
-    \item l'attacher à la contrainte \texttt{let} ;
-    \item l'attacher au nœud CamlX correspondant.
-  \end{itemize}
-\end{frame}
-
-\begin{frame}{… et nettoyage}
+\begin{frame}{Nettoyage des boîtes}
  Les structures union-find sont mutables et contiennent du partage. On utilise
  des types avec des indices de De Bruijn.
 
@@ -358,7 +358,7 @@ let (x, y) = (fun x -> x) (1, fun x -> x)
 \begin{tabular}{l|l}
   À gauche & À droite\\
 \hline
-$(x, y)$ & $\forall \alpha.\; (\mathsf{int}, \alpha \to \alpha)$ \\
+$(x, y)$ & $\forall \alpha.\; (\mathsf{int} \times \alpha \to \alpha)$ \\
 \texttt{PCons(Tuple, [x; y])} &
 \texttt{Forall (TCons (Tuple, [int; …]))}
 \end{tabular}
@@ -380,9 +380,6 @@ $(x, y)$ & $\forall \alpha.\; (\mathsf{int}, \alpha \to \alpha)$ \\
   \begin{itemize}
     \item Par exemple, $\forall \alpha.\; (\tau_1, \tau_2) \leq (\forall
       \alpha.\; \tau_1, \forall \alpha.\; \tau_2)$.
-      \pause
-    \item … mais la relation de sous-typage est indécidable!
-      \pause
     \item Solution: attacher des coercions aux patterns.
   \end{itemize}
 

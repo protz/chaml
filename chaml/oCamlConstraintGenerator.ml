@@ -168,7 +168,7 @@ module Make(S: Algebra.SOLVER) = struct
               p_constraint = `True;
               var_map;
               introduced_vars = [];
-              pat = `Var (var, solver_scheme);
+              pat = `Var var;
             }
         | Ppat_tuple patterns ->
           let xis = List.map (fun _ -> fresh_type_var ()) patterns in
@@ -524,7 +524,7 @@ module Make(S: Algebra.SOLVER) = struct
             let ident = ident "+" pos in
             let plus_map = IdentMap.add ident (plus_var, solver_scheme) IdentMap.empty in
             ([plus_var], `Equals (plus_var, plus_type), plus_map, Some solver_pscheme),
-            (`Var (ident, solver_scheme), solver_pscheme, `Magic)
+            (`Var ident, solver_pscheme, `Magic)
           in
           let minus_scheme =
             let minus_var = fresh_type_var ~letter:'z' () in
@@ -537,7 +537,7 @@ module Make(S: Algebra.SOLVER) = struct
             let ident = ident "-" pos in
             let minus_map = IdentMap.add ident (minus_var, solver_scheme) IdentMap.empty in
             ([minus_var], `Equals (minus_var, minus_type), minus_map, Some solver_pscheme),
-            (`Var (ident, solver_scheme), solver_pscheme, `Magic)
+            (`Var ident, solver_pscheme, `Magic)
           in
           let mult_scheme =
             let mult_var = fresh_type_var ~letter:'z' () in
@@ -550,7 +550,7 @@ module Make(S: Algebra.SOLVER) = struct
             let ident = ident "*" pos in
             let mult_map = IdentMap.add ident (mult_var, solver_scheme) IdentMap.empty in
             ([mult_var], `Equals (mult_var, mult_type), mult_map, Some solver_pscheme),
-            (`Var (ident, solver_scheme), solver_pscheme, `Magic)
+            (`Var ident, solver_pscheme, `Magic)
           in
           List.split [plus_scheme; minus_scheme; mult_scheme]
         in
