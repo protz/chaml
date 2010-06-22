@@ -105,6 +105,7 @@
   \definecolor{oxygengray}{HTML}{555753}
   \definecolor{oxygenlightgray}{HTML}{EEEEEC}
   \definecolor{oxygenblue}{HTML}{3465A4}
+  \definecolor{dark}{HTML}{2e3436}
   \setbeamercolor*{Title bar}{fg=white,bg=oxygenblue}
   \setbeamercolor*{Location bar}{fg=oxygenorange,bg=oxygenlightgray}
   \setbeamercolor*{frametitle}{parent=Title bar}
@@ -112,6 +113,7 @@
   \setbeamercolor*{block body}{bg=oxygenlightgray,fg=oxygengray}
   \setbeamercolor*{normal text}{bg=white,fg=oxygengray}
   \setbeamercolor*{section in head/foot}{bg=oxygenblue,fg=white}
+  \setbeamercolor*{title in head/foot}{bg=dark,fg=white}
 
   \usecolortheme[named=oxygenorange]{structure}
 
@@ -305,7 +307,7 @@ val y: ∀ α. α → α
     \end{tikzpicture}
   \end{center}
   Idée: le générateur de contraintes renvoie \emph{deux} arbres qui
-  \emph{\red{partagent}} des structures $\sigma$ décrivant les schémas de type.
+  \emph{\red{partagent}} des structures \red{$\sigma$} décrivant les schémas de type.
 \end{frame}
 
 \begin{frame}{Fonctionnement de cette méthode}
@@ -392,7 +394,7 @@ in
    \item les \texttt{let} sont multiples.
  \end{itemize}
 
- \begin{block}{CamlX:}
+ \begin{block}{CamlX}
  Une représentation avec des types clairs mais des expressions complexes.
  \end{block}
 \end{frame}
@@ -545,6 +547,16 @@ $(x, y)$ & $\forall \alpha.\; (\mathsf{int} \times \alpha \to \alpha)$ \\
 
 \subsection{Règles de génération de coercions}
 
+\begin{frame}{Vu de loin}
+  La relation de sous-typage dans $F_\eta$ est indécidable mais…
+  \begin{itemize}
+    \item on ne demande jamais: $\tau \leq \tau'$?,
+    \item on génère des coercions \emph{au préalable},
+    \item on sait toujours \emph{comment} coercer et vers quel type,
+    \item on opère sur un sous-ensemble des situations de sous-typage.
+  \end{itemize}
+\end{frame}
+
 \begin{frame}{Comment générer les coercions ?}
 Un ensemble de règles statiques permet de générer les coercions adaptées à
 chaque situation, \emph{par filtrage sur le type et le pattern}.
@@ -563,16 +575,6 @@ coercion -> typ}.
   \footnotesize (exemple au tableau)
 \end{flushright}
 
-\end{frame}
-
-\begin{frame}{Vu de loin}
-  La relation de sous-typage dans $F_\eta$ est indécidable mais…
-  \begin{itemize}
-    \item on ne demande jamais: $\tau \leq \tau'$?,
-    \item on génère des coercions \emph{au préalable},
-    \item on sait toujours \emph{comment} coercer et vers quel type,
-    \item on opère sur un sous-ensemble des situations de sous-typage.
-  \end{itemize}
 \end{frame}
 
 \begin{frame}[fragile]{L'exemple initial}
@@ -600,7 +602,7 @@ On vérifie le langage <<~core~>>…
 
 \vspace{5ex}
 
-… répond toujours oui (\red{ouf !}).
+… et on répond toujours oui (\red{ouf !}).
   \end{center}
 
   \vspace{2em}
@@ -675,17 +677,12 @@ On vérifie le langage <<~core~>>…
 \end{frame}
 
 
-{{%
-  \setbeamertemplate{navigation symbols}{}%
-  \setbeamertemplate{background}{}%
-  \setbeamertemplate{background canvas}{}%
-  \frame[plain]{
+\begin{frame}
   \begin{center}
     \Huge
-    \fontspec[Colour=888888, Ligatures=Rare, Fractions=On]{MEgalopolis Extra}
+    \fontspec[Colour=2e3436, Ligatures=Rare, Fractions=On]{MEgalopolis Extra}
     Questions ?
   \end{center}
-  }%
-}}
+\end{frame}
 
 \end{document}
