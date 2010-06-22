@@ -112,6 +112,7 @@ let _ =
   let arg_print_typed_ast = ref false in
   let arg_print_core_ast = ref false in
   let arg_type_check = ref true in
+  let arg_print_useless = ref false in
   let add_opt v k = Options.set_opt k v in
   let usage = String.concat ""
                 ["ChaML: a type-checker for OCaml programs.\n";
@@ -127,6 +128,7 @@ let _ =
       "--dont-print-types", Arg.Clear arg_print_types, "don't print the inferred types, à la ocamlc -i";
       "--print-typed-ast", Arg.Set arg_print_typed_ast, "print the AST annotated with the types found by the solver";
       "--print-core-ast", Arg.Set arg_print_core_ast, "print the System F generated term";
+      "--print-useless-information", Arg.Set arg_print_useless, "print useless information";
       "--im-feeling-lucky", Arg.Clear arg_type_check, "don't type-check";
       "--enable", Arg.String (add_opt true), "enable one of the features above";
       "--disable", Arg.String (add_opt false), "disable one of the features above";
@@ -196,4 +198,14 @@ let _ =
     (* The final type-checking part *)
     TypeCheck.check core_ast;
     Error.debug "[Driver] Done.\n";
+    if !arg_print_useless then begin
+      Printf.printf "[Driver] %d nodes in the OCaml ast\n"
+        (Count.count_ocaml_nodes ast);
+      Printf.printf "[Driver] %d nodes in the constraint\n"
+        (Count.count_constraint_nodes konstraint);
+      Printf.printf "[Driver] %d nodes in the CamlX AST\n"
+        (Count.count_camlx_nodes camlx_ast);
+      Printf.printf "[Driver] %d nodes in the Core AST\n"
+        (Count.count_core_nodes core_ast);
+    end;
   end
