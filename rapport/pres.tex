@@ -53,7 +53,8 @@
 \setmonofont[Scale=.88]{DejaVu Sans Mono}
 
 \mode<presentation> {
-  \usetheme{Singapore}
+  \usetheme{Darmstadt}
+  \useinnertheme{circles}
   \setbeamercovered{transparent}
   \AtBeginSection[]{
     \begin{frame}<beamer| handout>[shrink]
@@ -67,14 +68,63 @@
       %\tableofcontents[sectionstyle=show/shaded,subsectionstyle=show/shaded/hide]
       \tableofcontents[sectionstyle=show/shaded,subsectionstyle=show/shaded/hide]
     \end{frame}}
+
+  \setbeamertemplate{navigation symbols}{}
+
+  \defbeamertemplate*{footline}{infolines theme}
+  {
+    \leavevmode%
+    \hbox{%
+    \begin{beamercolorbox}[wd=.2\paperwidth,ht=2.25ex,dp=1ex,center]{date in head/foot}%
+      \usebeamerfont{author in head/foot}Jonathan Protzenko
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.5\paperwidth,ht=2.25ex,dp=1ex,center]{title in head/foot}%
+      \usebeamerfont{title in head/foot}\insertshorttitle
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.3\paperwidth,ht=2.25ex,dp=1ex,right]{date in head/foot}%
+      \usebeamerfont{date in head/foot}\insertshortdate{}\hspace*{2em}
+      \insertframenumber{} / \inserttotalframenumber\hspace*{2ex} 
+    \end{beamercolorbox}}%
+    \vskip0pt%
+  }
+
+  \defbeamertemplate*{headline}{miniframes theme}
+  {%
+    \begin{beamercolorbox}{section in head/foot}
+      \vskip2pt\insertnavigation{\paperwidth}
+      \vskip12pt
+    \end{beamercolorbox}%
+  }
+
+  \definecolor{oxygenorange}{HTML}{F7800A}
+  \definecolor{oxygengray}{HTML}{686868}
+  \definecolor{oxygenlightgray}{HTML}{EEEEEE}
+  \definecolor{oxygenblue}{HTML}{236EAF}
+  \setbeamercolor*{Title bar}{fg=white,bg=oxygenblue}
+  \setbeamercolor*{Location bar}{fg=oxygenorange,bg=oxygenlightgray}
+  \setbeamercolor*{frametitle}{parent=Title bar}
+  \setbeamercolor*{block title}{bg=oxygenblue,fg=white}
+  \setbeamercolor*{block body}{bg=oxygenlightgray,fg=oxygengray}
+  \setbeamercolor*{normal text}{bg=white,fg=oxygengray}
+  \setbeamercolor*{section in head/foot}{bg=oxygenblue,fg=white}
+
+  \usecolortheme[named=oxygenorange]{structure}
+
+  \pgfdeclareverticalshading{beamer@aboveframetitle}{\the\paperwidth}{
+    color(0cm)=(oxygenblue);
+    color(2ex)=(oxygenblue)
+  }
 }
-%\setbeamertemplate{navigation symbols}{}
 
 \title{\textsc{Traduction d'OCaml vers une variante de Système F}}
 \author{Jonathan Protzenko\\sous la direction de François Pottier}
 \date{\today}
 
 \begin{document}
+
+\makeatletter
+\beamer@compressfalse
+\makeatother
 
 \begin{frame}
   \titlepage
@@ -100,6 +150,8 @@
     \item Vérifier le typage \emph{a posteriori}
   \end{itemize}
 \end{frame}
+
+%\end{document}\bye
 
 \begin{frame}{Objectifs à long terme}
   \begin{itemize}
@@ -194,7 +246,8 @@
   $$
 \end{frame}
 
-\newcommand{\red}[1]{\textcolor[HTML]{a40000}{#1}}
+%\newcommand{\red}[1]{\textcolor[HTML]{a40000}{#1}}
+\newcommand{\red}[1]{\textcolor[HTML]{F7800A}{#1}}
 
 \begin{frame}[fragile]{Que fait l'inférence par contraintes?}
   L'inférence par contraintes répond \underline{oui ou non}.
@@ -208,7 +261,7 @@ val x: int
 val y: ∀ α. α → α
   \end{verbatim}
 
-  \textcolor[HTML]{a40000}{Comment l'adapter pour afficher un AST annoté?}
+  \red{Comment l'adapter pour afficher un AST annoté?}
 
   \begin{flushright}
     \footnotesize(Pas de value restriction dans les exemples)
