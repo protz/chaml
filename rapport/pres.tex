@@ -33,13 +33,16 @@
 \usetikzlibrary{backgrounds}	% drawing the background after the foreground
 %\usepackage[]{graphicx}
 %\usepackage[french,noend]{algorithm2e}
-\tikzstyle{background}=[rectangle, fill=gray!10, inner sep=0.2cm, rounded corners=5mm]
-\tikzstyle{pass}=[shade, shading=axis, rounded rectangle, draw, fill=black!10,
-        inner sep=5pt, text width=2cm,
+\definecolor{lightgray}{rgb}{.93,.93,.92}
+\definecolor{alu}{rgb}{.827,.843,.811}
+\definecolor{aluminium}{rgb}{.729,.741,.713}
+\tikzstyle{background}=[rectangle, fill=lightgray, inner sep=0.2cm, rounded corners=5mm]
+\tikzstyle{pass}=[rounded rectangle, draw, fill=aluminium,
+        inner sep=5pt, text width=2cm, text=black,
         text badly centered, minimum height=1.2cm,
         font=\bfseries\scriptsize\sffamily]
-\tikzstyle{tool}=[rectangle, draw, thick, fill=black!10, inner sep=5pt, text
-        width=1.5cm,
+\tikzstyle{tool}=[rectangle, draw, thick, fill=aluminium, inner sep=5pt, text
+        width=1.5cm, text=black,
         text badly centered, minimum height=.8cm,
         font=\bfseries\scriptsize\sffamily] 
 
@@ -75,13 +78,13 @@
   {
     \leavevmode%
     \hbox{%
-    \begin{beamercolorbox}[wd=.2\paperwidth,ht=2.25ex,dp=1ex,center]{date in head/foot}%
+    \begin{beamercolorbox}[wd=.2\paperwidth,ht=2.25ex,dp=1ex,center]{author in head/foot}%
       \usebeamerfont{author in head/foot}Jonathan Protzenko
     \end{beamercolorbox}%
     \begin{beamercolorbox}[wd=.5\paperwidth,ht=2.25ex,dp=1ex,center]{title in head/foot}%
       \usebeamerfont{title in head/foot}\insertshorttitle
     \end{beamercolorbox}%
-    \begin{beamercolorbox}[wd=.3\paperwidth,ht=2.25ex,dp=1ex,right]{date in head/foot}%
+    \begin{beamercolorbox}[wd=.3\paperwidth,ht=2.25ex,dp=1ex,right]{author in head/foot}%
       \usebeamerfont{date in head/foot}\insertshortdate{}\hspace*{2em}
       \insertframenumber{} / \inserttotalframenumber\hspace*{2ex} 
     \end{beamercolorbox}}%
@@ -96,10 +99,12 @@
     \end{beamercolorbox}%
   }
 
-  \definecolor{oxygenorange}{HTML}{F7800A}
-  \definecolor{oxygengray}{HTML}{686868}
-  \definecolor{oxygenlightgray}{HTML}{EEEEEE}
-  \definecolor{oxygenblue}{HTML}{236EAF}
+  %\definecolor{oxygenorange}{HTML}{5C3566}
+  \definecolor{oxygenorange}{HTML}{4E9A06}
+  %\definecolor{oxygenorange}{HTML}{8F5902}
+  \definecolor{oxygengray}{HTML}{555753}
+  \definecolor{oxygenlightgray}{HTML}{EEEEEC}
+  \definecolor{oxygenblue}{HTML}{3465A4}
   \setbeamercolor*{Title bar}{fg=white,bg=oxygenblue}
   \setbeamercolor*{Location bar}{fg=oxygenorange,bg=oxygenlightgray}
   \setbeamercolor*{frametitle}{parent=Title bar}
@@ -115,6 +120,9 @@
     color(2ex)=(oxygenblue)
   }
 }
+
+%\newcommand{\red}[1]{\textcolor[HTML]{a40000}{#1}}
+\newcommand{\red}[1]{\textcolor[HTML]{F7800A}{#1}}
 
 \title{\textsc{Traduction d'OCaml vers une variante de Système F}}
 \author{Jonathan Protzenko\\sous la direction de François Pottier}
@@ -165,7 +173,9 @@
   \end{itemize}
 \end{frame}
 
+{
 \begin{frame}{Dans les grandes lignes…}
+  \vspace{-2em}
   \begin{center}
     \begin{tikzpicture}
       [node distance = 1cm, auto, every node/.style={node distance=3cm}]
@@ -195,6 +205,7 @@
   \footnotesize Le processus se découpe en deux parties~: génération/résolution de
   contraintes, et traductions jusqu'à Système FE+.
 \end{frame}
+}
 
 \subsection{Contributions}
 
@@ -207,12 +218,14 @@
           donner un \emph{AST annoté}.
         \item Élaborer un processus de traduction d'un fragment d'OCaml vers un
           langage minimaliste
-        \item Concevoir le système de types qui permet de justifier le comportement
-          d'OCaml
       \end{itemize}
     \column{.5\columnwidth}
       \includegraphics[width=\columnwidth]{screen1.png}
   \end{columns}
+  \begin{itemize}
+    \item Concevoir le système de types qui permet de justifier le comportement
+      d'OCaml
+  \end{itemize}
 \end{frame}
 
 \begin{frame}{Trois langages}
@@ -245,9 +258,6 @@
   \rrbracket \wedge X_1 \to X_2 = T\right)
   $$
 \end{frame}
-
-%\newcommand{\red}[1]{\textcolor[HTML]{a40000}{#1}}
-\newcommand{\red}[1]{\textcolor[HTML]{F7800A}{#1}}
 
 \begin{frame}[fragile]{Que fait l'inférence par contraintes?}
   L'inférence par contraintes répond \underline{oui ou non}.
@@ -314,10 +324,11 @@ val y: ∀ α. α → α
   conserver les types utilisés pour instancier les schémas.
 
   \begin{center}
-    \fbox{Les schémas sont résolus au niveau des contraintes \texttt{let}.}
+    \red{\fbox{Les schémas sont résolus au niveau des contraintes \texttt{let}.}}
   \end{center}
 
-  \texttt{function, fun, let, match} génèrent une contrainte \texttt{let}. Donc :
+  \texttt{function, fun, let, match} génèrent une contrainte \texttt{let}.
+  Procédure :
   \begin{itemize}
     \item créer une boîte ;
     \item l'attacher à la contrainte \texttt{let} ;
