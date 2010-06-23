@@ -640,6 +640,24 @@ On vérifie le langage <<~core~>>…
 
 \end{frame}
 
+\begin{frame}[fragile]{Exemple de sortie de ChaML}
+
+  Batterie de tests : une trentaine d'expressions ML mettant à l'épreuve les
+  constructions reconnues par le programme. Comparaison de la sortie du solveur
+  avec OCaml + type-checking du programme Core.
+
+  \begin{verbatim}
+[Driver] 427 nodes in the OCaml ast
+[Driver] 957 nodes in the constraint
+[Driver] 915 nodes in the CamlX AST
+[Driver] 666 nodes in the Core AST
+  \end{verbatim}
+
+  Beaucoup d'annotations explicites de type en CamlX (pour construire les
+  coercions). Le langage Core est plus léger.
+
+\end{frame}
+
 \begin{frame}{Par rapport aux objectifs originaux\dots}
 
   Sont actuellement traduits :
