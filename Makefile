@@ -54,7 +54,7 @@ count:
 	#wc -l `find chaml stdlib tests -iname '*.ml' -or -iname '*.mli' -or -iname '*.mly' -or -iname '*.mll'` | sort -n
 	sloccount chaml tests stdlib Makefile *.sh
 
-GRAPH_FILES = $(shell find chaml -iname '*.ml*' -and -not -iname 'algebra.ml*' -and -not -iname '.*' -and -not -iname 'algebra.ml*' -and -not -iname 'typePrinter.ml*')
+GRAPH_FILES = $(shell find chaml -iname '*.ml*' -and -not -iname 'algebra.ml*' -and -not -iname '.*' -and -not -iname 'algebra.ml*' -and -not -iname 'typePrinter.ml*' -and -not -iname 'count.ml*')
 #GRAPH_FILES = $(shell ls chaml/*.ml*)
 #GRAPH_FILES = $(shell ls chaml/*.ml* stdlib/*.ml*)
 

@@ -12,8 +12,6 @@ Run make debug_ast to run the tool on test.ml and print the various intermediate
   languages.
 
 WARNING: you are strongly advised to use a shell with a black background.
-WARNING: the type-checker doesn't work yet, so you will have exceptions after
-  the FC+ term is pretty-printed.
 WARNING: because ocamlbuild cannot handle menhir and ocamlyacc at the same time,
   there is a horrible ./yacchack.sh and ./noyacchack.sh that basically move
   OCaml's parser.mly out of the build tree. BE SURE TO RUN MANUALLY
