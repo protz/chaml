@@ -147,7 +147,7 @@ let count_ocaml_nodes str =
     match ppat_desc with
     | Ppat_any ->
         1
-    | Ppat_var v ->
+    | Ppat_var _ ->
         1
     | Ppat_tuple p ->
         1 + List.fold_left (fun acc p -> acc + count_pat p) 0 p
@@ -169,7 +169,7 @@ let count_ocaml_nodes str =
     | Pexp_apply (e1, label_expr_list) ->
         1 + count_expr e1 + List.fold_left (fun acc (_, e) -> acc + count_expr e)
         0 label_expr_list
-    | Pexp_let (rec_flag, pe, e2) ->
+    | Pexp_let (_, pe, e2) ->
         1 + count_expr e2 + List.fold_left (fun acc (p, e) -> count_pat p + count_expr e + acc) 0 pe
     | Pexp_match (e1, pe) ->
         1 + count_expr e1 + List.fold_left (fun acc (p, e) -> count_pat p + count_expr e + acc) 0 pe
