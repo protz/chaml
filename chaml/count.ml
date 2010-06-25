@@ -115,6 +115,9 @@ let count_core_nodes e =
     | `Magic _ ->
         1
 
+    | `Coerce (e, c) ->
+        1 + count_expr e + count_coerc c
+
   and count_pat = function
     | `Var _ ->
         1

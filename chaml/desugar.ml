@@ -78,7 +78,27 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
             | `Var ident ->
                 let a = find ident new_env in
                 let e = desugar_expr new_env expr in
-                AtomMap.add a (f_type_term, e) acc
+                let e = wrap_lambda young_vars e in
+                let f_type_term =
+                  let rec wrap i t =
+                    if i = 0 then
+                      t
+                    else
+                      `Forall (wrap (i - 1) t)
+                  in
+                  wrap young_vars f_type_term
+                in
+                let new_pat = generate_coerc new_env
+                  { pattern = `Var a; forall = young_vars; type_term = f_type_term}
+                in
+                begin match new_pat with
+                | `Coerce (`Var a, c) ->
+                    AtomMap.add a (f_type_term, `Coerce (e, c)) acc
+                | `Var a ->
+                    AtomMap.add a (f_type_term, e) acc
+                | _ ->
+                    assert false
+                end
             | _ ->
                 assert false
           )
@@ -86,8 +106,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
           pat_coerc_exprs
         in
         let e = `LetRec (map, e2) in
-        let _, { young_vars; _ }, _ = List.hd pat_coerc_exprs in
-        wrap_lambda young_vars e
+        e
       else
         (* And then we desugar all of the initial branches in the same previous
          * scope *)
@@ -291,8 +310,8 @@ and generate_coerc env cenv =
                     seen.(DeBruijn.index v) <- true
               | `Cons (_cons_name, cons_args) ->
                   List.iter walk cons_args
-              | `Forall _ ->
-                  assert false
+              | `Forall t ->
+                  walk t
           in
           walk type_term;
           (* We remove quantifiers we don't use *)
@@ -380,7 +399,7 @@ let rec doc_of_expr: Core.expression -> Pprint.document =
         e2
 
     | `LetRec (map, e2) ->
-        let letdoc = pcolor colors.yellow "let" in
+        let letdoc = pcolor colors.yellow "let rec" in
         let anddoc = pcolor colors.yellow "and" in
         let branches = AtomMap.to_list map in
         let branches = List.map
@@ -389,7 +408,7 @@ let rec doc_of_expr: Core.expression -> Pprint.document =
             let tdoc = string (DeBruijn.string_of_type_term t) in
             let edoc = doc_of_expr e in
             vdoc ^^ colon ^^ space ^^ tdoc ^^ space ^^ equals ^^ space ^^
-            (nest 2 (break1 ^^ edoc)) ^^ break1)
+            (nest 2 (break1 ^^ edoc)))
           branches
         in
         let branches = concat
@@ -460,6 +479,12 @@ let rec doc_of_expr: Core.expression -> Pprint.document =
 
     | `Magic t ->
         (string "%magic: ") ^^ (string (DeBruijn.string_of_type_term t))
+
+    | `Coerce (expr, coerc) ->
+        let edoc = doc_of_expr expr in
+        let cdoc = doc_of_coerc coerc in
+        let triangle = pcolor colors.green ~l:1 "▸" in
+        edoc ^^ space ^^ triangle ^^ space ^^ cdoc
 
 and doc_of_pat: Core.pattern -> Pprint.document =
   let open Pprint in

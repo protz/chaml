@@ -85,18 +85,17 @@ let rec infer: env -> Core.expression -> DeBruijn.type_term =
         t2
 
     | `LetRec (map, e2) ->
+        let real_type t = function
+          | `Coerce (e, c) ->
+              apply_coerc t c
+          | _ ->
+              t
+        in
         let env = AtomMap.fold
-          (fun k (t, _) acc ->
-            add k t acc)
-          map
-          env
+          (fun k (t, e) acc -> add k (real_type t e) acc) map env
         in
         AtomMap.iter
-          (fun k (t, e) ->
-            let t' = infer env e in
-            if t <> t' then
-              fail "Letrec";
-          )
+          (fun _a (t, e) -> if (real_type t e) <> (infer env e) then fail "Letrec")
           map;
         infer env e2
 
@@ -133,6 +132,9 @@ let rec infer: env -> Core.expression -> DeBruijn.type_term =
 
     | `Magic t ->
         t
+
+    | `Coerce (e, c) ->
+        apply_coerc (infer env e) c
 
 and infer_pat: Core.pattern -> DeBruijn.type_term -> (Atom.t * DeBruijn.type_term) list =
   fun pat t ->

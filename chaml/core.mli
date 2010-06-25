@@ -63,7 +63,7 @@ type const = [
 type expression = [
   | `TyAbs of expression
   | `TyApp of expression * type_term
-  (* | `Coerce of expression * coercion *)
+  | `Coerce of expression * coercion
 
   | `Fun of var * type_term * expression
   | `Match of expression * (pattern * expression) list
