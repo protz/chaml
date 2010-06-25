@@ -68,7 +68,7 @@ type expression = [
   | `Fun of var * type_term * expression
   | `Match of expression * (pattern * expression) list
   | `Let of var * expression * expression 
-  | `LetRec of (type_term * expression) Map.Make(Atom).t * expression
+  | `LetRec of (type_term * expression) Jmap.Make(Atom).t * expression
   | `App of expression * expression list
 
   | `Tuple of expression list

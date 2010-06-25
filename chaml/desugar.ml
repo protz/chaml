@@ -46,7 +46,7 @@ let find: ident -> env -> Atom.t =
   fun ident { atom_of_ident } ->
     IdentMap.find ident atom_of_ident
 
-module AtomMap = Map.Make(Atom)
+module AtomMap = Jmap.Make(Atom)
 
 let concat f l =
   List.fold_left f (List.hd l) (List.tl l)
@@ -78,7 +78,6 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
             | `Var ident ->
                 let a = find ident new_env in
                 let e = desugar_expr new_env expr in
-                let e = wrap_lambda young_vars e in
                 AtomMap.add a (f_type_term, e) acc
             | _ ->
                 assert false
@@ -86,7 +85,9 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
           AtomMap.empty
           pat_coerc_exprs
         in
-        `LetRec (map, e2)
+        let e = `LetRec (map, e2) in
+        let _, { young_vars; _ }, _ = List.hd pat_coerc_exprs in
+        wrap_lambda young_vars e
       else
         (* And then we desugar all of the initial branches in the same previous
          * scope *)
@@ -378,8 +379,28 @@ let rec doc_of_expr: Core.expression -> Pprint.document =
         break1 ^^ indoc ^^ break1 ^^
         e2
 
-    | `LetRec _ ->
-        assert false
+    | `LetRec (map, e2) ->
+        let letdoc = pcolor colors.yellow "let" in
+        let anddoc = pcolor colors.yellow "and" in
+        let branches = AtomMap.to_list map in
+        let branches = List.map
+          (fun (v, (t, e)) ->
+            let vdoc = string (Atom.string_of_atom v) in
+            let tdoc = string (DeBruijn.string_of_type_term t) in
+            let edoc = doc_of_expr e in
+            vdoc ^^ colon ^^ space ^^ tdoc ^^ space ^^ equals ^^ space ^^
+            (nest 2 (break1 ^^ edoc)) ^^ break1)
+          branches
+        in
+        let branches = concat
+          (fun x y -> x ^^ break1 ^^ anddoc ^^ space ^^ y)
+          branches
+        in
+        let indoc = pcolor colors.yellow "in" in
+        let e2 = doc_of_expr e2 in
+        letdoc ^^ space ^^ branches ^^ 
+        break1 ^^ indoc ^^ break1 ^^
+        e2
 
     | `Fun (`Var v, t, e2) ->
         let vdoc = string (Atom.string_of_atom v) in

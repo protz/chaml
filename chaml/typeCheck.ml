@@ -17,7 +17,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module AtomMap = Map.Make(Atom)
+module AtomMap = Jmap.Make(Atom)
 
 type env = {
   type_of_atom: DeBruijn.type_term AtomMap.t;
@@ -94,7 +94,8 @@ let rec infer: env -> Core.expression -> DeBruijn.type_term =
         AtomMap.iter
           (fun k (t, e) ->
             let t' = infer env e in
-            assert (t = t');
+            if t <> t' then
+              fail "Letrec";
           )
           map;
         infer env e2
@@ -236,4 +237,4 @@ and apply_coerc: DeBruijn.type_term -> Core.coercion -> DeBruijn.type_term =
 let check expr =
   let env = { type_of_atom = AtomMap.empty } in
   let typ = infer env expr in
-  assert (typ = Algebra.TypeCons.type_cons_unit)
+  ignore (typ);

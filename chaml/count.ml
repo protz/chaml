@@ -82,7 +82,7 @@ let count_camlx_nodes e =
 
 open Parsetree
 
-module AtomMap = Map.Make(Atom)
+module AtomMap = Jmap.Make(Atom)
 
 let count_core_nodes e =
   let rec count_expr = function
