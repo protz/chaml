@@ -67,7 +67,7 @@ let translate =
   let rec translate_expr: env -> CamlX.Make(BaseSolver).expression -> f_expression = 
     fun env uexpr ->
     match uexpr with
-      | `Let (pat_expr_list, e2) ->
+      | `Let (rec_flag, pat_expr_list, e2) ->
           let pat_expr_list =
             List.map
               (fun (upat, pscheme, uexpr) ->
@@ -94,7 +94,7 @@ let translate =
               pat_expr_list
           in
           let fexpr = translate_expr env e2 in
-          `Let (pat_expr_list, fexpr)
+          `Let (rec_flag, pat_expr_list, fexpr)
 
       | `Function (pscheme, pat_expr_list) ->
            let pat_expr_list = List.map
@@ -191,7 +191,7 @@ let rec doc_of_expr: f_expression -> Pprint.document =
   let open Pprint in
   let open Bash in
   function
-    | `Let (pat_expr_list, e2) ->
+    | `Let (rec_flag, pat_expr_list, e2) ->
         let gen (pat, { young_vars = nlambdas; f_type_term = scheme }, expr) =
           let pdoc = doc_of_pat pat in
           let edoc = doc_of_expr expr in
@@ -220,7 +220,8 @@ let rec doc_of_expr: f_expression -> Pprint.document =
         let e2 = doc_of_expr e2 in
         let letdoc = fancystring (color 208 "let") 3 in
         let indoc = fancystring (color 208 "in") 2 in
-        letdoc ^^ space ^^ pat_expr_list ^^ break1 ^^
+        let recdoc = if rec_flag then string "rec " else empty in
+        letdoc ^^ space ^^ recdoc ^^ pat_expr_list ^^ break1 ^^
         indoc ^^ break1 ^^
         e2
 

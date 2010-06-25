@@ -1,7 +1,5 @@
-let (|>) x f = f x
+let rec x = x + 1
+let fst (x, y) = x
 
-let inc x = x + 1
-let square x = x * x
-
-let _ =
-  2 |> inc |> square |> inc |> square
+let rec f x = (x, x)
+and g (y, x) = fst (f y)

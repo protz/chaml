@@ -338,26 +338,76 @@ module Make(S: Algebra.SOLVER) = struct
       | Pexp_let (rec_flag, pat_expr_list, e2) ->
           (* Once again, the list of pattern/expressions is here because of
            * let ... and ... in e2 (multiple simultaneous definitions *)
-          if rec_flag <> Asttypes.Nonrecursive then
-            raise_error (NotImplemented ("rec flag", pexp_loc));
-          let { e_constraint = c2; expr = expr_e2 } =
-            generate_constraint_expression t e2
-          in
-          let run (acc, map) pat_expr =
-            let { scheme; pat_expr; } =
-              generate_constraint_scheme pat_expr
-            in
-            let _, _, new_map, _ = scheme in
-            dont_bind_several_times pexp_loc map new_map;
-            let union = IdentMap.union map new_map in
-            (scheme, pat_expr) :: acc, union
-          in
-          let constraints, pat_expr =
-            List.split (fst (List.fold_left run ([], IdentMap.empty) pat_expr_list)) in
-          {
-            e_constraint = `Let (constraints, c2);
-            expr =  `Let (pat_expr, expr_e2);
-          }
+          begin match rec_flag with
+          | Asttypes.Nonrecursive ->
+              let { e_constraint = c2; expr = expr_e2 } =
+                generate_constraint_expression t e2
+              in
+              let run (acc, map) pat_expr =
+                let { scheme; pat_expr; } =
+                  generate_constraint_scheme pat_expr
+                in
+                let _, _, new_map, _ = scheme in
+                dont_bind_several_times pexp_loc map new_map;
+                let union = IdentMap.union map new_map in
+                (scheme, pat_expr) :: acc, union
+              in
+              let constraints, pat_expr =
+                List.split (fst (List.fold_left run ([], IdentMap.empty) pat_expr_list)) in
+              {
+                e_constraint = `Let (constraints, c2);
+                expr =  `Let (false, pat_expr, expr_e2);
+              }
+          | Asttypes.Recursive ->
+              let main_type_vars = ref [] in
+              let pattern_constraints = ref [] in
+              let common_introduced_vars = ref [] in
+              let expression_constraints = ref [] in
+              let common_ident_map = ref IdentMap.empty in
+              let exprs = ref [] in
+              let push l e = l := e :: !l in
+              let gen (pat, expr) = 
+                let x = fresh_type_var ~letter:'r' () in
+                push main_type_vars x;
+                let { p_constraint; var_map; introduced_vars; pat } =
+                  generate_constraint_pattern x pat
+                in
+                let p_constraint = `Exists (introduced_vars, p_constraint) in
+                push pattern_constraints p_constraint;
+                push common_introduced_vars introduced_vars;
+                dont_bind_several_times pexp_loc !common_ident_map var_map;
+                common_ident_map := IdentMap.union !common_ident_map var_map;
+                let { e_constraint; expr } =
+                  generate_constraint_expression x expr
+                in
+                push expression_constraints e_constraint;
+                let pscheme = new_pscheme x in
+                push exprs (pat, pscheme, expr);
+              in
+              List.iter gen pat_expr_list;
+              let inner_scheme: type_scheme =
+                [], constr_conj !pattern_constraints, !common_ident_map, None
+              in
+              let inner_constraint =
+                `Let ([inner_scheme], constr_conj !expression_constraints)
+              in
+              let { e_constraint = c2; expr = e2 } =
+                generate_constraint_expression t e2
+              in
+              let outer_scheme: type_scheme =
+                !main_type_vars, inner_constraint, !common_ident_map, None
+              in
+              let outer_constraint = 
+                `Let ([outer_scheme], c2)
+              in
+              {
+                e_constraint = outer_constraint;
+                expr = `Let (true, !exprs, e2);
+              }
+          | Asttypes.Default ->
+              raise_error (NotImplemented ("rec flag = default", pexp_loc))
+          end
+
       | Pexp_match (e1, pat_expr_list) ->
           if opt_generalize_match then
             (* We generalize here. See the draft version of ATTAPL p.98 for the
@@ -567,7 +617,7 @@ module Make(S: Algebra.SOLVER) = struct
         let { e_constraint = topmost_constraint; expr = topmost_expression } = constraint_expression in
         if opt_default_bindings then
           { e_constraint = `Let (default_bindings, topmost_constraint);
-            expr = `Let (default_let_bindings, topmost_expression) }
+            expr = `Let (false, default_let_bindings, topmost_expression) }
         else
           constraint_expression
 

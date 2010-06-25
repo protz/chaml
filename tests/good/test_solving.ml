@@ -110,3 +110,9 @@ let f14 a = (
   let x y = x (x y) in 
   let x y = x (x y) in 
   x (fun z -> z) *)
+
+let fsharp =
+  let (|>) x f = f x in
+  let inc x = x + 1 in
+  let square x = x * x in
+  2 |> inc |> square |> inc |> square

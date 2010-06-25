@@ -58,7 +58,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
       e
   in
   match expr with
-  | `Let (pat_coerc_exprs, e2) ->
+  | `Let (_rec_flag, pat_coerc_exprs, e2) ->
       (* We have the invariant that all identifiers are distinct, we explicitely
        * checked for that in the constraint generator. This is the first pass
        * that allows us to get a pointer to all generated atoms and patterns. *)

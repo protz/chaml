@@ -38,7 +38,7 @@ open CamlX
 
 let count_camlx_nodes e =
   let rec count_expr = function
-    | `Let (pe, e) ->
+    | `Let (_, pe, e) ->
         1 + count_expr e +
         (List.fold_left (fun acc (p, { f_type_term; _ }, e) ->
           acc + count_type f_type_term + count_pat p + count_expr e) 0 pe)

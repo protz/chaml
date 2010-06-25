@@ -29,7 +29,8 @@ open Algebra.Identifiers
 module Make (S: Algebra.SOLVER): sig
 
   type expression = [
-    | `Let of (pattern * S.pscheme * expression) list * expression 
+    | `Let of bool * (pattern * S.pscheme * expression) list * expression 
+        (** The boolean is true if this is recursive *)
     | `Instance of ident * S.instance
     | `App of expression * expression list
     | `Function of S.pscheme * (pattern * expression) list
@@ -64,7 +65,7 @@ type f_type_term = DeBruijn.type_term
 type f_instance = f_type_term list
 
 type f_expression = [
-  | `Let of (f_pattern * f_clblock * f_expression) list * f_expression 
+  | `Let of bool * (f_pattern * f_clblock * f_expression) list * f_expression 
   | `Instance of ident * f_instance
   | `App of f_expression * f_expression list
       (** Maybe we can simplify this later on (do we really want it?) *)
