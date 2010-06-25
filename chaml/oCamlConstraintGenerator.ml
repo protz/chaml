@@ -36,6 +36,7 @@ module Make(S: Algebra.SOLVER) = struct
     | VariableBoundSeveralTimes of string * Location.t
     | VariableMustOccurBothSides of string * Location.t
     | AlgebraError of Algebra.Core.error
+    | OnlyIdentInLetRec of Location.t
 
   exception Error of error
   let raise_error e = raise (Error e)
@@ -61,6 +62,10 @@ module Make(S: Algebra.SOLVER) = struct
         Printf.sprintf
           "%a: variable %s must occur on both sides of this pattern\n"
           print_loc loc v
+    | OnlyIdentInLetRec (loc) ->
+        Printf.sprintf
+          "%a: only variables are allowed as the left-hand side of `let rec'\n"
+          print_loc loc
     | AlgebraError e ->
         Algebra.Core.string_of_error e
 
@@ -372,6 +377,8 @@ module Make(S: Algebra.SOLVER) = struct
                 let { p_constraint; var_map; introduced_vars; pat } =
                   generate_constraint_pattern x pat
                 in
+                if IdentMap.cardinal var_map > 1 then
+                  raise_error (OnlyIdentInLetRec pexp_loc);
                 let p_constraint = `Exists (introduced_vars, p_constraint) in
                 push pattern_constraints p_constraint;
                 push common_introduced_vars introduced_vars;
@@ -394,8 +401,9 @@ module Make(S: Algebra.SOLVER) = struct
               let { e_constraint = c2; expr = e2 } =
                 generate_constraint_expression t e2
               in
+              let _, first_pscheme, _ = List.hd !exprs in
               let outer_scheme: type_scheme =
-                !main_type_vars, inner_constraint, !common_ident_map, None
+                !main_type_vars, inner_constraint, !common_ident_map, Some first_pscheme
               in
               let outer_constraint = 
                 `Let ([outer_scheme], c2)

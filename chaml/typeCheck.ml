@@ -84,6 +84,21 @@ let rec infer: env -> Core.expression -> DeBruijn.type_term =
         let t2 = infer env e2 in
         t2
 
+    | `LetRec (map, e2) ->
+        let env = AtomMap.fold
+          (fun k (t, _) acc ->
+            add k t acc)
+          map
+          env
+        in
+        AtomMap.iter
+          (fun k (t, e) ->
+            let t' = infer env e in
+            assert (t = t');
+          )
+          map;
+        infer env e2
+
     | `App (expr, exprs) ->
         let t0 = infer env expr in
         let ti = List.map (infer env) exprs in

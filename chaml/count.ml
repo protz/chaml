@@ -82,6 +82,8 @@ let count_camlx_nodes e =
 
 open Parsetree
 
+module AtomMap = Map.Make(Atom)
+
 let count_core_nodes e =
   let rec count_expr = function
     | `TyAbs e ->
@@ -95,6 +97,12 @@ let count_core_nodes e =
           (fun acc (p, e) -> acc + count_pat p + count_expr e) 0 pe
     | `Let (_, e1, e2) ->
         1 + count_expr e1 + count_expr e2
+    | `LetRec (map, e2) ->
+        let v =
+          AtomMap.fold (fun k (t, e) acc -> count_type t + count_expr e + acc)
+          map 0
+        in
+        1 + v + count_expr e2
     | `App (e, es) ->
         1 + count_expr e + (List.fold_left (fun acc e -> acc + count_expr e) 0 es)
 

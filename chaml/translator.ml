@@ -68,6 +68,13 @@ let translate =
     fun env uexpr ->
     match uexpr with
       | `Let (rec_flag, pat_expr_list, e2) ->
+          (* This is a convention: in the case of a recursive let, the scheme
+           * variables are shared across all the identifiers' types and they are
+           * stored in the first identifiers pscheme. *)
+          let rec_scheme_vars =
+            let _, pscheme, _ = List.hd pat_expr_list in
+            pscheme.p_young_vars
+          in
           let pat_expr_list =
             List.map
               (fun (upat, pscheme, uexpr) ->
@@ -75,9 +82,15 @@ let translate =
                 let fpat = translate_pat env upat in
                 (* Then we move to the rigt of let p1 = e1, this is where we
                  * introduce the new type variables *)
-                let new_env = List.fold_left lift_add env pscheme.p_young_vars in
+                let young_vars =
+                  if rec_flag then
+                    rec_scheme_vars
+                  else
+                    pscheme.p_young_vars
+                in
+                let new_env = List.fold_left lift_add env young_vars in
                 let f_type_term = type_term_of_uvar new_env pscheme.p_uvar in
-                let young_vars = List.length pscheme.p_young_vars in
+                let young_vars = List.length young_vars in
                 Error.debug "[TScheme] %d variables in this pattern\n" young_vars;
                 let clblock = {
                   young_vars;

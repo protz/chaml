@@ -46,6 +46,8 @@ let find: ident -> env -> Atom.t =
   fun ident { atom_of_ident } ->
     IdentMap.find ident atom_of_ident
 
+module AtomMap = Map.Make(Atom)
+
 let concat f l =
   List.fold_left f (List.hd l) (List.tl l)
 
@@ -58,7 +60,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
       e
   in
   match expr with
-  | `Let (_rec_flag, pat_coerc_exprs, e2) ->
+  | `Let (rec_flag, pat_coerc_exprs, e2) ->
       (* We have the invariant that all identifiers are distinct, we explicitely
        * checked for that in the constraint generator. This is the first pass
        * that allows us to get a pointer to all generated atoms and patterns. *)
@@ -69,33 +71,50 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
       (* We generate e2 with all identifiers in scope *)
       let new_env = introduce (List.flatten new_atoms) env in
       let e2 = desugar_expr new_env e2 in
-      (* And then we desugar all of the initial branches in the same previous
-       * scope *)
-      let gen_branch e2 (_, { young_vars; f_type_term = type_term }, e1) pat = 
-        let e1 = desugar_expr env e1 in
-        (* Beware, now we must generate proper F terms *)
-        (* So we generate proper Lambdas *)
-        let e1 = wrap_lambda young_vars e1 in
-        (* Generate the coercion *)
-        let new_pat =
-          generate_coerc new_env { pattern = pat; forall = young_vars; type_term }
+      if rec_flag then
+        let map = List.fold_left
+          (fun acc (pat, { young_vars; f_type_term; }, expr) ->
+            match pat with
+            | `Var ident ->
+                let a = find ident new_env in
+                let e = desugar_expr new_env expr in
+                let e = wrap_lambda young_vars e in
+                AtomMap.add a (f_type_term, e) acc
+            | _ ->
+                assert false
+          )
+          AtomMap.empty
+          pat_coerc_exprs
         in
-        (* The pattern has already been translated in a first pass. Now check if
-         * it's just an identifier (we can use a regular let-binding) or a
-         * pattern (then, we use a match) *)
-        match new_pat with
-        | `Var atom ->
-            Error.debug "[DLet] Found a regular let\n";
-            `Let (`Var atom, e1, e2)
-        | `Any ->
-            Error.debug "[DAny] Let's not use match for that one\n";
-            `Let (`Var (Atom.fresh (ident "_" Location.none)), e1, e2)
-        | _ ->
-            `Match (e1, [(new_pat, e2)])
-      in
-      (* Wrap everyone around e2 *)
-      let expr = List.fold_left2 gen_branch e2 pat_coerc_exprs new_patterns in
-      expr
+        `LetRec (map, e2)
+      else
+        (* And then we desugar all of the initial branches in the same previous
+         * scope *)
+        let gen_branch e2 (_, { young_vars; f_type_term = type_term }, e1) pat = 
+          let e1 = desugar_expr env e1 in
+          (* Beware, now we must generate proper F terms *)
+          (* So we generate proper Lambdas *)
+          let e1 = wrap_lambda young_vars e1 in
+          (* Generate the coercion *)
+          let new_pat =
+            generate_coerc new_env { pattern = pat; forall = young_vars; type_term }
+          in
+          (* The pattern has already been translated in a first pass. Now check if
+           * it's just an identifier (we can use a regular let-binding) or a
+           * pattern (then, we use a match) *)
+          match new_pat with
+          | `Var atom ->
+              Error.debug "[DLet] Found a regular let\n";
+              `Let (`Var atom, e1, e2)
+          | `Any ->
+              Error.debug "[DAny] Let's not use match for that one\n";
+              `Let (`Var (Atom.fresh (ident "_" Location.none)), e1, e2)
+          | _ ->
+              `Match (e1, [(new_pat, e2)])
+        in
+        (* Wrap everyone around e2 *)
+        let expr = List.fold_left2 gen_branch e2 pat_coerc_exprs new_patterns in
+        expr
 
   | `Instance (ident, type_terms) ->
       (* Remember, we have the invariant that the instance variables are in the
@@ -358,6 +377,9 @@ let rec doc_of_expr: Core.expression -> Pprint.document =
           (nest 2 (break1 ^^ e1)) ^^
         break1 ^^ indoc ^^ break1 ^^
         e2
+
+    | `LetRec _ ->
+        assert false
 
     | `Fun (`Var v, t, e2) ->
         let vdoc = string (Atom.string_of_atom v) in
