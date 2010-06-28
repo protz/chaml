@@ -1,9 +1,3 @@
-let fst (x, _) = x
+type 'a list = Nil | Cons of 'a * 'a list
 
-let rec1 =
-  let rec f x = (x, x)
-  and g (y, x) = fst (f y)
-  in
-  f
-
-let rec2 = rec1
+let l = Cons (1, Nil)

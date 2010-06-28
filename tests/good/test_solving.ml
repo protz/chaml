@@ -135,3 +135,4 @@ let test_const_patterns =
   let 2, x = f "toto" in
   x
 
+let rec2 = rec1
