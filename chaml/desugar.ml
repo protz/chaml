@@ -73,7 +73,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
       let e2 = desugar_expr new_env e2 in
       if rec_flag then
         let map = List.fold_left
-          (fun acc (pat, { young_vars; f_type_term; }, expr) ->
+          (fun acc (pat, { young_vars; f_type_term = instanciated_type; }, expr) ->
             match pat with
             | `Var ident ->
                 let a = find ident new_env in
@@ -86,16 +86,16 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
                     else
                       `Forall (wrap (i - 1) t)
                   in
-                  wrap young_vars f_type_term
+                  wrap young_vars instanciated_type
                 in
                 let new_pat = generate_coerc new_env
                   { pattern = `Var a; forall = young_vars; type_term = f_type_term}
                 in
                 begin match new_pat with
                 | `Coerce (`Var a, c) ->
-                    AtomMap.add a (f_type_term, `Coerce (e, c)) acc
+                    AtomMap.add a (instanciated_type, `Coerce (e, c)) acc
                 | `Var a ->
-                    AtomMap.add a (f_type_term, e) acc
+                    AtomMap.add a (instanciated_type, e) acc
                 | _ ->
                     assert false
                 end

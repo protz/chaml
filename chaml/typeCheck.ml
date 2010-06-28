@@ -85,18 +85,29 @@ let rec infer: env -> Core.expression -> DeBruijn.type_term =
         t2
 
     | `LetRec (map, e2) ->
-        let real_type t = function
-          | `Coerce (e, c) ->
-              apply_coerc t c
-          | _ ->
-              t
+        let env = AtomMap.fold
+          (fun k (t, _e) acc -> add k t acc) map env
         in
         let env = AtomMap.fold
-          (fun k (t, e) acc -> add k (real_type t e) acc) map env
+          (fun k (t, e) acc ->
+            let rec strip = function
+              | `Coerce (e, c) ->
+                  let c_type, n_type = strip e in
+                  c_type, apply_coerc n_type c
+              | `TyAbs e ->
+                  let c_type, n_type = strip e in
+                  c_type, `Forall n_type
+              | e ->
+                  let t = infer env e in
+                  t, t
+            in
+            let c_type, n_type = strip e in
+            if c_type <> t then
+              fail "Letrec";
+            add k n_type acc)
+          map
+          env
         in
-        AtomMap.iter
-          (fun _a (t, e) -> if (real_type t e) <> (infer env e) then fail "Letrec")
-          map;
         infer env e2
 
     | `App (expr, exprs) ->
@@ -239,4 +250,4 @@ and apply_coerc: DeBruijn.type_term -> Core.coercion -> DeBruijn.type_term =
 let check expr =
   let env = { type_of_atom = AtomMap.empty } in
   let typ = infer env expr in
-  ignore (typ);
+  Error.debug "[Driver] Final type is %s\n" (DeBruijn.string_of_type_term typ)
