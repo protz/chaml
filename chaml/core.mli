@@ -43,21 +43,21 @@ type coercion = [
       (** Distribute ∀ under, say, τ1 * τ2 *)
 ]
 
-type pattern = [
-    var
-  | `Tuple of pattern list
-  | `Or of pattern * pattern
-  | `Any
-
-  | `Coerce of pattern * coercion
-]
-
 type const = [
   | `Char of char
   | `Int of int
   | `Float of float
   | `String of string
   | `Unit
+]
+
+type pattern = [
+    var
+  | `Tuple of pattern list
+  | `Or of pattern * pattern
+  | `Any
+  | `Const of const
+  | `Coerce of pattern * coercion
 ]
 
 type expression = [

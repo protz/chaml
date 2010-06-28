@@ -175,6 +175,9 @@ let translate =
       | `Any as r ->
           r
 
+      | `Const c ->
+          `Const c
+
       | `Tuple patterns ->
           `Tuple (List.map (translate_pat env) patterns)
 
@@ -335,6 +338,9 @@ and doc_of_pat: f_pattern -> Pprint.document =
         let pdoc1 = doc_of_pat p1 in
         let pdoc2 = doc_of_pat p2 in
         pdoc1 ^^ space ^^ bar ^^ space ^^ pdoc2
+
+    | `Const c ->
+        doc_of_const c
 
     | `Var ident ->
         string (string_of_ident ident)

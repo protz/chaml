@@ -85,11 +85,19 @@ let rec infer: env -> Core.expression -> DeBruijn.type_term =
         t2
 
     | `LetRec (map, e2) ->
+        (* First we add into the environment all the identifiers *)
         let env = AtomMap.fold
           (fun k (t, _e) acc -> add k t acc) map env
         in
+        (* What this function does is: go through all Λ and ▸ to find the
+         * expression beneath, type-checks it, and returns the inferred type
+         * with the Λ and ▸ taken into account (that's for e2), and the type
+         * without them taken into account, that's for checking against the
+         * annotated type in the AST. *)
         let env = AtomMap.fold
           (fun k (t, e) acc ->
+            (* We do not enforce the fact that `Coerce comes first, then `TyAbs.
+             * We should! *)
             let rec strip = function
               | `Coerce (e, c) ->
                   let c_type, n_type = strip e in
@@ -155,6 +163,9 @@ and infer_pat: Core.pattern -> DeBruijn.type_term -> (Atom.t * DeBruijn.type_ter
         infer_pat pat t'
 
     | `Any ->
+        []
+
+    | `Const _ ->
         []
 
     | `Var atom ->

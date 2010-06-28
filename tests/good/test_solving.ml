@@ -116,3 +116,16 @@ let fsharp =
   let inc x = x + 1 in
   let square x = x * x in
   2 |> inc |> square |> inc |> square
+
+let rec1 =
+  let rec f x = (x, x)
+  and g (y, x) = fst (f y)
+  in
+  f
+
+let rec fib n =
+  match n with
+  | 0 -> 1
+  | 1 -> 1
+  | _ ->
+      fib (n-1) + fib (n-2)

@@ -66,6 +66,7 @@ let count_camlx_nodes e =
         1 + List.fold_left (fun acc p -> acc + count_pat p) 0 p
     | `Or (p1, p2) ->
         1 + count_pat p1 + count_pat p2
+    | `Const _
     | `Any ->
         1
 
@@ -99,7 +100,7 @@ let count_core_nodes e =
         1 + count_expr e1 + count_expr e2
     | `LetRec (map, e2) ->
         let v =
-          AtomMap.fold (fun k (t, e) acc -> count_type t + count_expr e + acc)
+          AtomMap.fold (fun _k (t, e) acc -> count_type t + count_expr e + acc)
           map 0
         in
         1 + v + count_expr e2
@@ -125,6 +126,7 @@ let count_core_nodes e =
         1 + List.fold_left (fun acc p -> acc + count_pat p) 0 p
     | `Or (p1, p2) ->
         1 + count_pat p1 + count_pat p2
+    | `Const _
     | `Any ->
         1
     | `Coerce (p, c) ->

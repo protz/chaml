@@ -244,6 +244,9 @@ and desugar_pat env ?rebind pat =
       Error.debug "[DOr] Orpat out\n";
       `Or (p1, p2), a1
 
+  | `Const c ->
+      `Const (desugar_const c), []
+
   | `Any ->
       `Any, []
 
@@ -334,6 +337,9 @@ and generate_coerc env cenv =
         let p1 = if c1 = `Id then p1 else `Coerce (p1, c1) in
         let p2 = if c2 = `Id then p2 else `Coerce (p2, c2) in
         `Or (p1, p2), `Id
+
+    | `Const x, _ ->
+        `Const x, `Id
 
     | `Any, _ ->
         `Any, `Id
@@ -505,6 +511,9 @@ and doc_of_pat: Core.pattern -> Pprint.document =
 
     | `Var atom ->
         string (Atom.string_of_atom atom)
+
+    | `Const c ->
+        doc_of_const c
 
     | `Coerce (pat, coerc) ->
         let pdoc = doc_of_pat pat in

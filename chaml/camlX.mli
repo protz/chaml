@@ -49,6 +49,7 @@ module Make (S: Algebra.SOLVER): sig
     | `Var of ident
     | `Tuple of pattern list
     | `Or of pattern * pattern
+    | `Const of const
     | `Any
   ]
   and const = [
@@ -85,6 +86,7 @@ and f_pattern = [
   | `Var of ident
   | `Tuple of f_pattern list
   | `Or of f_pattern * f_pattern
+  | `Const of f_const
   | `Any
 ]
 and f_const = [
