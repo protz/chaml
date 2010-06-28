@@ -165,7 +165,10 @@ and infer_pat: Core.pattern -> DeBruijn.type_term -> (Atom.t * DeBruijn.type_ter
     | `Any ->
         []
 
-    | `Const _ ->
+    | `Const c ->
+        let t' = infer_const c in
+        if t <> t' then
+          fail "Const";
         []
 
     | `Var atom ->
