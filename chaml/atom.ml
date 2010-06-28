@@ -27,6 +27,8 @@ let fresh identifier = {
   id = Oo.id (object end);
 }
 
+let phantom () = fresh (Algebra.Identifiers.ident "_phantom" Location.none)
+
 let ident { identifier; _ } = identifier
 
 let compare { id = id1; _ } { id = id2; _ } = compare id1 id2
