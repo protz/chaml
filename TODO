@@ -1,6 +1,0 @@
-Issues
-------
-
-- Equirecursive types are unfolded one level too deep. Figure out why the type
-  parser doesn't complain. This is triggered by --enable generalized-match
-- Found a bug with equirecursive types! Triggered by the same option.

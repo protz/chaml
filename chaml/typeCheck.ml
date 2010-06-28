@@ -96,12 +96,7 @@ let rec infer: env -> Core.expression -> DeBruijn.type_term =
          * annotated type in the AST. *)
         let env = AtomMap.fold
           (fun k (t, e) acc ->
-            (* We do not enforce the fact that `Coerce comes first, then `TyAbs.
-             * We should! *)
             let rec strip = function
-              | `Coerce (e, c) ->
-                  let c_type, n_type = strip e in
-                  c_type, apply_coerc n_type c
               | `TyAbs e ->
                   let c_type, n_type = strip e in
                   c_type, `Forall n_type
@@ -152,8 +147,8 @@ let rec infer: env -> Core.expression -> DeBruijn.type_term =
     | `Magic t ->
         t
 
-    | `Coerce (e, c) ->
-        apply_coerc (infer env e) c
+    (* | `Coerce (e, c) ->
+        apply_coerc (infer env e) c *)
 
 and infer_pat: Core.pattern -> DeBruijn.type_term -> (Atom.t * DeBruijn.type_term) list =
   fun pat t ->

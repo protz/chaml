@@ -72,8 +72,8 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
       let new_env = introduce (List.flatten new_atoms) env in
       let e2 = desugar_expr new_env e2 in
       if rec_flag then
-        let map = List.fold_left
-          (fun acc (pat, { young_vars; f_type_term = instanciated_type; }, expr) ->
+        let (map, wrap) = List.fold_left
+          (fun (acc, wrap) (pat, { young_vars; f_type_term = instanciated_type; }, expr) ->
             match pat with
             | `Var ident ->
                 let a = find ident new_env in
@@ -93,19 +93,21 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
                 in
                 begin match new_pat with
                 | `Coerce (`Var a, c) ->
-                    AtomMap.add a (instanciated_type, `Coerce (e, c)) acc
+                    AtomMap.add a (instanciated_type, e) acc,
+                    (fun e -> `Match (`Instance a, [`Coerce (`Var a, c), wrap e]))
                 | `Var a ->
-                    AtomMap.add a (instanciated_type, e) acc
+                    AtomMap.add a (instanciated_type, e) acc,
+                    wrap
                 | _ ->
                     assert false
                 end
             | _ ->
                 assert false
           )
-          AtomMap.empty
+          (AtomMap.empty, fun x -> x)
           pat_coerc_exprs
         in
-        let e = `LetRec (map, e2) in
+        let e = `LetRec (map, wrap e2) in
         e
       else
         (* And then we desugar all of the initial branches in the same previous

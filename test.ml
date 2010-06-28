@@ -1,4 +1,9 @@
-let test_const_patterns =
-  let f _ = 2, 3. in
-  let 2, x = f "toto" in
-  x
+let fst (x, _) = x
+
+let rec1 =
+  let rec f x = (x, x)
+  and g (y, x) = fst (f y)
+  in
+  f
+
+let rec2 = rec1
