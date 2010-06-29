@@ -162,7 +162,11 @@ module Make(S: Algebra.SOLVER) = struct
      * to a specific identifier.
      *
      * *)
-    let rec generate_constraint_pattern: S.var type_var -> pattern -> constraint_pattern =
+    let rec generate_constraint_pattern:
+          S.var type_var ->
+          pattern ->
+          constraint_pattern
+        =
       fun x { ppat_desc; ppat_loc } ->
       match ppat_desc with
         | Ppat_any ->
@@ -276,7 +280,11 @@ module Make(S: Algebra.SOLVER) = struct
      * default value for ?blah arguments.
      *
      * *)
-    and generate_constraint_expression: S.var type_var -> expression -> constraint_expression =
+    and generate_constraint_expression:
+          S.var type_var ->
+          expression ->
+          constraint_expression
+        =
       fun t { pexp_desc; pexp_loc } ->
       match pexp_desc with
       | Pexp_done ->

@@ -60,6 +60,23 @@ module Make (S: Algebra.SOLVER): sig
     | `Unit
   ]
 
+  type user_type_var = string
+  type user_type_term = user_type_var Algebra.Core.type_term
+  type user_type_kind = [ `Variant | `Record ]
+  type user_label = string
+  type user_type = {
+    user_type_vars: user_type_var list;
+    user_type_kind: user_type_kind;
+    user_type_fields: (user_label * user_type) list;
+  }
+
+  type structure_item = [
+    | `Let of bool * (pattern * S.pscheme * expression) list
+    | `Type of user_type
+  ]
+
+  type structure = structure_item list
+
 end
 
 type f_type_term = DeBruijn.type_term
@@ -102,3 +119,20 @@ and f_clblock = {
   young_vars: int;
   f_type_term: f_type_term;
 }
+
+type f_user_type_var = string
+type f_user_type_term = f_user_type_var Algebra.Core.type_term
+type f_user_type_kind = [ `Variant | `Record ]
+type f_user_label = string
+type f_user_type = {
+  user_type_vars: f_user_type_var list;
+  user_type_kind: f_user_type_kind;
+  user_type_fields: (f_user_label * f_user_type) list;
+}
+
+type f_structure_item = [
+  | `Let of bool * (f_pattern * f_clblock * f_expression) list
+  | `Type of f_user_type
+]
+
+type f_structure = f_structure_item list
