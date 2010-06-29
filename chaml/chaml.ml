@@ -187,13 +187,13 @@ let _ =
     let camlx_ast = Translator.translate hterm in
     if !arg_print_typed_ast then begin
       flush stdout; flush stderr;
-      print_string (Translator.string_of_expr camlx_ast);
+      print_string (Translator.string_of_struct camlx_ast);
     end;
     (* Translate to the core language *)
     let core_ast = Desugar.desugar camlx_ast in
     if !arg_print_core_ast then begin
       flush stdout; flush stderr;
-      print_string (Desugar.string_of_expr core_ast);
+      print_string (Desugar.string_of_struct core_ast);
     end;
     (* The final type-checking part *)
     TypeCheck.check core_ast;

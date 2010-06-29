@@ -43,6 +43,6 @@ module Make: functor (S: Algebra.SOLVER) -> sig
   val generate_constraint:
     generalize_match:bool ->
     default_bindings:bool -> Parsetree.structure ->
-    [ `Ok of Constraint.Make(S).type_constraint * CamlX.Make(S).expression | `Error of error ]
+    [ `Ok of Constraint.Make(S).type_constraint * CamlX.Make(S).structure | `Error of error ]
 
 end

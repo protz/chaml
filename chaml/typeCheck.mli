@@ -20,4 +20,5 @@
 (** This is the final step of the translation process. It type-checks the
     {!Core} expression. *)
 
-val check: Core.expression -> unit
+(* val check: Core.signature -> Core.structure -> unit *)
+val check: Core.structure -> unit

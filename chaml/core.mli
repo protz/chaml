@@ -60,6 +60,8 @@ type pattern = [
   | `Coerce of pattern * coercion
 ]
 
+module AtomMap: module type of Jmap.Make(Atom)
+
 type expression = [
   | `TyAbs of expression
   | `TyApp of expression * type_term
@@ -68,7 +70,7 @@ type expression = [
   | `Fun of var * type_term * expression
   | `Match of expression * (pattern * expression) list
   | `Let of var * expression * expression 
-  | `LetRec of (type_term * expression) Jmap.Make(Atom).t * expression
+  | `LetRec of (type_term * expression) AtomMap.t * expression
   | `App of expression * expression list
 
   | `Tuple of expression list
@@ -87,7 +89,7 @@ type user_type = {
 }
 
 type structure = [
-  | `Let of pattern * expression
-  | `LetRec of (var * expression) list
+  | `Let of pattern * (type_term AtomMap.t) * expression
+  | `LetRec of (var * type_term * expression) list
   | `Type of user_type
 ] list

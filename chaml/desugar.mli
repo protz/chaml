@@ -21,5 +21,5 @@
     and desugars all the constructs into a core System F {!Core.expression}.
     Types are left untouched but coercions are generated as needed. *)
 
-val desugar: CamlX.f_expression -> Core.expression
-val string_of_expr: Core.expression -> string
+val desugar: CamlX.f_structure -> Core.structure
+val string_of_struct: Core.structure -> string
