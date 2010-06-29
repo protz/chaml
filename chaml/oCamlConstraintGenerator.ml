@@ -110,6 +110,12 @@ module Make(S: Algebra.SOLVER) = struct
     pat_expr: camlx_pattern * S.pscheme * camlx_expression;
   }
 
+  type let_info = {
+    constr_scheme: type_scheme list;
+    camlx_pat_expr: (camlx_pattern * S.pscheme * camlx_expression) list;
+    rec_flag: bool;
+  }
+
   (* These are just convenient helpers *)
   let fresh_type_var ?letter () =
     let prefix = Option.map (String.make 1) letter in
@@ -364,78 +370,19 @@ module Make(S: Algebra.SOLVER) = struct
       | Pexp_let (rec_flag, pat_expr_list, e2) ->
           (* Once again, the list of pattern/expressions is here because of
            * let ... and ... in e2 (multiple simultaneous definitions *)
-          begin match rec_flag with
-          | Asttypes.Nonrecursive ->
-              let { e_constraint = c2; expr = expr_e2 } =
-                generate_constraint_expression t e2
-              in
-              let run (acc, map) pat_expr =
-                let { scheme; pat_expr; } =
-                  generate_constraint_scheme pat_expr
-                in
-                let _, _, new_map, _ = scheme in
-                dont_bind_several_times pexp_loc map new_map;
-                let union = IdentMap.union map new_map in
-                (scheme, pat_expr) :: acc, union
-              in
-              let constraints, pat_expr =
-                List.split (fst (List.fold_left run ([], IdentMap.empty) pat_expr_list)) in
-              {
-                e_constraint = `Let (constraints, c2);
-                expr =  `Let (false, pat_expr, expr_e2);
-              }
-          | Asttypes.Recursive ->
-              let main_type_vars = ref [] in
-              let pattern_constraints = ref [] in
-              let common_introduced_vars = ref [] in
-              let expression_constraints = ref [] in
-              let common_ident_map = ref IdentMap.empty in
-              let exprs = ref [] in
-              let push l e = l := e :: !l in
-              let gen (pat, expr) = 
-                let x = fresh_type_var ~letter:'r' () in
-                push main_type_vars x;
-                let { p_constraint; var_map; introduced_vars; pat } =
-                  generate_constraint_pattern x pat
-                in
-                if IdentMap.cardinal var_map > 1 then
-                  raise_error (OnlyIdentInLetRec pexp_loc);
-                let p_constraint = `Exists (introduced_vars, p_constraint) in
-                push pattern_constraints p_constraint;
-                push common_introduced_vars introduced_vars;
-                dont_bind_several_times pexp_loc !common_ident_map var_map;
-                common_ident_map := IdentMap.union !common_ident_map var_map;
-                let { e_constraint; expr } =
-                  generate_constraint_expression x expr
-                in
-                push expression_constraints e_constraint;
-                let pscheme = new_pscheme x in
-                push exprs (pat, pscheme, expr);
-              in
-              List.iter gen pat_expr_list;
-              let inner_scheme: type_scheme =
-                [], constr_conj !pattern_constraints, !common_ident_map, None
-              in
-              let inner_constraint =
-                `Let ([inner_scheme], constr_conj !expression_constraints)
-              in
-              let { e_constraint = c2; expr = e2 } =
-                generate_constraint_expression t e2
-              in
-              let _, first_pscheme, _ = List.hd !exprs in
-              let outer_scheme: type_scheme =
-                !main_type_vars, inner_constraint, !common_ident_map, Some first_pscheme
-              in
-              let outer_constraint = 
-                `Let ([outer_scheme], c2)
-              in
-              {
-                e_constraint = outer_constraint;
-                expr = `Let (true, !exprs, e2);
-              }
-          | Asttypes.Default ->
-              raise_error (NotImplemented ("rec flag = default", pexp_loc))
-          end
+          generate_constraint_let
+            rec_flag
+            pat_expr_list
+            pexp_loc
+            begin
+              fun { constr_scheme; camlx_pat_expr; rec_flag; } ->
+                let { e_constraint = c2; expr = expr_e2;  } =
+                  generate_constraint_expression t e2
+                in {
+                  e_constraint = `Let (constr_scheme, c2);
+                  expr =  `Let (rec_flag, camlx_pat_expr, expr_e2);
+                }
+            end
 
       | Pexp_match (e1, pat_expr_list) ->
           if opt_generalize_match then
@@ -555,6 +502,80 @@ module Make(S: Algebra.SOLVER) = struct
       | _ ->
           raise_error (NotImplemented ("some expression", pexp_loc))
 
+    and generate_constraint_let: 'a.
+          Asttypes.rec_flag ->
+          (pattern * expression) list ->
+          Location.t ->
+          (let_info -> 'a) ->
+          'a
+        =
+      fun rec_flag pat_expr_list pexp_loc k ->
+      match rec_flag with
+      | Asttypes.Nonrecursive ->
+          let run (acc, map) pat_expr =
+            let { scheme; pat_expr; } =
+              generate_constraint_scheme pat_expr
+            in
+            let _, _, new_map, _ = scheme in
+            dont_bind_several_times pexp_loc map new_map;
+            let union = IdentMap.union map new_map in
+            (scheme, pat_expr) :: acc, union
+          in
+          let constraints, pat_expr =
+            List.split (fst (List.fold_left run ([], IdentMap.empty) pat_expr_list))
+          in
+          k {
+            constr_scheme = constraints;
+            camlx_pat_expr = pat_expr;
+            rec_flag = false;
+          }
+      | Asttypes.Recursive ->
+          let main_type_vars = ref [] in
+          let pattern_constraints = ref [] in
+          let common_introduced_vars = ref [] in
+          let expression_constraints = ref [] in
+          let common_ident_map = ref IdentMap.empty in
+          let exprs = ref [] in
+          let push l e = l := e :: !l in
+          let gen (pat, expr) = 
+            let x = fresh_type_var ~letter:'r' () in
+            push main_type_vars x;
+            let { p_constraint; var_map; introduced_vars; pat } =
+              generate_constraint_pattern x pat
+            in
+            if IdentMap.cardinal var_map > 1 then
+              raise_error (OnlyIdentInLetRec pexp_loc);
+            let p_constraint = `Exists (introduced_vars, p_constraint) in
+            push pattern_constraints p_constraint;
+            push common_introduced_vars introduced_vars;
+            dont_bind_several_times pexp_loc !common_ident_map var_map;
+            common_ident_map := IdentMap.union !common_ident_map var_map;
+            let { e_constraint; expr } =
+              generate_constraint_expression x expr
+            in
+            push expression_constraints e_constraint;
+            let pscheme = new_pscheme x in
+            push exprs (pat, pscheme, expr);
+          in
+          List.iter gen pat_expr_list;
+          let inner_scheme: type_scheme =
+            [], constr_conj !pattern_constraints, !common_ident_map, None
+          in
+          let inner_constraint =
+            `Let ([inner_scheme], constr_conj !expression_constraints)
+          in
+          let _, first_pscheme, _ = List.hd !exprs in
+          let outer_scheme: type_scheme =
+            !main_type_vars, inner_constraint, !common_ident_map, Some first_pscheme
+          in
+          k {
+            constr_scheme = [outer_scheme];
+            camlx_pat_expr = !exprs;
+            rec_flag = true;
+          }
+      | Asttypes.Default ->
+          raise_error (NotImplemented ("rec flag = default", pexp_loc))
+
     (* Parsetree.structure
      *
      * structure_items are only for top-level definitions inside modules
@@ -572,24 +593,40 @@ module Make(S: Algebra.SOLVER) = struct
      * `Let type.
      *
      * *)
-    and generate_constraint_structure: structure -> constraint_expression =
+    and generate_constraint_structure:
+          structure ->
+          type_constraint * camlx_expression =
       fun structure ->
-        let fold_structure_item { pstr_desc; pstr_loc } old_expression =
-          match pstr_desc with
-          | Pstr_value (rec_flag, pat_expr_list) ->
-              {
-                pexp_desc = Pexp_let (rec_flag, pat_expr_list, old_expression);
-                pexp_loc = pstr_loc;
-              }
-          | Pstr_eval expr ->
-              let fake_pattern = { ppat_desc = Ppat_any; ppat_loc = Location.none } in
-              {
-                pexp_desc =
-                  Pexp_let (Asttypes.Nonrecursive, [fake_pattern, expr], old_expression);
-                pexp_loc = pstr_loc;
-              }
-          | _ ->
-              raise_error (NotImplemented ("some structure item", pstr_loc))
+        let fold_structure_item:
+              structure_item ->
+              type_constraint * camlx_expression ->
+              type_constraint * camlx_expression =
+          fun { pstr_desc; pstr_loc } (c2, e2) ->
+            match pstr_desc with
+            | Pstr_value (rec_flag, pat_expr_list) ->
+                generate_constraint_let
+                  rec_flag
+                  pat_expr_list
+                  pstr_loc
+                  begin
+                    fun { constr_scheme; camlx_pat_expr; rec_flag; } ->
+                      `Let (constr_scheme, c2),
+                      `Let (rec_flag, camlx_pat_expr, e2);
+                  end
+
+            | Pstr_eval expr ->
+                generate_constraint_let
+                  Asttypes.Nonrecursive
+                  [{ ppat_desc = Ppat_any; ppat_loc = Location.none }, expr]
+                  pstr_loc
+                  begin
+                    fun { constr_scheme; camlx_pat_expr; rec_flag; } ->
+                      `Let (constr_scheme, c2),
+                      `Let (rec_flag, camlx_pat_expr, e2)
+                  end
+
+            | _ ->
+                raise_error (NotImplemented ("some structure item", pstr_loc))
         in
         let default_bindings, default_let_bindings =
           let plus_scheme =
@@ -633,22 +670,15 @@ module Make(S: Algebra.SOLVER) = struct
           in
           List.split [plus_scheme; minus_scheme; mult_scheme]
         in
-        let topmost_expression =
-          let finish = {
-              pexp_desc = Pexp_done;
-              pexp_loc = Location.none
-            }
-          in
-          List.fold_right fold_structure_item structure finish
+        let topmost_constraint, topmost_expression =
+          List.fold_right fold_structure_item structure (`Done, `Const `Unit)
         in
-        let t = fresh_type_var () in
-        let constraint_expression = generate_constraint_expression t topmost_expression in
-        let { e_constraint = topmost_constraint; expr = topmost_expression } = constraint_expression in
         if opt_default_bindings then
-          { e_constraint = `Let (default_bindings, topmost_constraint);
-            expr = `Let (false, default_let_bindings, topmost_expression) }
+          `Let (default_bindings, topmost_constraint),
+          `Let (false, default_let_bindings, topmost_expression)
         else
-          constraint_expression
+          topmost_constraint,
+          topmost_expression
 
     (* This is only used by Pexp_let case. Still, it's a nice standalone block. *)
     and generate_constraint_scheme: pattern * expression -> constraint_scheme =
@@ -671,7 +701,7 @@ module Make(S: Algebra.SOLVER) = struct
     (** The "driver" for OCaml constraint generation. Takes care of catching all
         errors and returning an understandable error message. *)
     try
-      let { e_constraint; expr } = generate_constraint_structure structure in
+      let e_constraint, expr = generate_constraint_structure structure in
       `Ok (e_constraint, expr)
     with
       | Error e -> `Error e

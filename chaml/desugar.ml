@@ -488,11 +488,11 @@ let rec doc_of_expr: Core.expression -> Pprint.document =
     | `Magic t ->
         (string "%magic: ") ^^ (string (DeBruijn.string_of_type_term t))
 
-    | `Coerce (expr, coerc) ->
+    (* | `Coerce (expr, coerc) ->
         let edoc = doc_of_expr expr in
         let cdoc = doc_of_coerc coerc in
         let triangle = pcolor colors.green ~l:1 "▸" in
-        edoc ^^ space ^^ triangle ^^ space ^^ cdoc
+        edoc ^^ space ^^ triangle ^^ space ^^ cdoc *)
 
 and doc_of_pat: Core.pattern -> Pprint.document =
   let open Pprint in
