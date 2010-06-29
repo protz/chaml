@@ -502,6 +502,8 @@ module Make(S: Algebra.SOLVER) = struct
       | _ ->
           raise_error (NotImplemented ("some expression", pexp_loc))
 
+    (* This is used both by Pexp_let and Pstr_eval/Pstr_let. Glad we have
+     * polymorphic recursion! *)
     and generate_constraint_let: 'a.
           Asttypes.rec_flag ->
           (pattern * expression) list ->
@@ -595,12 +597,14 @@ module Make(S: Algebra.SOLVER) = struct
      * *)
     and generate_constraint_structure:
           structure ->
-          type_constraint * camlx_expression =
+          type_constraint * camlx_expression
+        =
       fun structure ->
         let fold_structure_item:
               structure_item ->
               type_constraint * camlx_expression ->
-              type_constraint * camlx_expression =
+              type_constraint * camlx_expression
+            =
           fun { pstr_desc; pstr_loc } (c2, e2) ->
             match pstr_desc with
             | Pstr_value (rec_flag, pat_expr_list) ->
