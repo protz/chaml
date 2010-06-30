@@ -72,7 +72,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
       let new_env = introduce (List.flatten new_atoms) env in
       let e2 = desugar_expr new_env e2 in
       if rec_flag then
-        let (map, wrap) = List.fold_left
+        let (var_type_exprs, wrap) = List.fold_left
           (fun (acc, wrap) (pat, { young_vars; f_type_term = instanciated_type; }, expr) ->
             match pat with
             | `Var ident ->
@@ -93,10 +93,10 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
                 in
                 begin match new_pat with
                 | `Coerce (`Var a, c) ->
-                    AtomMap.add a (instanciated_type, e) acc,
+                    (`Var a, instanciated_type, e) :: acc,
                     (fun e -> `Match (`Instance a, [`Coerce (`Var a, c), wrap e]))
                 | `Var a ->
-                    AtomMap.add a (instanciated_type, e) acc,
+                    (`Var a, instanciated_type, e) :: acc,
                     wrap
                 | _ ->
                     assert false
@@ -104,10 +104,10 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
             | _ ->
                 assert false
           )
-          (AtomMap.empty, fun x -> x)
+          ([], fun x -> x)
           pat_coerc_exprs
         in
-        let e = `LetRec (map, wrap e2) in
+        let e = `LetRec (var_type_exprs, wrap e2) in
         e
       else
         (* And then we desugar all of the initial branches in the same previous
@@ -360,6 +360,11 @@ and desugar_const const =
   | `Char _ | `Int _ | `String _ as x ->
       x
 
+(* and desugar_struct str =
+  match str with
+  | `Let (pat, tmap, expr) -> *)
+
+
 let desugar expr =
   let env = { atom_of_ident = IdentMap.empty } in
   desugar_expr env expr
@@ -409,15 +414,14 @@ let rec doc_of_expr: Core.expression -> Pprint.document =
     | `LetRec (map, e2) ->
         let letdoc = pcolor colors.yellow "let rec" in
         let anddoc = pcolor colors.yellow "and" in
-        let branches = AtomMap.to_list map in
         let branches = List.map
-          (fun (v, (t, e)) ->
+          (fun (`Var v, t, e) ->
             let vdoc = string (Atom.string_of_atom v) in
             let tdoc = string (DeBruijn.string_of_type_term t) in
             let edoc = doc_of_expr e in
             vdoc ^^ colon ^^ space ^^ tdoc ^^ space ^^ equals ^^ space ^^
             (nest 2 (break1 ^^ edoc)))
-          branches
+          map
         in
         let branches = concat
           (fun x y -> x ^^ break1 ^^ anddoc ^^ space ^^ y)

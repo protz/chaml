@@ -69,7 +69,7 @@ type expression = [
   | `Fun of var * type_term * expression
   | `Match of expression * (pattern * expression) list
   | `Let of var * expression * expression 
-  | `LetRec of (type_term * expression) AtomMap.t * expression
+  | `LetRec of (var * type_term * expression) list * expression
   | `App of expression * expression list
 
   | `Tuple of expression list

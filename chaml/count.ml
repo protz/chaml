@@ -108,8 +108,8 @@ let count_core_nodes e =
         1 + count_expr e1 + count_expr e2
     | `LetRec (map, e2) ->
         let v =
-          AtomMap.fold (fun _k (t, e) acc -> count_type t + count_expr e + acc)
-          map 0
+          List.fold_left (fun acc (_k, t, e) -> count_type t + count_expr e + acc)
+          0 map
         in
         1 + v + count_expr e2
     | `App (e, es) ->
