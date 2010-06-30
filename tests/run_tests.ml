@@ -142,7 +142,7 @@ let _ =
   let test1 () =
     print_endline (Bash.box "Constraint Solving - standard tests");
     let o = Ocamlbuild_plugin.run_and_read
-      "./chaml.native --enable caml-types --im-feeling-lucky --disable generalize-match tests/good/test_solving.ml"
+      "./chaml.native --enable caml-types --disable generalize-match tests/good/test_solving.ml"
     in
     (* Disable all warnings. It's a test, so there WILL be useless things such as
      * redundant patterns. *)
@@ -150,7 +150,7 @@ let _ =
       "ocamlc -i -w a tests/good/test_solving.ml"
     in
     let o'' = Ocamlbuild_plugin.run_and_read
-      "./chaml.native --enable caml-types --im-feeling-lucky tests/good/test_solving.ml"
+      "./chaml.native --enable caml-types tests/good/test_solving.ml"
     in
     compare [o; o'; o''];
   in

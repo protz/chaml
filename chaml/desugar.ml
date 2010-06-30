@@ -91,6 +91,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
           let e1 = wrap_lambda young_vars e1 in
           (* Generate the coercion *)
           let new_pat =
+            (* XXX FIXME why new_env here? *)
             generate_coerc new_env { pattern = pat; forall = young_vars; type_term }
           in
           (* The pattern has already been translated in a first pass. Now check if
@@ -374,19 +375,35 @@ and desugar_const const =
 
 and desugar_struct (env, acc) str =
   match str with
-  | `Let (true, pat_coerc_exprs) ->
-      let _, new_atoms =
+  | `Let (rec_flag, pat_coerc_exprs) ->
+      let new_patterns, new_atoms =
         List.split
           (List.map (fun (pat, _, _) -> desugar_pat env pat) pat_coerc_exprs)
       in
       let new_env = introduce (List.flatten new_atoms) env in
-      new_env,
-      desugar_letrec
-        new_env
-        pat_coerc_exprs
-        (fun var_type_exprs -> `LetRec var_type_exprs) :: acc
-  | `Let (false, _pat_expr_list) ->
-      failwith "TODO: top-level regular let in desugar"
+      if rec_flag then
+          new_env,
+          desugar_letrec
+            new_env
+            pat_coerc_exprs
+            (fun var_type_exprs -> `LetRec var_type_exprs) :: acc
+      else
+          (* And then we desugar all of the initial branches in the same previous
+           * scope *)
+          let gen_branch (_, { young_vars; f_type_term = type_term }, e1) pat = 
+            let e1 = desugar_expr env e1 in
+            (* Beware, now we must generate proper F terms *)
+            (* So we generate proper Lambdas *)
+            let e1 = wrap_lambda young_vars e1 in
+            (* Generate the coercion *)
+            let new_pat =
+              generate_coerc new_env { pattern = pat; forall = young_vars; type_term }
+            in
+            `Let (new_pat, e1)
+          in
+          new_env,
+          List.map2 gen_branch pat_coerc_exprs new_patterns @ acc
+
   | `Type _ ->
       failwith "TODO: top-level type decl in desugar"
 

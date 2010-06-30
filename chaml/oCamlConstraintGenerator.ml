@@ -684,7 +684,6 @@ module Make(S: Algebra.SOLVER) = struct
         let topmost_constraint, structure_items =
           List.fold_right fold_structure_item structure (`Done, [])
         in
-        let structure_items = List.rev structure_items in
         if opt_default_bindings then
           `Let (default_bindings, topmost_constraint),
           `Let (false, default_let_bindings) :: structure_items
