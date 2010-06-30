@@ -118,7 +118,6 @@ module TypeCons = struct
     Hashtbl.add tbl "char" { cons_name = "char"; cons_arity = 0 };
     Hashtbl.add tbl "string" { cons_name = "string"; cons_arity = 0 };
     Hashtbl.add tbl "float" { cons_name = "float"; cons_arity = 0 };
-    Hashtbl.add tbl "unit" { cons_name = "unit"; cons_arity = 0 };
     Hashtbl.add tbl "_bottom" { cons_name = "⟂"; cons_arity = 0 };
     tbl
 
@@ -155,7 +154,6 @@ module TypeCons = struct
   let type_cons_char = type_cons "char" []
   let type_cons_string = type_cons "string" []
   let type_cons_float = type_cons "float" []
-  let type_cons_unit = type_cons "unit" []
   let type_cons_bottom = type_cons "_bottom" []
   
   let head_symbol_arrow = Hashtbl.find global_constructor_table "->"

@@ -22,6 +22,7 @@
 type t
 
 val fresh: Algebra.Identifiers.ident -> t
+val phantom: unit -> t
 val ident: t -> Algebra.Identifiers.ident
 
 val compare: t -> t -> int

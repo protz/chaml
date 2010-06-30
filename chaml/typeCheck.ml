@@ -17,7 +17,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module AtomMap = Map.Make(Atom)
+module AtomMap = Jmap.Make(Atom)
 
 type env = {
   type_of_atom: DeBruijn.type_term AtomMap.t;
@@ -84,6 +84,35 @@ let rec infer: env -> Core.expression -> DeBruijn.type_term =
         let t2 = infer env e2 in
         t2
 
+    | `LetRec (map, e2) ->
+        (* First we add into the environment all the identifiers *)
+        let env = AtomMap.fold
+          (fun k (t, _e) acc -> add k t acc) map env
+        in
+        (* What this function does is: go through all Λ and ▸ to find the
+         * expression beneath, type-checks it, and returns the inferred type
+         * with the Λ and ▸ taken into account (that's for e2), and the type
+         * without them taken into account, that's for checking against the
+         * annotated type in the AST. *)
+        let env = AtomMap.fold
+          (fun k (t, e) acc ->
+            let rec strip = function
+              | `TyAbs e ->
+                  let c_type, n_type = strip e in
+                  c_type, `Forall n_type
+              | e ->
+                  let t = infer env e in
+                  t, t
+            in
+            let c_type, n_type = strip e in
+            if c_type <> t then
+              fail "Letrec";
+            add k n_type acc)
+          map
+          env
+        in
+        infer env e2
+
     | `App (expr, exprs) ->
         let t0 = infer env expr in
         let ti = List.map (infer env) exprs in
@@ -118,6 +147,9 @@ let rec infer: env -> Core.expression -> DeBruijn.type_term =
     | `Magic t ->
         t
 
+    (* | `Coerce (e, c) ->
+        apply_coerc (infer env e) c *)
+
 and infer_pat: Core.pattern -> DeBruijn.type_term -> (Atom.t * DeBruijn.type_term) list =
   fun pat t ->
     match pat with
@@ -126,6 +158,12 @@ and infer_pat: Core.pattern -> DeBruijn.type_term -> (Atom.t * DeBruijn.type_ter
         infer_pat pat t'
 
     | `Any ->
+        []
+
+    | `Const c ->
+        let t' = infer_const c in
+        if t <> t' then
+          fail "Const";
         []
 
     | `Var atom ->
@@ -221,4 +259,4 @@ and apply_coerc: DeBruijn.type_term -> Core.coercion -> DeBruijn.type_term =
 let check expr =
   let env = { type_of_atom = AtomMap.empty } in
   let typ = infer env expr in
-  assert (typ = Algebra.TypeCons.type_cons_unit)
+  Error.debug "[Driver] Final type is %s\n" (DeBruijn.string_of_type_term typ)

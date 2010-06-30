@@ -36,6 +36,7 @@ module Make(S: Algebra.SOLVER) = struct
     | VariableBoundSeveralTimes of string * Location.t
     | VariableMustOccurBothSides of string * Location.t
     | AlgebraError of Algebra.Core.error
+    | OnlyIdentInLetRec of Location.t
 
   exception Error of error
   let raise_error e = raise (Error e)
@@ -61,6 +62,10 @@ module Make(S: Algebra.SOLVER) = struct
         Printf.sprintf
           "%a: variable %s must occur on both sides of this pattern\n"
           print_loc loc v
+    | OnlyIdentInLetRec (loc) ->
+        Printf.sprintf
+          "%a: only variables are allowed as the left-hand side of `let rec'\n"
+          print_loc loc
     | AlgebraError e ->
         Algebra.Core.string_of_error e
 
@@ -83,6 +88,8 @@ module Make(S: Algebra.SOLVER) = struct
   (* Convenience shortcuts *)
   type camlx_pattern = CamlX.Make(S).pattern
   type camlx_expression = CamlX.Make(S).expression
+  type camlx_structure = CamlX.Make(S).structure
+  type camlx_const = CamlX.Make(S).const
 
   (* Instead of returning 4-uples each time, the main functions
    * generate_constraint_pattern, generate_constraint_expression... return
@@ -102,6 +109,12 @@ module Make(S: Algebra.SOLVER) = struct
   type constraint_scheme = {
     scheme: type_scheme;
     pat_expr: camlx_pattern * S.pscheme * camlx_expression;
+  }
+
+  type let_info = {
+    constr_scheme: type_scheme list;
+    camlx_pat_expr: (camlx_pattern * S.pscheme * camlx_expression) list;
+    rec_flag: bool;
   }
 
   (* These are just convenient helpers *)
@@ -150,7 +163,11 @@ module Make(S: Algebra.SOLVER) = struct
      * to a specific identifier.
      *
      * *)
-    let rec generate_constraint_pattern: S.var type_var -> pattern -> constraint_pattern =
+    let rec generate_constraint_pattern:
+          S.var type_var ->
+          pattern ->
+          constraint_pattern
+        =
       fun x { ppat_desc; ppat_loc } ->
       match ppat_desc with
         | Ppat_any ->
@@ -171,61 +188,90 @@ module Make(S: Algebra.SOLVER) = struct
               pat = `Var var;
             }
         | Ppat_tuple patterns ->
-          let xis = List.map (fun _ -> fresh_type_var ()) patterns in
-          let patterns = List.map2
-            (fun pattern xi ->
-              let { p_constraint = konstraint; var_map; introduced_vars; pat; } =
-                generate_constraint_pattern xi pattern
-              in
-              konstraint, var_map, xi :: introduced_vars, pat)
-            patterns
-            xis
-          in
-          let pattern_constraint = constr_conj (List.map (fun (x, _, _, _) -> x) patterns) in
-          let pattern_map = List.fold_left
-            (fun known_map sub_map ->
-              dont_bind_several_times ppat_loc known_map sub_map;
-              IdentMap.union known_map sub_map
-            )
-            IdentMap.empty
-            (List.map (fun (_, x, _, _) -> x) patterns)
-          in
-          let pattern_vars = List.flatten (List.map (fun (_, _, x, _) -> x) patterns) in
-          let pat = `Tuple (List.map (fun (_, _, _, x) -> x) patterns) in
-          let konstraint = `Equals (x, type_cons_tuple (tvl_ttl xis)) in
-          let p_constraint = `Conj (konstraint, pattern_constraint) in
-          {
-            p_constraint;
-            var_map = pattern_map;
-            introduced_vars = pattern_vars;
-            pat;
-          }
+            let xis = List.map (fun _ -> fresh_type_var ()) patterns in
+            let patterns = List.map2
+              (fun pattern xi ->
+                let { p_constraint = konstraint; var_map; introduced_vars; pat; } =
+                  generate_constraint_pattern xi pattern
+                in
+                konstraint, var_map, xi :: introduced_vars, pat)
+              patterns
+              xis
+            in
+            let pattern_constraint = constr_conj (List.map (fun (x, _, _, _) -> x) patterns) in
+            let pattern_map = List.fold_left
+              (fun known_map sub_map ->
+                dont_bind_several_times ppat_loc known_map sub_map;
+                IdentMap.union known_map sub_map
+              )
+              IdentMap.empty
+              (List.map (fun (_, x, _, _) -> x) patterns)
+            in
+            let pattern_vars = List.flatten (List.map (fun (_, _, x, _) -> x) patterns) in
+            let pat = `Tuple (List.map (fun (_, _, _, x) -> x) patterns) in
+            let konstraint = `Equals (x, type_cons_tuple (tvl_ttl xis)) in
+            let p_constraint = `Conj (konstraint, pattern_constraint) in
+            {
+              p_constraint;
+              var_map = pattern_map;
+              introduced_vars = pattern_vars;
+              pat;
+            }
         | Ppat_or (pat1, pat2) ->
-          (* match e1 with p1 | p2 -> *)
-          let { p_constraint = c1; var_map = map1; introduced_vars = vars1; pat = lp1 } =
-            generate_constraint_pattern x pat1
-          in
-          let { p_constraint = c2; var_map = map2; introduced_vars = vars2; pat = lp2 } =
-            generate_constraint_pattern x pat2
-          in
-          bind_both_sides ppat_loc map1 map2;
-          (* If identifier i is bound to type variable x1 on the left and x2
-           * on the right, this just generates the constraint "x1 = x2" *)
-          let constraints =
-            IdentMap.fold
-              (fun k (v, _) acc ->
-                 `Equals (fst (IdentMap.find k map2), tv_tt v) :: acc)
-              map1
-              []
-          in
-          {
-            p_constraint = constr_conj (c1 :: c2 :: constraints);
-            var_map = map1;
-            introduced_vars = vars1 @ vars2;
-            pat = `Or (lp1, lp2);
-          }
+            (* match e1 with p1 | p2 -> *)
+            let { p_constraint = c1; var_map = map1; introduced_vars = vars1; pat = lp1 } =
+              generate_constraint_pattern x pat1
+            in
+            let { p_constraint = c2; var_map = map2; introduced_vars = vars2; pat = lp2 } =
+              generate_constraint_pattern x pat2
+            in
+            bind_both_sides ppat_loc map1 map2;
+            (* If identifier i is bound to type variable x1 on the left and x2
+             * on the right, this just generates the constraint "x1 = x2" *)
+            let constraints =
+              IdentMap.fold
+                (fun k (v, _) acc ->
+                   `Equals (fst (IdentMap.find k map2), tv_tt v) :: acc)
+                map1
+                []
+            in
+            {
+              p_constraint = constr_conj (c1 :: c2 :: constraints);
+              var_map = map1;
+              introduced_vars = vars1 @ vars2;
+              pat = `Or (lp1, lp2);
+            }
+        | Ppat_constant const ->
+            let konstraint, constant =
+              generate_constraint_constant ppat_loc x const
+            in
+            {
+              p_constraint = konstraint;
+              var_map = IdentMap.empty;
+              introduced_vars = [];
+              pat = `Const constant
+            }
         | _ ->
             raise_error (NotImplemented ("some pattern", ppat_loc))
+
+    and generate_constraint_constant:
+          Location.t ->
+          S.var type_var ->
+          Asttypes.constant ->
+          type_constraint * camlx_const
+        =
+      let open Asttypes in
+      fun pexp_loc t -> function
+        | Const_int x ->
+            `Equals (t, type_cons_int), `Int x
+        | Const_char x ->
+            `Equals (t, type_cons_char), `Char x
+        | Const_string x ->
+            `Equals (t, type_cons_string), `String x
+        | Const_float x ->
+            `Equals (t, type_cons_float), `Float x
+        | _ ->
+            raise_error (NotImplemented ("int32 or int64 or intnative", pexp_loc))
 
     (* Parsetree.expression
      *
@@ -235,11 +281,13 @@ module Make(S: Algebra.SOLVER) = struct
      * default value for ?blah arguments.
      *
      * *)
-    and generate_constraint_expression: S.var type_var -> expression -> constraint_expression =
+    and generate_constraint_expression:
+          S.var type_var ->
+          expression ->
+          constraint_expression
+        =
       fun t { pexp_desc; pexp_loc } ->
       match pexp_desc with
-      | Pexp_done ->
-          { e_constraint = `Done; expr = `Const `Unit }
       | Pexp_ident (Longident.Lident x) ->
           let solver_instance = S.new_instance () in
           let ident = ident x pexp_loc in
@@ -247,17 +295,8 @@ module Make(S: Algebra.SOLVER) = struct
           let expr = `Instance (ident, solver_instance) in
           { e_constraint; expr; }
       | Pexp_constant c ->
-          let open Asttypes in
-          let e_constraint, expr = match c with
-            | Const_int x ->
-                `Equals (t, type_cons_int), `Int x
-            | Const_char x ->
-                `Equals (t, type_cons_char), `Char x
-            | Const_string x ->
-                `Equals (t, type_cons_string), `String x
-            | Const_float x ->
-                `Equals (t, type_cons_float), `Float x
-            | _ -> raise_error (NotImplemented ("int32 or int64 or intnative", pexp_loc))
+          let e_constraint, expr =
+            generate_constraint_constant pexp_loc t c
           in
           { e_constraint; expr = `Const expr; }
       | Pexp_function (_, _, pat_expr_list) ->
@@ -338,26 +377,20 @@ module Make(S: Algebra.SOLVER) = struct
       | Pexp_let (rec_flag, pat_expr_list, e2) ->
           (* Once again, the list of pattern/expressions is here because of
            * let ... and ... in e2 (multiple simultaneous definitions *)
-          if rec_flag <> Asttypes.Nonrecursive then
-            raise_error (NotImplemented ("rec flag", pexp_loc));
-          let { e_constraint = c2; expr = expr_e2 } =
-            generate_constraint_expression t e2
-          in
-          let run (acc, map) pat_expr =
-            let { scheme; pat_expr; } =
-              generate_constraint_scheme pat_expr
-            in
-            let _, _, new_map, _ = scheme in
-            dont_bind_several_times pexp_loc map new_map;
-            let union = IdentMap.union map new_map in
-            (scheme, pat_expr) :: acc, union
-          in
-          let constraints, pat_expr =
-            List.split (fst (List.fold_left run ([], IdentMap.empty) pat_expr_list)) in
-          {
-            e_constraint = `Let (constraints, c2);
-            expr =  `Let (pat_expr, expr_e2);
-          }
+          generate_constraint_let
+            rec_flag
+            pat_expr_list
+            pexp_loc
+            begin
+              fun { constr_scheme; camlx_pat_expr; rec_flag; } ->
+                let { e_constraint = c2; expr = expr_e2;  } =
+                  generate_constraint_expression t e2
+                in {
+                  e_constraint = `Let (constr_scheme, c2);
+                  expr =  `Let (rec_flag, camlx_pat_expr, expr_e2);
+                }
+            end
+
       | Pexp_match (e1, pat_expr_list) ->
           if opt_generalize_match then
             (* We generalize here. See the draft version of ATTAPL p.98 for the
@@ -476,6 +509,82 @@ module Make(S: Algebra.SOLVER) = struct
       | _ ->
           raise_error (NotImplemented ("some expression", pexp_loc))
 
+    (* This is used both by Pexp_let and Pstr_eval/Pstr_let. Glad we have
+     * polymorphic recursion! *)
+    and generate_constraint_let: 'a.
+          Asttypes.rec_flag ->
+          (pattern * expression) list ->
+          Location.t ->
+          (let_info -> 'a) ->
+          'a
+        =
+      fun rec_flag pat_expr_list pexp_loc k ->
+      match rec_flag with
+      | Asttypes.Nonrecursive ->
+          let run (acc, map) pat_expr =
+            let { scheme; pat_expr; } =
+              generate_constraint_scheme pat_expr
+            in
+            let _, _, new_map, _ = scheme in
+            dont_bind_several_times pexp_loc map new_map;
+            let union = IdentMap.union map new_map in
+            (scheme, pat_expr) :: acc, union
+          in
+          let constraints, pat_expr =
+            List.split (fst (List.fold_left run ([], IdentMap.empty) pat_expr_list))
+          in
+          k {
+            constr_scheme = constraints;
+            camlx_pat_expr = pat_expr;
+            rec_flag = false;
+          }
+      | Asttypes.Recursive ->
+          let main_type_vars = ref [] in
+          let pattern_constraints = ref [] in
+          let common_introduced_vars = ref [] in
+          let expression_constraints = ref [] in
+          let common_ident_map = ref IdentMap.empty in
+          let exprs = ref [] in
+          let push l e = l := e :: !l in
+          let gen (pat, expr) = 
+            let x = fresh_type_var ~letter:'r' () in
+            push main_type_vars x;
+            let { p_constraint; var_map; introduced_vars; pat } =
+              generate_constraint_pattern x pat
+            in
+            if IdentMap.cardinal var_map > 1 then
+              raise_error (OnlyIdentInLetRec pexp_loc);
+            let p_constraint = `Exists (introduced_vars, p_constraint) in
+            push pattern_constraints p_constraint;
+            push common_introduced_vars introduced_vars;
+            dont_bind_several_times pexp_loc !common_ident_map var_map;
+            common_ident_map := IdentMap.union !common_ident_map var_map;
+            let { e_constraint; expr } =
+              generate_constraint_expression x expr
+            in
+            push expression_constraints e_constraint;
+            let pscheme = new_pscheme x in
+            push exprs (pat, pscheme, expr);
+          in
+          List.iter gen pat_expr_list;
+          let inner_scheme: type_scheme =
+            [], constr_conj !pattern_constraints, !common_ident_map, None
+          in
+          let inner_constraint =
+            `Let ([inner_scheme], constr_conj !expression_constraints)
+          in
+          let _, first_pscheme, _ = List.hd !exprs in
+          let outer_scheme: type_scheme =
+            !main_type_vars, inner_constraint, !common_ident_map, Some first_pscheme
+          in
+          k {
+            constr_scheme = [outer_scheme];
+            camlx_pat_expr = !exprs;
+            rec_flag = true;
+          }
+      | Asttypes.Default ->
+          raise_error (NotImplemented ("rec flag = default", pexp_loc))
+
     (* Parsetree.structure
      *
      * structure_items are only for top-level definitions inside modules
@@ -493,24 +602,42 @@ module Make(S: Algebra.SOLVER) = struct
      * `Let type.
      *
      * *)
-    and generate_constraint_structure: structure -> constraint_expression =
+    and generate_constraint_structure:
+          structure ->
+          type_constraint * camlx_structure
+        =
       fun structure ->
-        let fold_structure_item { pstr_desc; pstr_loc } old_expression =
-          match pstr_desc with
-          | Pstr_value (rec_flag, pat_expr_list) ->
-              {
-                pexp_desc = Pexp_let (rec_flag, pat_expr_list, old_expression);
-                pexp_loc = pstr_loc;
-              }
-          | Pstr_eval expr ->
-              let fake_pattern = { ppat_desc = Ppat_any; ppat_loc = Location.none } in
-              {
-                pexp_desc =
-                  Pexp_let (Asttypes.Nonrecursive, [fake_pattern, expr], old_expression);
-                pexp_loc = pstr_loc;
-              }
-          | _ ->
-              raise_error (NotImplemented ("some structure item", pstr_loc))
+        let fold_structure_item:
+              structure_item ->
+              type_constraint * camlx_expression ->
+              type_constraint * camlx_expression
+            =
+          fun { pstr_desc; pstr_loc } (c2, str) ->
+            match pstr_desc with
+            | Pstr_value (rec_flag, pat_expr_list) ->
+                generate_constraint_let
+                  rec_flag
+                  pat_expr_list
+                  pstr_loc
+                  begin
+                    fun { constr_scheme; camlx_pat_expr; rec_flag; } ->
+                      `Let (constr_scheme, c2),
+                      `Let (rec_flag, camlx_pat_expr) :: str
+                  end
+
+            | Pstr_eval expr ->
+                generate_constraint_let
+                  Asttypes.Nonrecursive
+                  [{ ppat_desc = Ppat_any; ppat_loc = Location.none }, expr]
+                  pstr_loc
+                  begin
+                    fun { constr_scheme; camlx_pat_expr; rec_flag; } ->
+                      `Let (constr_scheme, c2),
+                      `Let (rec_flag, camlx_pat_expr) :: str
+                  end
+
+            | _ ->
+                raise_error (NotImplemented ("some structure item", pstr_loc))
         in
         let default_bindings, default_let_bindings =
           let plus_scheme =
@@ -554,22 +681,16 @@ module Make(S: Algebra.SOLVER) = struct
           in
           List.split [plus_scheme; minus_scheme; mult_scheme]
         in
-        let topmost_expression =
-          let finish = {
-              pexp_desc = Pexp_done;
-              pexp_loc = Location.none
-            }
-          in
-          List.fold_right fold_structure_item structure finish
+        let topmost_constraint, structure_items =
+          List.fold_right fold_structure_item structure (`Done, [])
         in
-        let t = fresh_type_var () in
-        let constraint_expression = generate_constraint_expression t topmost_expression in
-        let { e_constraint = topmost_constraint; expr = topmost_expression } = constraint_expression in
+        let structure_items = List.rev structure_items in
         if opt_default_bindings then
-          { e_constraint = `Let (default_bindings, topmost_constraint);
-            expr = `Let (default_let_bindings, topmost_expression) }
+          `Let (default_bindings, topmost_constraint),
+          `Let (false, default_let_bindings) :: structure_items
         else
-          constraint_expression
+          topmost_constraint,
+          structure_items
 
     (* This is only used by Pexp_let case. Still, it's a nice standalone block. *)
     and generate_constraint_scheme: pattern * expression -> constraint_scheme =
@@ -592,8 +713,8 @@ module Make(S: Algebra.SOLVER) = struct
     (** The "driver" for OCaml constraint generation. Takes care of catching all
         errors and returning an understandable error message. *)
     try
-      let { e_constraint; expr } = generate_constraint_structure structure in
-      `Ok (e_constraint, expr)
+      let e_constraint, str = generate_constraint_structure structure in
+      `Ok (e_constraint, str)
     with
       | Error e -> `Error e
       | Algebra.Core.Error e -> `Error (AlgebraError e)

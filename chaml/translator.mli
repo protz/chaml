@@ -25,5 +25,5 @@
 open Unify
 open Algebra.Identifiers
 
-val translate: CamlX.Make(Unify.BaseSolver).expression -> CamlX.f_expression
-val string_of_expr: CamlX.f_expression -> string
+val translate: CamlX.Make(Unify.BaseSolver).structure -> CamlX.f_structure
+val string_of_struct: CamlX.f_structure -> string

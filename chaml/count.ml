@@ -38,7 +38,7 @@ open CamlX
 
 let count_camlx_nodes e =
   let rec count_expr = function
-    | `Let (pe, e) ->
+    | `Let (_, pe, e) ->
         1 + count_expr e +
         (List.fold_left (fun acc (p, { f_type_term; _ }, e) ->
           acc + count_type f_type_term + count_pat p + count_expr e) 0 pe)
@@ -66,6 +66,7 @@ let count_camlx_nodes e =
         1 + List.fold_left (fun acc p -> acc + count_pat p) 0 p
     | `Or (p1, p2) ->
         1 + count_pat p1 + count_pat p2
+    | `Const _
     | `Any ->
         1
 
@@ -77,10 +78,20 @@ let count_camlx_nodes e =
     | `Forall t ->
         1 + count_type t
 
+  and count_struct = function
+    | `Let (_, pe) ->
+        1 + List.fold_left
+          (fun acc (p, { f_type_term; _ }, e) ->
+            acc + count_type f_type_term + count_pat p + count_expr e)
+          0 pe
+    | _ ->
+        failwith "TODO: count top-level type declarations"
   in
-  count_expr e
+  List.fold_left (fun acc x -> acc + count_struct x) 0 e
 
 open Parsetree
+
+module AtomMap = Jmap.Make(Atom)
 
 let count_core_nodes e =
   let rec count_expr = function
@@ -95,6 +106,12 @@ let count_core_nodes e =
           (fun acc (p, e) -> acc + count_pat p + count_expr e) 0 pe
     | `Let (_, e1, e2) ->
         1 + count_expr e1 + count_expr e2
+    | `LetRec (map, e2) ->
+        let v =
+          List.fold_left (fun acc (_k, t, e) -> count_type t + count_expr e + acc)
+          0 map
+        in
+        1 + v + count_expr e2
     | `App (e, es) ->
         1 + count_expr e + (List.fold_left (fun acc e -> acc + count_expr e) 0 es)
 
@@ -107,6 +124,9 @@ let count_core_nodes e =
     | `Magic _ ->
         1
 
+    | `Coerce (e, c) ->
+        1 + count_expr e + count_coerc c
+
   and count_pat = function
     | `Var _ ->
         1
@@ -114,6 +134,7 @@ let count_core_nodes e =
         1 + List.fold_left (fun acc p -> acc + count_pat p) 0 p
     | `Or (p1, p2) ->
         1 + count_pat p1 + count_pat p2
+    | `Const _
     | `Any ->
         1
     | `Coerce (p, c) ->
@@ -139,8 +160,17 @@ let count_core_nodes e =
     | `CovarTuple (_, c) ->
         1 + count_coerc c
 
+  and count_struct = function
+    | `Let (pat, expr) ->
+        count_pat pat + count_expr expr + 1
+    | `LetRec l ->
+       1 + List.fold_left
+        (fun acc (_v, t, e) -> count_type t + count_expr e + acc) 0 l
+    | _ ->
+        failwith "TODO: count top-level type declarations"
   in
-  count_expr e
+
+  List.fold_left (fun acc x -> acc + count_struct x) 0 e
 
 let count_ocaml_nodes str =
   let rec count_pat { ppat_desc; _ } =

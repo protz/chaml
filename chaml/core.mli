@@ -43,22 +43,23 @@ type coercion = [
       (** Distribute ∀ under, say, τ1 * τ2 *)
 ]
 
-type pattern = [
-    var
-  | `Tuple of pattern list
-  | `Or of pattern * pattern
-  | `Any
-
-  | `Coerce of pattern * coercion
-]
-
 type const = [
   | `Char of char
   | `Int of int
   | `Float of float
   | `String of string
-  | `Unit
 ]
+
+type pattern = [
+    var
+  | `Tuple of pattern list
+  | `Or of pattern * pattern
+  | `Any
+  | `Const of const
+  | `Coerce of pattern * coercion
+]
+
+module AtomMap: module type of Jmap.Make(Atom)
 
 type expression = [
   | `TyAbs of expression
@@ -68,11 +69,26 @@ type expression = [
   | `Fun of var * type_term * expression
   | `Match of expression * (pattern * expression) list
   | `Let of var * expression * expression 
+  | `LetRec of ([ var | `Coerce of var * coercion] * type_term * expression) list * expression
   | `App of expression * expression list
 
   | `Tuple of expression list
-  | `Instance of Atom.t
+  | `Instance of var
   | `Const of const
 
   | `Magic of type_term
 ]
+
+type type_kind = [ `Variant | `Record ]
+type type_label = string
+type user_type = {
+  type_vars: DeBruijn.t list;
+  type_kind: type_kind;
+  type_fields: (type_label * type_term) list;
+}
+
+type structure = [
+  | `Let of pattern * expression
+  | `LetRec of ([ var | `Coerce of var * coercion] * type_term * expression) list
+  | `Type of user_type
+] list

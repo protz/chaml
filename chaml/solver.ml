@@ -292,6 +292,12 @@ let solve =
               pscheme.p_young_vars <- young_vars
         end;
 
+        (* Here we used to unify variables that were unreachable with bottom, so
+         * that they're directly removed from the type scheme. We skip this,
+         * because the coercion generator later on will already compute all
+         * reachable type variables for a given identifier and will instanciate
+         * all unused quantifiers with bottom. It's less efficient, though. *)
+
         (* The schemes have already been allocated when generating a CamlX term,
          * However, the [var_map] is a mapping from identifiers to [(uvar,
          * scheme)] where uvar represents the pre-allocated variable and scheme

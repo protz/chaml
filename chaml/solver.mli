@@ -21,7 +21,16 @@
     the unifier heavily. *)
 
 (** This can be forwarded to other modules that depend on a solver. This is
-    actually borrowed from [Unify]. *)
+    actually borrowed from [Unify]. 
+
+    WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
+
+    This module equality is used all over the code, especially in *functor
+    applications.* For instance, we use the fact that
+    CamlX.Make(Unify.BaseSolver) == CamlX.Make(Solver.BaseSolver)
+    from chaml.ml. This only works if CamlX is not generative, that is, does not
+    contain exceptions, record types, and possibly other things.
+*)
 module BaseSolver: module type of Unify.BaseSolver
 
 (** Describes a unification or solving error.  *)
