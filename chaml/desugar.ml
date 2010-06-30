@@ -357,7 +357,7 @@ and desugar_const const =
   | `Float f ->
       let f = float_of_string f in
       `Float f
-  | `Char _ | `Int _ | `String _ | `Unit as x ->
+  | `Char _ | `Int _ | `String _ as x ->
       x
 
 let desugar expr =
@@ -534,8 +534,6 @@ and doc_of_const: Core.const -> Pprint.document =
         string (string_of_float f)
     | `String s ->
         dquote ^^ (string s) ^^ dquote
-    | `Unit ->
-        string "()"
 
 and doc_of_coerc: Core.coercion -> Pprint.document =
   let open Pprint in
@@ -567,8 +565,46 @@ and doc_of_coerc: Core.coercion -> Pprint.document =
     | `DistribTuple ->
         fancystring "∀×" 2
 
-let string_of_expr expr =
+and doc_of_struct: Core.structure -> Pprint.document =
+  let open Pprint in
+  let open Bash in
+  let rec doc_of_str =
+    function
+      | `Let (pat, _, e1) ->
+        let letdoc = pcolor colors.yellow "let" in
+        let pdoc = doc_of_pat pat in
+        let e1 = doc_of_expr e1 in
+        letdoc ^^ space ^^ pdoc ^^ space ^^ equals ^^ 
+          (nest 2 (break1 ^^ e1)) ^^
+        break1
+
+    | `LetRec l ->
+        let letdoc = pcolor colors.yellow "let rec" in
+        let anddoc = pcolor colors.yellow "and" in
+        let branches = List.map
+          (fun (`Var v, t, e) ->
+            let vdoc = string (Atom.string_of_atom v) in
+            let tdoc = string (DeBruijn.string_of_type_term t) in
+            let edoc = doc_of_expr e in
+            vdoc ^^ colon ^^ space ^^ tdoc ^^ space ^^ equals ^^ space ^^
+            (nest 2 (break1 ^^ edoc)))
+          l
+        in
+        let branches = concat
+          (fun x y -> x ^^ break1 ^^ anddoc ^^ space ^^ y)
+          branches
+        in
+        letdoc ^^ space ^^ branches ^^ 
+        break1
+    | `Type _ ->
+        failwith "TODO: pretty-printing type decls in Core"
+  in
+  fun str ->
+    let l = List.map doc_of_str str in
+    concat (fun x y -> x ^^ break1 ^^ break1 ^^ y) l
+
+let string_of_struct str =
   let buf = Buffer.create 16 in
-  let doc = Pprint.(^^) (doc_of_expr expr) Pprint.hardline in
+  let doc = Pprint.(^^) (doc_of_struct str) Pprint.hardline in
   Pprint.Buffer.pretty 1.0 Bash.twidth buf doc;
   Buffer.contents buf

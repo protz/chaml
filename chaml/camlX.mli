@@ -57,7 +57,6 @@ module Make (S: Algebra.SOLVER): sig
     | `Int of int
     | `Float of string
     | `String of string
-    | `Unit
   ]
 
   type user_type_var = string
@@ -112,8 +111,6 @@ and f_const = [
   | `Float of string
       (** This will have to be converted too *)
   | `String of string
-  | `Unit
-      (** This will eventually be removed when we have data types *)
 ]
 and f_clblock = {
   young_vars: int;

@@ -605,7 +605,7 @@ module Make(S: Algebra.SOLVER) = struct
      * *)
     and generate_constraint_structure:
           structure ->
-          type_constraint * camlx_expression
+          type_constraint * camlx_structure
         =
       fun structure ->
         let fold_structure_item:
@@ -613,7 +613,7 @@ module Make(S: Algebra.SOLVER) = struct
               type_constraint * camlx_expression ->
               type_constraint * camlx_expression
             =
-          fun { pstr_desc; pstr_loc } (c2, e2) ->
+          fun { pstr_desc; pstr_loc } (c2, str) ->
             match pstr_desc with
             | Pstr_value (rec_flag, pat_expr_list) ->
                 generate_constraint_let
@@ -623,7 +623,7 @@ module Make(S: Algebra.SOLVER) = struct
                   begin
                     fun { constr_scheme; camlx_pat_expr; rec_flag; } ->
                       `Let (constr_scheme, c2),
-                      `Let (rec_flag, camlx_pat_expr, e2);
+                      `Let (rec_flag, camlx_pat_expr) :: str
                   end
 
             | Pstr_eval expr ->
@@ -634,7 +634,7 @@ module Make(S: Algebra.SOLVER) = struct
                   begin
                     fun { constr_scheme; camlx_pat_expr; rec_flag; } ->
                       `Let (constr_scheme, c2),
-                      `Let (rec_flag, camlx_pat_expr, e2)
+                      `Let (rec_flag, camlx_pat_expr) :: str
                   end
 
             | _ ->
@@ -682,15 +682,16 @@ module Make(S: Algebra.SOLVER) = struct
           in
           List.split [plus_scheme; minus_scheme; mult_scheme]
         in
-        let topmost_constraint, topmost_expression =
-          List.fold_right fold_structure_item structure (`Done, `Const `Unit)
+        let topmost_constraint, structure_items =
+          List.fold_right fold_structure_item structure (`Done, [])
         in
+        let structure_items = List.rev structure_items in
         if opt_default_bindings then
           `Let (default_bindings, topmost_constraint),
-          `Let (false, default_let_bindings, topmost_expression)
+          `Let (false, default_let_bindings) :: structure_items
         else
           topmost_constraint,
-          topmost_expression
+          structure_items
 
     (* This is only used by Pexp_let case. Still, it's a nice standalone block. *)
     and generate_constraint_scheme: pattern * expression -> constraint_scheme =
@@ -713,8 +714,8 @@ module Make(S: Algebra.SOLVER) = struct
     (** The "driver" for OCaml constraint generation. Takes care of catching all
         errors and returning an understandable error message. *)
     try
-      let e_constraint, expr = generate_constraint_structure structure in
-      `Ok (e_constraint, expr)
+      let e_constraint, str = generate_constraint_structure structure in
+      `Ok (e_constraint, str)
     with
       | Error e -> `Error e
       | Algebra.Core.Error e -> `Error (AlgebraError e)

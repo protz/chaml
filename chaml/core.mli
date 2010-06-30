@@ -48,7 +48,6 @@ type const = [
   | `Int of int
   | `Float of float
   | `String of string
-  | `Unit
 ]
 
 type pattern = [

@@ -78,8 +78,16 @@ let count_camlx_nodes e =
     | `Forall t ->
         1 + count_type t
 
+  and count_struct = function
+    | `Let (_, pe) ->
+        1 + List.fold_left
+          (fun acc (p, { f_type_term; _ }, e) ->
+            acc + count_type f_type_term + count_pat p + count_expr e)
+          0 pe
+    | _ ->
+        failwith "TODO: count top-level type declarations"
   in
-  count_expr e
+  List.fold_left (fun acc x -> acc + count_struct x) 0 e
 
 open Parsetree
 
@@ -152,8 +160,18 @@ let count_core_nodes e =
     | `CovarTuple (_, c) ->
         1 + count_coerc c
 
+  and count_struct = function
+    | `Let (pat, map, expr) ->
+        count_pat pat + count_expr expr + 1 +
+        (AtomMap.fold (fun _k t acc -> count_type t + acc) map 0)
+    | `LetRec l ->
+       1 + List.fold_left
+        (fun acc (_v, t, e) -> count_type t + count_expr e + acc) 0 l
+    | _ ->
+        failwith "TODO: count top-level type declarations"
   in
-  count_expr e
+
+  List.fold_left (fun acc x -> acc + count_struct x) 0 e
 
 let count_ocaml_nodes str =
   let rec count_pat { ppat_desc; _ } =

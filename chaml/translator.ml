@@ -20,6 +20,8 @@
 open Algebra.Identifiers
 open Unify
 open CamlX
+module CamlX_ = CamlX.Make(BaseSolver)
+open CamlX_
 
 (* Various helpers to work with environments *)
 
@@ -64,50 +66,14 @@ let type_term_of_uvar env uvar =
 exception Magic
 
 let translate =
-  let rec translate_expr: env -> CamlX.Make(BaseSolver).expression -> f_expression = 
+  let rec translate_expr: env -> expression -> f_expression = 
     fun env uexpr ->
     match uexpr with
       | `Let (rec_flag, pat_expr_list, e2) ->
-          (* This is a convention: in the case of a recursive let, the scheme
-           * variables are shared across all the identifiers' types and they are
-           * stored in the first identifiers pscheme. *)
-          let rec_scheme_vars =
-            let _, pscheme, _ = List.hd pat_expr_list in
-            pscheme.p_young_vars
-          in
-          let pat_expr_list =
-            List.map
-              (fun (upat, pscheme, uexpr) ->
-                (* The patterns are translated in the current environment *)
-                let fpat = translate_pat env upat in
-                (* Then we move to the rigt of let p1 = e1, this is where we
-                 * introduce the new type variables *)
-                let young_vars =
-                  if rec_flag then
-                    rec_scheme_vars
-                  else
-                    pscheme.p_young_vars
-                in
-                let new_env = List.fold_left lift_add env young_vars in
-                let f_type_term = type_term_of_uvar new_env pscheme.p_uvar in
-                let young_vars = List.length young_vars in
-                Error.debug "[TScheme] %d variables in this pattern\n" young_vars;
-                let clblock = {
-                  young_vars;
-                  f_type_term;
-                } in
-                let fexpr =
-                  try
-                    translate_expr new_env uexpr
-                  with Magic ->
-                    `Magic f_type_term
-                in
-                (fpat, clblock, fexpr)
-              )
-              pat_expr_list
-          in
-          let fexpr = translate_expr env e2 in
-          `Let (rec_flag, pat_expr_list, fexpr)
+          translate_let_pat_expr_list rec_flag pat_expr_list
+            (fun pat_expr_list ->
+              let fexpr = translate_expr env e2 in
+              `Let (rec_flag, pat_expr_list, fexpr))
 
       | `Function (pscheme, pat_expr_list) ->
            let pat_expr_list = List.map
@@ -167,9 +133,55 @@ let translate =
       | `Magic ->
           raise Magic
 
+  and translate_let_pat_expr_list: 'a.
+        bool ->
+        (pattern * BaseSolver.pscheme * expression) ->
+        ((f_pattern * f_clblock * f_expression) -> 'a) ->
+        'a
+     = fun rec_flag pat_expr_list k ->
+    (* This is a convention: in the case of a recursive let, the scheme
+     * variables are shared across all the identifiers' types and they are
+     * stored in the first identifiers pscheme. *)
+    let rec_scheme_vars =
+      let _, pscheme, _ = List.hd pat_expr_list in
+      pscheme.p_young_vars
+    in
+    let pat_expr_list =
+      List.map
+        (fun (upat, pscheme, uexpr) ->
+          (* The patterns are translated in the current environment *)
+          let fpat = translate_pat env upat in
+          (* Then we move to the rigt of let p1 = e1, this is where we
+           * introduce the new type variables *)
+          let young_vars =
+            if rec_flag then
+              rec_scheme_vars
+            else
+              pscheme.p_young_vars
+          in
+          let new_env = List.fold_left lift_add env young_vars in
+          let f_type_term = type_term_of_uvar new_env pscheme.p_uvar in
+          let young_vars = List.length young_vars in
+          Error.debug "[TScheme] %d variables in this pattern\n" young_vars;
+          let clblock = {
+            young_vars;
+            f_type_term;
+          } in
+          let fexpr =
+            try
+              translate_expr new_env uexpr
+            with Magic ->
+              `Magic f_type_term
+          in
+          (fpat, clblock, fexpr)
+        )
+        pat_expr_list
+    in
+    k pat_expr_list
+
   (* [translate_pat] just generates patterns as needed. It doesn't try to
    * assign schemes to variables if those are on the left-hand side of a pattern. *)
-  and translate_pat: env -> CamlX.Make(BaseSolver).pattern -> f_pattern =
+  and translate_pat: env -> pattern -> f_pattern =
     fun env upat ->
     match upat with
       | `Any as r ->
@@ -187,9 +199,19 @@ let translate =
       | `Var ident ->
           `Var ident
 
+  and translate_struct: env -> structure_item -> f_structure_item =
+    fun env ustr ->
+      match ustr with
+      | `Let (rec_flag, pat_expr_list) ->
+          translate_pat_expr_list rec_flag pat_expr_list
+            (fun pat_expr_list ->
+              `Let (rec_flag, pat_expr_list))
+      | `Type _ ->
+          failwith "TODO: implement type decls in translator.ml"
+
   in
 
-  translate_expr { fvar_of_uvar = IntMap.empty }
+  List.map (fun x -> translate_struct { fvar_of_uvar = IntMap.empty } x)
 
 (* Just generate as many uppercase lambdas as needed *)
 let make lambda n = 
@@ -356,8 +378,6 @@ and doc_of_const: f_const -> Pprint.document =
         string f
     | `String s ->
         dquote ^^ (string s) ^^ dquote
-    | `Unit ->
-        string "()"
 
 let string_of_expr expr =
   let buf = Buffer.create 16 in
