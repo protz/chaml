@@ -94,7 +94,8 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
                 begin match new_pat with
                 | `Coerce (`Var a, c) ->
                     (`Var a, instanciated_type, e) :: acc,
-                    (fun e -> `Match (`Instance a, [`Coerce (`Var a, c), wrap e]))
+                    (fun e ->
+                      `Match (`Instance (`Var a), [`Coerce (`Var a, c), wrap e]))
                 | `Var a ->
                     (`Var a, instanciated_type, e) :: acc,
                     wrap
@@ -144,7 +145,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
       let app expr type_term =
         `TyApp (expr, type_term)
       in
-      let instance = `Instance (find ident env) in
+      let instance = `Instance (`Var (find ident env)) in
       List.fold_left app instance type_terms
 
   | `App (expr, exprs) ->
@@ -178,7 +179,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
             (* Take an instance of the introduced variable. Because we're in ML,
              * there's no universal quantification on the type of x so there's no type
              * variables to instanciate, so no `TyApp. *)
-            let instance = `Instance atom in
+            let instance = `Instance var in
             (* Translate the expressions and the patterns *)
             let gen (pat, expr) =
               let pat, atoms = desugar_pat env pat in
@@ -441,7 +442,7 @@ let rec doc_of_expr: Core.expression -> Pprint.document =
         let edoc = nest 2 (break1 ^^ e2) in
         (pcolor 207 ~l:1 "λ") ^^ space ^^ vdoc ^^ space ^^ arrow ^^ space ^^ edoc
 
-    | `Instance atom ->
+    | `Instance (`Var atom) ->
         string (Atom.string_of_atom atom)
 
     | `App (e1, args) ->
@@ -574,7 +575,7 @@ and doc_of_struct: Core.structure -> Pprint.document =
   let open Bash in
   let rec doc_of_str =
     function
-      | `Let (pat, _, e1) ->
+      | `Let (pat, e1) ->
         let letdoc = pcolor colors.yellow "let" in
         let pdoc = doc_of_pat pat in
         let e1 = doc_of_expr e1 in

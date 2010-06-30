@@ -73,7 +73,7 @@ type expression = [
   | `App of expression * expression list
 
   | `Tuple of expression list
-  | `Instance of Atom.t
+  | `Instance of var
   | `Const of const
 
   | `Magic of type_term
@@ -88,7 +88,7 @@ type user_type = {
 }
 
 type structure = [
-  | `Let of pattern * (type_term AtomMap.t) * expression
+  | `Let of pattern * expression
   | `LetRec of (var * type_term * expression) list
   | `Type of user_type
 ] list

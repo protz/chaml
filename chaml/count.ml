@@ -161,9 +161,8 @@ let count_core_nodes e =
         1 + count_coerc c
 
   and count_struct = function
-    | `Let (pat, map, expr) ->
-        count_pat pat + count_expr expr + 1 +
-        (AtomMap.fold (fun _k t acc -> count_type t + acc) map 0)
+    | `Let (pat, expr) ->
+        count_pat pat + count_expr expr + 1
     | `LetRec l ->
        1 + List.fold_left
         (fun acc (_v, t, e) -> count_type t + count_expr e + acc) 0 l
