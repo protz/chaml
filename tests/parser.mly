@@ -86,8 +86,8 @@ type_constr:
   { type_cons_string }
 | FLOAT
   { type_cons_float }
-| UNIT
-  { type_cons_unit }
+(*| UNIT
+  { type_cons_unit }*)
 
 type_product:
 | e = type_product_elt TIMES option(EOL) es = type_product

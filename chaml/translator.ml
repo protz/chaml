@@ -20,7 +20,8 @@
 open Algebra.Identifiers
 open Unify
 open CamlX
-module CamlX_ = CamlX.Make(BaseSolver)
+(* Don't do this, kids. Works because this functor is applicative. *)
+module rec CamlX_: module type of CamlX.Make(BaseSolver) = CamlX_
 open CamlX_
 
 (* Various helpers to work with environments *)
