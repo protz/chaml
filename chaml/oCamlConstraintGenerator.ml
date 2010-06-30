@@ -609,8 +609,8 @@ module Make(S: Algebra.SOLVER) = struct
       fun structure ->
         let fold_structure_item:
               structure_item ->
-              type_constraint * camlx_expression ->
-              type_constraint * camlx_expression
+              type_constraint * camlx_structure ->
+              type_constraint * camlx_structure
             =
           fun { pstr_desc; pstr_loc } (c2, str) ->
             match pstr_desc with

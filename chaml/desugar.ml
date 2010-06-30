@@ -603,15 +603,15 @@ and doc_of_coerc: coercion -> Pprint.document =
 and doc_of_struct: structure -> Pprint.document =
   let open Pprint in
   let open Bash in
-  let rec doc_of_str =
+  let doc_of_str =
     function
-      | `Let (pat, e1) ->
-        let letdoc = pcolor colors.yellow "let" in
-        let pdoc = doc_of_pat pat in
-        let e1 = doc_of_expr e1 in
-        letdoc ^^ space ^^ pdoc ^^ space ^^ equals ^^ 
-          (nest 2 (break1 ^^ e1)) ^^
-        break1
+    | `Let (pat, e1) ->
+      let letdoc = pcolor colors.yellow "let" in
+      let pdoc = doc_of_pat pat in
+      let e1 = doc_of_expr e1 in
+      letdoc ^^ space ^^ pdoc ^^ space ^^ equals ^^ 
+        (nest 2 (break1 ^^ e1)) ^^
+      break1
 
     | `LetRec l ->
         let letdoc = pcolor colors.yellow "let rec" in

@@ -70,7 +70,8 @@ let translate =
     fun env uexpr ->
     match uexpr with
       | `Let (rec_flag, pat_expr_list, e2) ->
-          translate_let_pat_expr_list rec_flag pat_expr_list
+          translate_pat_expr_list
+            env rec_flag pat_expr_list
             (fun pat_expr_list ->
               let fexpr = translate_expr env e2 in
               `Let (rec_flag, pat_expr_list, fexpr))
@@ -133,12 +134,13 @@ let translate =
       | `Magic ->
           raise Magic
 
-  and translate_let_pat_expr_list: 'a.
+  and translate_pat_expr_list: 'a.
+        env ->
         bool ->
-        (pattern * BaseSolver.pscheme * expression) ->
-        ((f_pattern * f_clblock * f_expression) -> 'a) ->
+        (pattern * BaseSolver.pscheme * expression) list ->
+        ((f_pattern * f_clblock * f_expression) list -> 'a) ->
         'a
-     = fun rec_flag pat_expr_list k ->
+     = fun env rec_flag pat_expr_list k ->
     (* This is a convention: in the case of a recursive let, the scheme
      * variables are shared across all the identifiers' types and they are
      * stored in the first identifiers pscheme. *)
@@ -199,11 +201,17 @@ let translate =
       | `Var ident ->
           `Var ident
 
+  (* The thing is here, we're only renaming types, and types of top-level
+   * bindings are closed, so there's nothing to forward across structure items.
+   * However, when we desugar, the bindings above the current top-level binding
+   * must be made available, so then we'll use something like a fold_left
+   * instead of a map. *)
   and translate_struct: env -> structure_item -> f_structure_item =
     fun env ustr ->
       match ustr with
       | `Let (rec_flag, pat_expr_list) ->
-          translate_pat_expr_list rec_flag pat_expr_list
+          translate_pat_expr_list
+            env rec_flag pat_expr_list
             (fun pat_expr_list ->
               `Let (rec_flag, pat_expr_list))
       | `Type _ ->
@@ -379,8 +387,50 @@ and doc_of_const: f_const -> Pprint.document =
     | `String s ->
         dquote ^^ (string s) ^^ dquote
 
-let string_of_expr expr =
+and doc_of_struct: f_structure -> Pprint.document =
+  let open Pprint in
+  let open Bash in
+  let doc_of_str: f_structure_item -> Pprint.document =
+    function
+    | `Let (rec_flag, pat_expr_list) ->
+        let gen (pat, { young_vars = nlambdas; f_type_term = scheme }, expr) =
+          let pdoc = doc_of_pat pat in
+          let edoc = doc_of_expr expr in
+          let lb' = fancystring (color colors.blue "[") 1 in
+          let rb' = fancystring (color colors.blue "]") 1 in
+          let ldoc = gen_lambdas nlambdas in
+          let fdoc =
+            if nlambdas > 0 then
+              (make "∀" nlambdas) ^^ dot ^^ space
+            else
+              empty
+          in
+          let scheme = string (DeBruijn.string_of_type_term scheme) in
+          pdoc ^^ colon ^^ space ^^
+          fdoc ^^ lb' ^^ scheme ^^ rb' ^^ space ^^ equals ^^
+          space ^^ ldoc ^^
+            (nest 2 (break1 ^^ edoc)
+          )
+        in
+        let pat_expr_list = List.map gen pat_expr_list in
+        let anddoc = fancystring (color 208 "and") 3 in
+        let pat_expr_list = concat
+          (fun x y -> x ^^ break1 ^^ anddoc ^^ space ^^ y)
+          pat_expr_list
+        in
+        let letdoc = fancystring (color 208 "let") 3 in
+        let recdoc = if rec_flag then string "rec " else empty in
+        letdoc ^^ space ^^ recdoc ^^ pat_expr_list
+
+    | `Type _ ->
+        failwith "TODO: pretty-printing type decls in Core"
+  in
+  fun str ->
+    let l = List.map doc_of_str str in
+    concat (fun x y -> x ^^ break1 ^^ break1 ^^ y) l
+
+let string_of_struct str =
   let buf = Buffer.create 16 in
-  let doc = Pprint.(^^) (doc_of_expr expr) Pprint.hardline in
+  let doc = Pprint.(^^) (doc_of_struct str) Pprint.hardline in
   Pprint.Buffer.pretty 1.0 Bash.twidth buf doc;
   Buffer.contents buf
