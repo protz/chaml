@@ -32,18 +32,18 @@ let add atom typ { type_of_atom } =
 let fail msg =
   failwith msg
 
-let rec infer: env -> Core.expression -> DeBruijn.type_term =
+let rec infer_expr: env -> Core.expression -> DeBruijn.type_term =
   fun env expr ->
     match expr with
     | `TyAbs expr ->
         let new_env =
           { type_of_atom = AtomMap.map DeBruijn.lift env.type_of_atom }
         in
-        let typ = infer new_env expr in
+        let typ = infer_expr new_env expr in
         `Forall typ
 
     | `TyApp (expr, t2) ->
-        let t1 = infer env expr in
+        let t1 = infer_expr env expr in
         Error.debug "[OTyApp] Applying type %s to type %s\n"
           (DeBruijn.string_of_type_term t2)
           (DeBruijn.string_of_type_term t1);
@@ -58,16 +58,16 @@ let rec infer: env -> Core.expression -> DeBruijn.type_term =
 
     | `Fun (`Var x, t, expr) ->
         let env = add x t env in
-        Algebra.TypeCons.type_cons_arrow t (infer env expr)
+        Algebra.TypeCons.type_cons_arrow t (infer_expr env expr)
 
     | `Match (e1, pat_exprs) ->
-        let t1 = infer env e1 in
+        let t1 = infer_expr env e1 in
         let infer_branch (pat, expr) =
           let bound_identifiers = infer_pat pat t1 in
           let env =
             List.fold_left (fun env (atom, t) -> add atom t env) env bound_identifiers
           in
-          infer env expr
+          infer_expr env expr
         in
         let ti = List.map infer_branch pat_exprs in
         let t0 = List.hd ti in
@@ -76,46 +76,23 @@ let rec infer: env -> Core.expression -> DeBruijn.type_term =
         t0
 
     | `Let (`Var x, e1, e2) ->
-        let t1 = infer env e1 in
+        let t1 = infer_expr env e1 in
         Error.debug
           "[OLet] %s: %s\n" (Atom.string_of_atom x)
           (DeBruijn.string_of_type_term t1);
         let env = add x t1 env in
-        let t2 = infer env e2 in
+        let t2 = infer_expr env e2 in
         t2
 
-    | `LetRec (map, e2) ->
-        (* First we add into the environment all the identifiers *)
-        let env = AtomMap.fold
-          (fun k (t, _e) acc -> add k t acc) map env
-        in
-        (* What this function does is: go through all Λ and ▸ to find the
-         * expression beneath, type-checks it, and returns the inferred type
-         * with the Λ and ▸ taken into account (that's for e2), and the type
-         * without them taken into account, that's for checking against the
-         * annotated type in the AST. *)
-        let env = AtomMap.fold
-          (fun k (t, e) acc ->
-            let rec strip = function
-              | `TyAbs e ->
-                  let c_type, n_type = strip e in
-                  c_type, `Forall n_type
-              | e ->
-                  let t = infer env e in
-                  t, t
-            in
-            let c_type, n_type = strip e in
-            if c_type <> t then
-              fail "Letrec";
-            add k n_type acc)
-          map
+    | `LetRec (pat_type_exprs, e2) ->
+        infer_letrec
           env
-        in
-        infer env e2
+          pat_type_exprs
+            (fun env -> infer_expr env e2)
 
     | `App (expr, exprs) ->
-        let t0 = infer env expr in
-        let ti = List.map (infer env) exprs in
+        let t0 = infer_expr env expr in
+        let ti = List.map (infer_expr env) exprs in
         let apply t0 t =
           Error.debug "[OApp] Function %s argument %s\n"
             (DeBruijn.string_of_type_term t0)
@@ -131,7 +108,7 @@ let rec infer: env -> Core.expression -> DeBruijn.type_term =
         in
         List.fold_left apply t0 ti
 
-    | `Instance x ->
+    | `Instance (`Var x) ->
         let t = find x env in
         Error.debug "[OInstance] Scheme for %s is %s\n"
           (Atom.string_of_atom x)
@@ -139,7 +116,7 @@ let rec infer: env -> Core.expression -> DeBruijn.type_term =
         t
 
     | `Tuple exprs ->
-        Algebra.TypeCons.type_cons_tuple (List.map (infer env) exprs)
+        Algebra.TypeCons.type_cons_tuple (List.map (infer_expr env) exprs)
 
     | `Const const ->
         infer_const const
@@ -148,7 +125,47 @@ let rec infer: env -> Core.expression -> DeBruijn.type_term =
         t
 
     (* | `Coerce (e, c) ->
-        apply_coerc (infer env e) c *)
+        apply_coerc (infer_expr env e) c *)
+
+and infer_letrec: 'a. env -> _ -> (env -> 'a) -> 'a =
+  fun env pat_type_exprs k ->
+    (* First we add into the environment all the identifiers *)
+    let env = List.fold_left
+      (fun acc (p, t, _e) ->
+        let `Var a | `Coerce (`Var a, _) = p in
+        add a t acc)
+      env pat_type_exprs
+    in
+    (* What this function does is: go through all Λ and ▸ to find the
+     * expression beneath, type-checks it, and returns the inferred type
+     * with the Λ and ▸ taken into account (that's for e2), and the type
+     * without them taken into account, that's for checking against the
+     * annotated type in the AST. That way, we erase all previous type
+     * definitions and we possibly apply coercions on-the-fly yeah. *)
+    let env = List.fold_left
+      (fun env_acc (p, t, e) ->
+        let rec strip = function
+          | `TyAbs e ->
+              let c_type, n_type = strip e in
+              c_type, `Forall n_type
+          | e ->
+              let t = infer_expr env e in
+              t, t
+        in
+        let c_type, n_type = strip e in
+        if c_type <> t then
+          fail "Letrec";
+        let `Var a | `Coerce (`Var a, _) = p in
+        let n_type =
+          match p with
+            | `Var _ -> t
+            | `Coerce (`Var _, c) -> apply_coerc n_type c
+        in
+        add a n_type env_acc)
+      env
+      pat_type_exprs
+    in
+    k env
 
 and infer_pat: Core.pattern -> DeBruijn.type_term -> (Atom.t * DeBruijn.type_term) list =
   fun pat t ->
@@ -201,8 +218,6 @@ and infer_const: Core.const -> DeBruijn.type_term =
       type_cons_float
   | `String _ ->
       type_cons_string
-  | `Unit ->
-      type_cons_unit
 
 and apply_coerc: DeBruijn.type_term -> Core.coercion -> DeBruijn.type_term =
   fun typ coerc ->
@@ -256,7 +271,31 @@ and apply_coerc: DeBruijn.type_term -> Core.coercion -> DeBruijn.type_term =
             fail "Bad coercion"
         end
 
-let check expr =
+and infer_structure: env -> Core.structure -> env =
+  let rec infer_str: env -> _ -> env =
+    fun env -> function
+    | `LetRec var_type_exprs ->
+        infer_letrec
+          env
+          var_type_exprs
+          (fun x -> x)
+
+    | `Let (pat, expr) ->
+        let t = infer_expr env expr in
+        let bound_identifiers = infer_pat pat t in
+        let env =
+          List.fold_left (fun env (atom, t) -> add atom t env) env bound_identifiers
+        in
+        env
+
+    | `Type _ ->
+        failwith "TODO: implement type decls type-checking"
+  in
+  fun env structure ->
+    List.fold_left infer_str env structure
+
+
+let check str =
   let env = { type_of_atom = AtomMap.empty } in
-  let typ = infer env expr in
-  Error.debug "[Driver] Final type is %s\n" (DeBruijn.string_of_type_term typ)
+  let env = infer_structure env str in
+  ignore env
