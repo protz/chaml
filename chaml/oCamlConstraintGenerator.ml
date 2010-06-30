@@ -88,6 +88,7 @@ module Make(S: Algebra.SOLVER) = struct
   (* Convenience shortcuts *)
   type camlx_pattern = CamlX.Make(S).pattern
   type camlx_expression = CamlX.Make(S).expression
+  type camlx_structure = CamlX.Make(S).structure
   type camlx_const = CamlX.Make(S).const
 
   (* Instead of returning 4-uples each time, the main functions
@@ -287,8 +288,6 @@ module Make(S: Algebra.SOLVER) = struct
         =
       fun t { pexp_desc; pexp_loc } ->
       match pexp_desc with
-      | Pexp_done ->
-          { e_constraint = `Done; expr = `Const `Unit }
       | Pexp_ident (Longident.Lident x) ->
           let solver_instance = S.new_instance () in
           let ident = ident x pexp_loc in

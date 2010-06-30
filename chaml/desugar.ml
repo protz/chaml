@@ -19,6 +19,8 @@
 
 open Algebra.Identifiers
 open CamlX
+open Core
+open DeBruijn
 
 type env = {
   atom_of_ident: Atom.t IdentMap.t;
@@ -27,7 +29,7 @@ type env = {
 type cenv = {
   forall: int;
   type_term: DeBruijn.type_term;
-  pattern: Core.pattern;
+  pattern: pattern;
 }
 
 (* Introduce new identifiers in scope, possibly overriding previously defined
@@ -51,14 +53,16 @@ module AtomMap = Jmap.Make(Atom)
 let concat f l =
   List.fold_left f (List.hd l) (List.tl l)
 
-let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
+let rec wrap_lambda i e =
+  if i > 0 then
+    wrap_lambda (i - 1) (`TyAbs e)
+  else
+    e
+
+(* let v_vc = fun (v: var) -> (v :> [ var | `Coerce of var * coercion]) *)
+
+let rec desugar_expr: env -> CamlX.f_expression -> expression =
   fun env expr ->
-  let rec wrap_lambda i e =
-    if i > 0 then
-      wrap_lambda (i - 1) (`TyAbs e)
-    else
-      e
-  in
   match expr with
   | `Let (rec_flag, pat_coerc_exprs, e2) ->
       (* We have the invariant that all identifiers are distinct, we explicitely
@@ -72,44 +76,11 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
       let new_env = introduce (List.flatten new_atoms) env in
       let e2 = desugar_expr new_env e2 in
       if rec_flag then
-        let (var_type_exprs, wrap) = List.fold_left
-          (fun (acc, wrap) (pat, { young_vars; f_type_term = instanciated_type; }, expr) ->
-            match pat with
-            | `Var ident ->
-                let a = find ident new_env in
-                let e = desugar_expr new_env expr in
-                let e = wrap_lambda young_vars e in
-                let f_type_term =
-                  let rec wrap i t =
-                    if i = 0 then
-                      t
-                    else
-                      `Forall (wrap (i - 1) t)
-                  in
-                  wrap young_vars instanciated_type
-                in
-                let new_pat = generate_coerc new_env
-                  { pattern = `Var a; forall = young_vars; type_term = f_type_term}
-                in
-                begin match new_pat with
-                | `Coerce (`Var a, c) ->
-                    (`Var a, instanciated_type, e) :: acc,
-                    (fun e ->
-                      `Match (`Instance (`Var a), [`Coerce (`Var a, c), wrap e]))
-                | `Var a ->
-                    (`Var a, instanciated_type, e) :: acc,
-                    wrap
-                | _ ->
-                    assert false
-                end
-            | _ ->
-                assert false
-          )
-          ([], fun x -> x)
+        desugar_letrec
+          new_env
           pat_coerc_exprs
-        in
-        let e = `LetRec (var_type_exprs, wrap e2) in
-        e
+          (fun var_type_exprs ->
+            ((`LetRec (var_type_exprs, e2)) :> Core.expression))
       else
         (* And then we desugar all of the initial branches in the same previous
          * scope *)
@@ -219,6 +190,46 @@ let rec desugar_expr: env -> CamlX.f_expression -> Core.expression =
 
   | `Magic _ as x ->
       x
+
+and desugar_letrec: 'a.
+    env ->
+    (f_pattern * f_clblock * f_expression) list ->
+    (([ var | `Coerce of var * coercion] * type_term * expression) list -> 'a) ->
+    'a
+  =
+  fun new_env pat_coerc_exprs k ->
+    let var_type_exprs = List.map
+      (fun (pat, { young_vars; f_type_term = instanciated_type; }, expr) ->
+        match pat with
+        | `Var ident ->
+            let a = find ident new_env in
+            let e = desugar_expr new_env expr in
+            let e = wrap_lambda young_vars e in
+            let f_type_term =
+              let rec wrap i t =
+                if i = 0 then
+                  t
+                else
+                  `Forall (wrap (i - 1) t)
+              in
+              wrap young_vars instanciated_type
+            in
+            let new_pat = generate_coerc new_env
+              { pattern = `Var a; forall = young_vars; type_term = f_type_term}
+            in
+            begin match new_pat with
+            | `Coerce (`Var _, _) as p ->
+                (p, instanciated_type, e)
+            | `Var _ as p ->
+                (p, instanciated_type, e)
+            | _ ->
+                assert false
+            end
+        | _ ->
+            assert false)
+      pat_coerc_exprs
+    in
+    k var_type_exprs
 
 and desugar_pat env ?rebind pat =
   match pat with
@@ -361,14 +372,31 @@ and desugar_const const =
   | `Char _ | `Int _ | `String _ as x ->
       x
 
-(* and desugar_struct str =
+and desugar_struct (env, acc) str =
   match str with
-  | `Let (pat, tmap, expr) -> *)
+  | `Let (true, pat_coerc_exprs) ->
+      let _, new_atoms =
+        List.split
+          (List.map (fun (pat, _, _) -> desugar_pat env pat) pat_coerc_exprs)
+      in
+      let new_env = introduce (List.flatten new_atoms) env in
+      new_env,
+      desugar_letrec
+        new_env
+        pat_coerc_exprs
+        (fun var_type_exprs -> `LetRec var_type_exprs) :: acc
+  | `Let (false, _pat_expr_list) ->
+      failwith "TODO: top-level regular let in desugar"
+  | `Type _ ->
+      failwith "TODO: top-level type decl in desugar"
 
 
-let desugar expr =
+let desugar str =
   let env = { atom_of_ident = IdentMap.empty } in
-  desugar_expr env expr
+  let _toplevel_env, structure =
+    List.fold_left desugar_struct (env, []) str
+  in
+  List.rev structure
 
 
 (* Pretty-printing stuff *)
@@ -379,7 +407,7 @@ let pcolor ?l c s =
 
 let arrow = pcolor Bash.colors.Bash.yellow "->"
 
-let rec doc_of_expr: Core.expression -> Pprint.document = 
+let rec doc_of_expr: expression -> Pprint.document = 
   let open Pprint in
   let open Bash in
   function
@@ -416,11 +444,13 @@ let rec doc_of_expr: Core.expression -> Pprint.document =
         let letdoc = pcolor colors.yellow "let rec" in
         let anddoc = pcolor colors.yellow "and" in
         let branches = List.map
-          (fun (`Var v, t, e) ->
-            let vdoc = string (Atom.string_of_atom v) in
+          (fun (p, t, e) ->
+            let pdoc = doc_of_pat
+              ((p: [ var | `Coerce of var * coercion]) :> pattern)
+            in
             let tdoc = string (DeBruijn.string_of_type_term t) in
             let edoc = doc_of_expr e in
-            vdoc ^^ colon ^^ space ^^ tdoc ^^ space ^^ equals ^^ space ^^
+            pdoc ^^ colon ^^ space ^^ tdoc ^^ space ^^ equals ^^ space ^^
             (nest 2 (break1 ^^ edoc)))
           map
         in
@@ -499,7 +529,7 @@ let rec doc_of_expr: Core.expression -> Pprint.document =
         let triangle = pcolor colors.green ~l:1 "▸" in
         edoc ^^ space ^^ triangle ^^ space ^^ cdoc *)
 
-and doc_of_pat: Core.pattern -> Pprint.document =
+and doc_of_pat: pattern -> Pprint.document =
   let open Pprint in
   let open Bash in
   function
@@ -528,7 +558,7 @@ and doc_of_pat: Core.pattern -> Pprint.document =
         let triangle = pcolor colors.green ~l:1 "▸" in
         pdoc ^^ space ^^ triangle ^^ space ^^ cdoc
 
-and doc_of_const: Core.const -> Pprint.document =
+and doc_of_const: const -> Pprint.document =
   let open Pprint in
   function
     | `Char c ->
@@ -540,7 +570,7 @@ and doc_of_const: Core.const -> Pprint.document =
     | `String s ->
         dquote ^^ (string s) ^^ dquote
 
-and doc_of_coerc: Core.coercion -> Pprint.document =
+and doc_of_coerc: coercion -> Pprint.document =
   let open Pprint in
   function
     | `Id ->
@@ -570,7 +600,7 @@ and doc_of_coerc: Core.coercion -> Pprint.document =
     | `DistribTuple ->
         fancystring "∀×" 2
 
-and doc_of_struct: Core.structure -> Pprint.document =
+and doc_of_struct: structure -> Pprint.document =
   let open Pprint in
   let open Bash in
   let rec doc_of_str =
@@ -587,11 +617,13 @@ and doc_of_struct: Core.structure -> Pprint.document =
         let letdoc = pcolor colors.yellow "let rec" in
         let anddoc = pcolor colors.yellow "and" in
         let branches = List.map
-          (fun (`Var v, t, e) ->
-            let vdoc = string (Atom.string_of_atom v) in
+          (fun (p, t, e) ->
+            let pdoc = doc_of_pat
+              ((p: [ var | `Coerce of var * coercion]) :> pattern)
+            in
             let tdoc = string (DeBruijn.string_of_type_term t) in
             let edoc = doc_of_expr e in
-            vdoc ^^ colon ^^ space ^^ tdoc ^^ space ^^ equals ^^ space ^^
+            pdoc ^^ colon ^^ space ^^ tdoc ^^ space ^^ equals ^^ space ^^
             (nest 2 (break1 ^^ edoc)))
           l
         in

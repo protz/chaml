@@ -69,7 +69,7 @@ type expression = [
   | `Fun of var * type_term * expression
   | `Match of expression * (pattern * expression) list
   | `Let of var * expression * expression 
-  | `LetRec of (var * type_term * expression) list * expression
+  | `LetRec of ([ var | `Coerce of var * coercion] * type_term * expression) list * expression
   | `App of expression * expression list
 
   | `Tuple of expression list
@@ -89,6 +89,6 @@ type user_type = {
 
 type structure = [
   | `Let of pattern * expression
-  | `LetRec of (var * type_term * expression) list
+  | `LetRec of ([ var | `Coerce of var * coercion] * type_term * expression) list
   | `Type of user_type
 ] list
