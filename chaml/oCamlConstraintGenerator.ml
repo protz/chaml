@@ -38,6 +38,7 @@ module Make(S: Algebra.SOLVER) = struct
     | VariableMustOccurBothSides of string * Location.t
     | AlgebraError of Algebra.Core.error
     | OnlyIdentInLetRec of Location.t
+    | TypeConstructorArguments of string * int * int * Location.t
 
   exception Error of error
   let raise_error e = raise (Error e)
@@ -63,10 +64,15 @@ module Make(S: Algebra.SOLVER) = struct
         Printf.sprintf
           "%a: variable %s must occur on both sides of this pattern\n"
           print_loc loc v
-    | OnlyIdentInLetRec (loc) ->
+    | OnlyIdentInLetRec loc ->
         Printf.sprintf
           "%a: only variables are allowed as the left-hand side of `let rec'\n"
           print_loc loc
+    | TypeConstructorArguments (s, n1, n2, loc) ->
+        Printf.sprintf
+          "%a: the type constructor %s expects %d arguments, but you gave it %d\
+          arguments"
+          print_loc loc s n1 n2
     | AlgebraError e ->
         Algebra.Core.string_of_error e
 
@@ -113,12 +119,6 @@ module Make(S: Algebra.SOLVER) = struct
     pat_expr: camlx_pattern * S.pscheme * camlx_expression;
   }
 
-  type let_info = {
-    constr_scheme: type_scheme list;
-    camlx_pat_expr: (camlx_pattern * S.pscheme * camlx_expression) list;
-    rec_flag: bool;
-  }
-
   (* These are just convenient helpers *)
   let fresh_type_var ?letter () =
     let prefix = Option.map (String.make 1) letter in
@@ -147,28 +147,40 @@ module Make(S: Algebra.SOLVER) = struct
   type data_constructor = string * int type_term list
   type data_type = type_cons * data_constructor list
 
+  (* Because we're using physical equality for head symbols, we keep a mapping
+   * from type names to head symbols. *)
   type env = {
-    data_constructors: data_type StringMap.t
+    data_type_of_constructor: data_type StringMap.t;
+    head_symbol_of_type: type_cons StringMap.t;
   }
   let env = {
-    data_constructors = StringMap.empty
+    data_type_of_constructor = StringMap.empty;
+    head_symbol_of_type = StringMap.empty;
   }
 
-  let register_data_constructor: env -> data_constructor -> data_type -> env =
-    fun { data_constructors } data_constructor data_type ->
-      let data_constructors =
-        StringMap.add (fst data_constructor) data_type data_constructors
-      in
-      { data_constructors}
+  (* This enriches the environment with a mapping from the type name to the
+   * globally unique head symbol *)
+  let register_data_type: env -> type_cons -> env =
+    fun { data_type_of_constructor; head_symbol_of_type } type_cons -> {
+      data_type_of_constructor;
+      head_symbol_of_type =
+        StringMap.add type_cons.cons_name type_cons head_symbol_of_type
+    }
 
-  let register_data_type: env -> string -> int -> data_constructor list -> env =
-    fun env data_type_name arity data_constructors ->
-      let data_type = {
-          cons_name = data_type_name;
-          cons_arity = arity;
-        },
-        data_constructors
+  (* This enriches the environment with a mapping from one constructor (Nil,
+   * for example) to its corresponding data type. *)
+  let register_data_constructor: env -> data_constructor -> data_type -> env =
+    fun { data_type_of_constructor; head_symbol_of_type } data_constructor data_type ->
+      let data_type_of_constructor =
+        StringMap.add (fst data_constructor) data_type data_type_of_constructor
       in
+      { data_type_of_constructor; head_symbol_of_type }
+
+  (* This functions is used to register in the environment all the constructors
+   * for a given data type. *)
+  let register_data_constructors: env -> type_cons -> data_constructor list -> env =
+    fun env head_symbol data_constructors ->
+      let data_type = head_symbol, data_constructors in
       let env = List.fold_left
         (fun env data_constructor ->
           register_data_constructor env data_constructor data_type)
@@ -176,6 +188,42 @@ module Make(S: Algebra.SOLVER) = struct
         data_constructors
       in
       env
+
+  let head_symbol_of_type { head_symbol_of_type; _ } data_type =
+    StringMap.find data_type head_symbol_of_type
+
+  let data_type_of_constructor { data_type_of_constructor; _ } data_constructor =
+    StringMap.find data_constructor data_type_of_constructor
+
+  let tuple_or_not loc cons_name l1 args =
+    let l2 = List.length args in
+    if l1 = 1 && l2 > 1 then
+      [type_cons_tuple args]
+    else if l1 > 1 && l1 = l2 then
+      args
+    else
+      raise_error (TypeConstructorArguments (cons_name, l1, l2, loc))
+
+  let copy_data_constructor env k =
+    (* XXX bad complexity, maybe change the abstractions? *)
+    let head_symbol, data_constructors = data_type_of_constructor env k in
+    let cons_name, type_terms =
+      List.find (fun (k', _) -> k = k') data_constructors
+    in
+    assert (cons_name = k);
+    let mapping =
+      Array.init head_symbol.cons_arity (fun _ -> fresh_type_var ~letter:'d' ())
+    in
+    let type_terms =
+      let rec convert = function
+        | `Var i ->
+            mapping.(i)
+        | `Cons (head_symbol, args) ->
+            `Cons (head_symbol, List.map convert args)
+      in
+      List.map convert type_terms
+    in
+    Array.to_list mapping, type_terms
 
   let parse_typedecl: env -> (string * type_declaration) list -> env * camlx_user_type =
     let parse_typedecl: env -> string * type_declaration -> env * camlx_user_type =
@@ -195,7 +243,14 @@ module Make(S: Algebra.SOLVER) = struct
                 StringMap.empty
                 ptype_params
               in
-              let rec convert_core_type { ptyp_desc; ptyp_loc = _ } =
+              let arity = List.length ptype_params in
+              let head_symbol = {
+                  cons_name = ptype_name;
+                  cons_arity = arity;
+                }
+              in
+              let env = register_data_type env head_symbol in
+              let rec convert_core_type { ptyp_desc; ptyp_loc } =
                 match ptyp_desc with
                 | Ptyp_var v -> 
                     `Var (StringMap.find v params)
@@ -203,6 +258,18 @@ module Make(S: Algebra.SOLVER) = struct
                     type_cons_tuple (List.map convert_core_type ts)
                 | Ptyp_arrow (_, t1, t2) ->
                     type_cons_arrow (convert_core_type t1) (convert_core_type t2)
+                | Ptyp_constr (Longident.Lident t, ts) ->
+                    (* This can be ('a, 'b) t for instance *)
+                    Error.debug "[CG] Type lookup %s\n" t;
+                    let head_symbol = head_symbol_of_type env t in
+                    let ts = List.map convert_core_type ts in
+                    if List.length ts <> head_symbol.cons_arity then
+                      raise_error (TypeConstructorArguments (
+                        head_symbol.cons_name,
+                        head_symbol.cons_arity,
+                        List.length ts,
+                        ptyp_loc));
+                    `Cons (head_symbol, ts)
                 | _ ->
                     failwith "Dunno what to do with this core type"
               in
@@ -210,11 +277,9 @@ module Make(S: Algebra.SOLVER) = struct
                 (cons_name, List.map convert_core_type core_types)
               in
               let constructors = List.map parse_constructor constructors in
-              let arity = List.length ptype_params in
-              register_data_type
+              register_data_constructors
                 env
-                ptype_name
-                arity
+                head_symbol
                 constructors,
               object
                 method user_type_arity = arity
@@ -229,6 +294,15 @@ module Make(S: Algebra.SOLVER) = struct
           parse_typedecl env typedecl
       | _ ->
           failwith "Cannot parse simulatenous type decls"
+
+  (* This one is defined a bit later because it depends on env (not useful yet
+   * but who knows?) *)
+  type let_info = {
+    env: env;
+    constr_scheme: type_scheme list;
+    camlx_pat_expr: (camlx_pattern * S.pscheme * camlx_expression) list;
+    rec_flag: bool;
+  }
 
   (* Returns c_1 and (c_2 and ( ... and c_n)) *)
   let constr_conj = function
@@ -264,11 +338,12 @@ module Make(S: Algebra.SOLVER) = struct
      *
      * *)
     let rec generate_constraint_pattern:
+          env ->
           S.var type_var ->
           pattern ->
           constraint_pattern
         =
-      fun x { ppat_desc; ppat_loc } ->
+      fun env x { ppat_desc; ppat_loc } ->
       match ppat_desc with
         | Ppat_any ->
             {
@@ -292,7 +367,7 @@ module Make(S: Algebra.SOLVER) = struct
             let patterns = List.map2
               (fun pattern xi ->
                 let { p_constraint = konstraint; var_map; introduced_vars; pat; } =
-                  generate_constraint_pattern xi pattern
+                  generate_constraint_pattern env xi pattern
                 in
                 konstraint, var_map, xi :: introduced_vars, pat)
               patterns
@@ -320,10 +395,10 @@ module Make(S: Algebra.SOLVER) = struct
         | Ppat_or (pat1, pat2) ->
             (* match e1 with p1 | p2 -> *)
             let { p_constraint = c1; var_map = map1; introduced_vars = vars1; pat = lp1 } =
-              generate_constraint_pattern x pat1
+              generate_constraint_pattern env x pat1
             in
             let { p_constraint = c2; var_map = map2; introduced_vars = vars2; pat = lp2 } =
-              generate_constraint_pattern x pat2
+              generate_constraint_pattern env x pat2
             in
             bind_both_sides ppat_loc map1 map2;
             (* If identifier i is bound to type variable x1 on the left and x2
@@ -343,7 +418,7 @@ module Make(S: Algebra.SOLVER) = struct
             }
         | Ppat_constant const ->
             let konstraint, constant =
-              generate_constraint_constant ppat_loc x const
+              generate_constraint_constant env ppat_loc x const
             in
             {
               p_constraint = konstraint;
@@ -355,13 +430,14 @@ module Make(S: Algebra.SOLVER) = struct
             raise_error (NotImplemented ("some pattern", ppat_loc))
 
     and generate_constraint_constant:
+          env ->
           Location.t ->
           S.var type_var ->
           Asttypes.constant ->
           type_constraint * camlx_const
         =
       let open Asttypes in
-      fun pexp_loc t -> function
+      fun _env pexp_loc t -> function
         | Const_int x ->
             `Equals (t, type_cons_int), `Int x
         | Const_char x ->
@@ -382,11 +458,12 @@ module Make(S: Algebra.SOLVER) = struct
      *
      * *)
     and generate_constraint_expression:
+          env ->
           S.var type_var ->
           expression ->
           constraint_expression
         =
-      fun t { pexp_desc; pexp_loc } ->
+      fun env t { pexp_desc; pexp_loc } ->
       match pexp_desc with
       | Pexp_ident (Longident.Lident x) ->
           let solver_instance = S.new_instance () in
@@ -396,7 +473,7 @@ module Make(S: Algebra.SOLVER) = struct
           { e_constraint; expr; }
       | Pexp_constant c ->
           let e_constraint, expr =
-            generate_constraint_constant pexp_loc t c
+            generate_constraint_constant env pexp_loc t c
           in
           { e_constraint; expr = `Const expr; }
       | Pexp_function (_, _, pat_expr_list) ->
@@ -413,10 +490,10 @@ module Make(S: Algebra.SOLVER) = struct
           let generate_branch (pat, expr) =
             (* roughly [[ pat: X1 ]] *)
             let { p_constraint = c1; var_map; introduced_vars; pat } =
-              generate_constraint_pattern x1 pat
+              generate_constraint_pattern env x1 pat
             in
             (* [[ t: X2 ]] *)
-            let { e_constraint = c2; expr } = generate_constraint_expression x2 expr in
+            let { e_constraint = c2; expr } = generate_constraint_expression env x2 expr in
             let let_constr = `Let ([[], c1, var_map, None], c2) in
             (* This allows to properly scope the variables that are inner to
              * each pattern. x1 and x2 are a level higher since they are shared
@@ -445,7 +522,7 @@ module Make(S: Algebra.SOLVER) = struct
             (List.map
               (fun (_, expr) ->
                 let xi = fresh_type_var ~letter:'x' () in
-                xi, generate_constraint_expression xi expr
+                xi, generate_constraint_expression env xi expr
               )
               label_expr_list
             )
@@ -462,7 +539,7 @@ module Make(S: Algebra.SOLVER) = struct
           let equals_constr: type_constraint = `Equals (x1, arrow_type) in
           (* [[ e1: x1 ]] *)
           let { e_constraint = arrow_constr; expr = e1 } =
-            generate_constraint_expression x1 e1
+            generate_constraint_expression env x1 e1
           in
           (* combine both: [[ e1: t1 -> t2 -> ... -> tn -> t ]] *)
           let constr: type_constraint = `Conj (arrow_constr, equals_constr) in
@@ -478,13 +555,14 @@ module Make(S: Algebra.SOLVER) = struct
           (* Once again, the list of pattern/expressions is here because of
            * let ... and ... in e2 (multiple simultaneous definitions *)
           generate_constraint_let
+            env
             rec_flag
             pat_expr_list
             pexp_loc
             begin
-              fun { constr_scheme; camlx_pat_expr; rec_flag; } ->
+              fun { constr_scheme; camlx_pat_expr; rec_flag; env } ->
                 let { e_constraint = c2; expr = expr_e2;  } =
-                  generate_constraint_expression t e2
+                  generate_constraint_expression env t e2
                 in {
                   e_constraint = `Let (constr_scheme, c2);
                   expr =  `Let (rec_flag, camlx_pat_expr, expr_e2);
@@ -512,7 +590,7 @@ module Make(S: Algebra.SOLVER) = struct
             let x1 = fresh_type_var ~letter:'x' () in
             let ident1 = ident (random_ident_name ()) Location.none in
             let { e_constraint = constr_e1; expr = term_e1 } =
-              generate_constraint_expression x1 e1
+              generate_constraint_expression env x1 e1
             in
             let generate_branch (pat, expr) =
               (* Create a fresh variable *)
@@ -522,12 +600,12 @@ module Make(S: Algebra.SOLVER) = struct
               let instance_constr = `Instance (ident1, y, solver_instance) in
               (* It also satisfies the constraints of the pattern *)
               let { p_constraint = c1; var_map; introduced_vars; pat } =
-                generate_constraint_pattern y pat
+                generate_constraint_pattern env y pat
               in
               let c = constr_conj [instance_constr; c1] in
               (* Generate constraints for the expression *)
               let { e_constraint = c2; expr } =
-                generate_constraint_expression t expr
+                generate_constraint_expression env t expr
               in
               (* Why do we have generalized variables here? We're taking an
                * *instance* of e1 (as in "match e1 with ..."). This means the
@@ -560,14 +638,14 @@ module Make(S: Algebra.SOLVER) = struct
             let x1 = fresh_type_var ~letter:'x' () in
             let pscheme = new_pscheme x1 in
             let { e_constraint = constr_e1; expr = term_e1 } =
-              generate_constraint_expression x1 e1
+              generate_constraint_expression env x1 e1
             in
             let generate_branch (pat, expr) =
               let { p_constraint = c1; var_map; introduced_vars; pat } =
-                generate_constraint_pattern x1 pat
+                generate_constraint_pattern env x1 pat
               in
               let { e_constraint = c2; expr } =
-                generate_constraint_expression t expr
+                generate_constraint_expression env t expr
               in
               let let_constr = `Let ([[], c1, var_map, None], c2) in
               `Exists (introduced_vars, let_constr), (pat, None, expr)
@@ -594,7 +672,7 @@ module Make(S: Algebra.SOLVER) = struct
       | Pexp_tuple (expressions) ->
           let generate exp =
             let xi = fresh_type_var ~letter:'u' () in
-            let { e_constraint; expr; } = generate_constraint_expression xi exp in
+            let { e_constraint; expr; } = generate_constraint_expression env xi exp in
             xi, e_constraint, expr
           in
           let xis, constraints, expressions =
@@ -612,18 +690,19 @@ module Make(S: Algebra.SOLVER) = struct
     (* This is used both by Pexp_let and Pstr_eval/Pstr_let. Glad we have
      * polymorphic recursion! *)
     and generate_constraint_let: 'a.
+          env ->
           Asttypes.rec_flag ->
           (pattern * expression) list ->
           Location.t ->
           (let_info -> 'a) ->
           'a
         =
-      fun rec_flag pat_expr_list pexp_loc k ->
+      fun env rec_flag pat_expr_list pexp_loc k ->
       match rec_flag with
       | Asttypes.Nonrecursive ->
           let run (acc, map) pat_expr =
             let { scheme; pat_expr; } =
-              generate_constraint_scheme pat_expr
+              generate_constraint_scheme env pat_expr
             in
             let _, _, new_map, _ = scheme in
             dont_bind_several_times pexp_loc map new_map;
@@ -637,6 +716,7 @@ module Make(S: Algebra.SOLVER) = struct
             constr_scheme = constraints;
             camlx_pat_expr = pat_expr;
             rec_flag = false;
+            env;
           }
       | Asttypes.Recursive ->
           let main_type_vars = ref [] in
@@ -650,7 +730,7 @@ module Make(S: Algebra.SOLVER) = struct
             let x = fresh_type_var ~letter:'r' () in
             push main_type_vars x;
             let { p_constraint; var_map; introduced_vars; pat } =
-              generate_constraint_pattern x pat
+              generate_constraint_pattern env x pat
             in
             if IdentMap.cardinal var_map > 1 then
               raise_error (OnlyIdentInLetRec pexp_loc);
@@ -660,7 +740,7 @@ module Make(S: Algebra.SOLVER) = struct
             dont_bind_several_times pexp_loc !common_ident_map var_map;
             common_ident_map := IdentMap.union !common_ident_map var_map;
             let { e_constraint; expr } =
-              generate_constraint_expression x expr
+              generate_constraint_expression env x expr
             in
             push expression_constraints e_constraint;
             let pscheme = new_pscheme x in
@@ -681,6 +761,7 @@ module Make(S: Algebra.SOLVER) = struct
             constr_scheme = [outer_scheme];
             camlx_pat_expr = !exprs;
             rec_flag = true;
+            env;
           }
       | Asttypes.Default ->
           raise_error (NotImplemented ("rec flag = default", pexp_loc))
@@ -719,11 +800,12 @@ module Make(S: Algebra.SOLVER) = struct
                 | Pstr_value (rec_flag, pat_expr_list) ->
                     let c2, str2  = generate_structure_items env tl in
                     generate_constraint_let
+                      env
                       rec_flag
                       pat_expr_list
                       pstr_loc
                       begin
-                        fun { constr_scheme; camlx_pat_expr; rec_flag; } ->
+                        fun { constr_scheme; camlx_pat_expr; rec_flag; _ } ->
                           `Let (constr_scheme, c2),
                           `Let (rec_flag, camlx_pat_expr) :: str2
                       end
@@ -731,11 +813,12 @@ module Make(S: Algebra.SOLVER) = struct
                 | Pstr_eval expr ->
                     let c2, str2 = generate_structure_items env tl in
                     generate_constraint_let
+                      env
                       Asttypes.Nonrecursive
                       [{ ppat_desc = Ppat_any; ppat_loc = Location.none }, expr]
                       pstr_loc
                       begin
-                        fun { constr_scheme; camlx_pat_expr; rec_flag; } ->
+                        fun { constr_scheme; camlx_pat_expr; rec_flag; _ } ->
                           `Let (constr_scheme, c2),
                           `Let (rec_flag, camlx_pat_expr) :: str2
                       end
@@ -750,7 +833,7 @@ module Make(S: Algebra.SOLVER) = struct
                     raise_error (NotImplemented ("some structure item", pstr_loc))
                 end
           | [] ->
-              `True, []
+              `Done, []
         in
         let default_bindings, default_let_bindings =
           let plus_scheme =
@@ -805,14 +888,14 @@ module Make(S: Algebra.SOLVER) = struct
           structure_items
 
     (* This is only used by Pexp_let case. Still, it's a nice standalone block. *)
-    and generate_constraint_scheme: pattern * expression -> constraint_scheme =
-      fun (pat, expr) ->
+    and generate_constraint_scheme: env -> pattern * expression -> constraint_scheme =
+      fun env (pat, expr) ->
         let x = fresh_type_var ~letter:'x' () in
         let { p_constraint = c1; var_map; introduced_vars; pat } =
-          generate_constraint_pattern x pat
+          generate_constraint_pattern env x pat
         in
         let { e_constraint = c1'; expr } =
-          generate_constraint_expression x expr
+          generate_constraint_expression env x expr
         in
         let pscheme = new_pscheme x in
         let konstraint = `Exists (introduced_vars, `Conj (c1, c1')) in
