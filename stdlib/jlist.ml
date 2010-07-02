@@ -111,3 +111,12 @@ let mapi f l1 =
         List.rev acc
   in
   mapi [] 0 l1
+
+let fold_lefti f init l =
+  let rec fold_lefti i acc = function
+    | hd :: tl ->
+        fold_lefti (i + 1) (f i acc hd) tl
+    | [] ->
+        acc
+  in
+  fold_lefti 0 init l

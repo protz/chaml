@@ -59,14 +59,14 @@ module Make (S: Algebra.SOLVER): sig
     | `String of string
   ]
 
-  type user_type_var = string
+  type user_type_var = int
   type user_type_term = user_type_var Algebra.Core.type_term
   type user_type_kind = [ `Variant | `Record ]
   type user_label = string
   type user_type = <
-    user_type_vars: user_type_var list;
+    user_type_arity: int;
     user_type_kind: user_type_kind;
-    user_type_fields: (user_label * user_type) list;
+    user_type_fields: (user_label * user_type_term list) list;
   >
 
   type structure_item = [
@@ -117,6 +117,7 @@ and f_clblock = {
   f_type_term: f_type_term;
 }
 
+(* XXX this has been changed since *)
 type f_user_type_var = string
 type f_user_type_term = f_user_type_var Algebra.Core.type_term
 type f_user_type_kind = [ `Variant | `Record ]

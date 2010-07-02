@@ -1,4 +1,1 @@
-let rec f x =
-  g (x, x)
-and g (x, _) =
-  f x
+type 'a t = Nil | Cons of 'a * 'a t

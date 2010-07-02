@@ -56,3 +56,6 @@ val map2i: (int -> 'a -> 'b -> 'c) -> 'a list -> 'b list -> 'c list
 (** Same as [map] but pass an extra parameter that represents the index *)
 val mapi: (int -> 'a -> 'b) -> 'a list -> 'b list
 
+(** Same as [fold_left] except that the function takes the current index in the
+   list *)
+val fold_lefti: (int -> 'a -> 'b -> 'a) -> 'a -> 'b list -> 'a

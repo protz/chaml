@@ -22,6 +22,7 @@ open Error
 
 module Make(S: Algebra.SOLVER) = struct
 
+  module StringMap = Jmap.Make(String)
   module Constraint_ = Constraint.Make(S)
   open Constraint_
   open Algebra.Core
@@ -90,6 +91,7 @@ module Make(S: Algebra.SOLVER) = struct
   type camlx_expression = CamlX.Make(S).expression
   type camlx_structure = CamlX.Make(S).structure
   type camlx_const = CamlX.Make(S).const
+  type camlx_user_type = CamlX.Make(S).user_type
 
   (* Instead of returning 4-uples each time, the main functions
    * generate_constraint_pattern, generate_constraint_expression... return
@@ -129,6 +131,104 @@ module Make(S: Algebra.SOLVER) = struct
     S.new_pscheme_for_var uvar
 
   let random_ident_name () = Filename.basename (Filename.temp_file "" "")
+
+
+  (* We're forwarding an environment through all the recursive calls. It only
+   * contains a mapping from data constructors to their types. *)
+
+  (* Very naïve representation of data types.
+   *
+   * Example:
+   *   type ('a, 'b) t = Nil | Cons of 'a * ('a, 'b) t
+   * becomes
+   *   tc == { "t"; 2 },
+   *   [("Nil", []); ("Cons", [0; `Cons (t, [0; 1])])]
+   * *)
+  type data_constructor = string * int type_term list
+  type data_type = type_cons * data_constructor list
+
+  type env = {
+    data_constructors: data_type StringMap.t
+  }
+  let env = {
+    data_constructors = StringMap.empty
+  }
+
+  let register_data_constructor: env -> data_constructor -> data_type -> env =
+    fun { data_constructors } data_constructor data_type ->
+      let data_constructors =
+        StringMap.add (fst data_constructor) data_type data_constructors
+      in
+      { data_constructors}
+
+  let register_data_type: env -> string -> int -> data_constructor list -> env =
+    fun env data_type_name arity data_constructors ->
+      let data_type = {
+          cons_name = data_type_name;
+          cons_arity = arity;
+        },
+        data_constructors
+      in
+      let env = List.fold_left
+        (fun env data_constructor ->
+          register_data_constructor env data_constructor data_type)
+        env
+        data_constructors
+      in
+      env
+
+  let parse_typedecl: env -> (string * type_declaration) list -> env * camlx_user_type =
+    let parse_typedecl: env -> string * type_declaration -> env * camlx_user_type =
+      fun env (ptype_name, {
+          ptype_params;
+          ptype_cstrs = _;
+          ptype_kind;
+          ptype_private = _;
+          ptype_manifest = _;
+          ptype_variance = _;
+          ptype_loc = _;
+        }) ->
+          match ptype_kind with
+          | Ptype_variant constructors ->
+              let params = Jlist.fold_lefti
+                (fun i acc x -> StringMap.add x i acc)
+                StringMap.empty
+                ptype_params
+              in
+              let rec convert_core_type { ptyp_desc; ptyp_loc = _ } =
+                match ptyp_desc with
+                | Ptyp_var v -> 
+                    `Var (StringMap.find v params)
+                | Ptyp_tuple ts ->
+                    type_cons_tuple (List.map convert_core_type ts)
+                | Ptyp_arrow (_, t1, t2) ->
+                    type_cons_arrow (convert_core_type t1) (convert_core_type t2)
+                | _ ->
+                    failwith "Dunno what to do with this core type"
+              in
+              let parse_constructor (cons_name, core_types, _cons_loc) =
+                (cons_name, List.map convert_core_type core_types)
+              in
+              let constructors = List.map parse_constructor constructors in
+              let arity = List.length ptype_params in
+              register_data_type
+                env
+                ptype_name
+                arity
+                constructors,
+              object
+                method user_type_arity = arity
+                method user_type_kind  = `Variant
+                method user_type_fields = constructors
+              end
+          | _ ->
+              failwith "Unsupported data type"
+    in
+    fun env -> function
+      | [typedecl] ->
+          parse_typedecl env typedecl
+      | _ ->
+          failwith "Cannot parse simulatenous type decls"
 
   (* Returns c_1 and (c_2 and ( ... and c_n)) *)
   let constr_conj = function
@@ -603,41 +703,54 @@ module Make(S: Algebra.SOLVER) = struct
      *
      * *)
     and generate_constraint_structure:
+          env ->
           structure ->
           type_constraint * camlx_structure
         =
-      fun structure ->
-        let fold_structure_item:
-              structure_item ->
-              type_constraint * camlx_structure ->
+      fun env structure ->
+        let rec generate_structure_items:
+              env ->
+              structure_item list ->
               type_constraint * camlx_structure
             =
-          fun { pstr_desc; pstr_loc } (c2, str) ->
-            match pstr_desc with
-            | Pstr_value (rec_flag, pat_expr_list) ->
-                generate_constraint_let
-                  rec_flag
-                  pat_expr_list
-                  pstr_loc
-                  begin
-                    fun { constr_scheme; camlx_pat_expr; rec_flag; } ->
-                      `Let (constr_scheme, c2),
-                      `Let (rec_flag, camlx_pat_expr) :: str
-                  end
+          fun env -> function
+            | { pstr_desc; pstr_loc } :: tl ->
+                begin match pstr_desc with
+                | Pstr_value (rec_flag, pat_expr_list) ->
+                    let c2, str2  = generate_structure_items env tl in
+                    generate_constraint_let
+                      rec_flag
+                      pat_expr_list
+                      pstr_loc
+                      begin
+                        fun { constr_scheme; camlx_pat_expr; rec_flag; } ->
+                          `Let (constr_scheme, c2),
+                          `Let (rec_flag, camlx_pat_expr) :: str2
+                      end
 
-            | Pstr_eval expr ->
-                generate_constraint_let
-                  Asttypes.Nonrecursive
-                  [{ ppat_desc = Ppat_any; ppat_loc = Location.none }, expr]
-                  pstr_loc
-                  begin
-                    fun { constr_scheme; camlx_pat_expr; rec_flag; } ->
-                      `Let (constr_scheme, c2),
-                      `Let (rec_flag, camlx_pat_expr) :: str
-                  end
+                | Pstr_eval expr ->
+                    let c2, str2 = generate_structure_items env tl in
+                    generate_constraint_let
+                      Asttypes.Nonrecursive
+                      [{ ppat_desc = Ppat_any; ppat_loc = Location.none }, expr]
+                      pstr_loc
+                      begin
+                        fun { constr_scheme; camlx_pat_expr; rec_flag; } ->
+                          `Let (constr_scheme, c2),
+                          `Let (rec_flag, camlx_pat_expr) :: str2
+                      end
 
-            | _ ->
-                raise_error (NotImplemented ("some structure item", pstr_loc))
+                | Pstr_type typedecl ->
+                    let new_env, camlx_user_type = parse_typedecl env typedecl in
+                    let c2, str2 = generate_structure_items new_env tl in
+                    c2,
+                    `Type camlx_user_type :: str2
+
+                | _ ->
+                    raise_error (NotImplemented ("some structure item", pstr_loc))
+                end
+          | [] ->
+              `True, []
         in
         let default_bindings, default_let_bindings =
           let plus_scheme =
@@ -682,7 +795,7 @@ module Make(S: Algebra.SOLVER) = struct
           List.split [plus_scheme; minus_scheme; mult_scheme]
         in
         let topmost_constraint, structure_items =
-          List.fold_right fold_structure_item structure (`Done, [])
+          generate_structure_items env structure
         in
         if opt_default_bindings then
           `Let (default_bindings, topmost_constraint),
@@ -712,7 +825,7 @@ module Make(S: Algebra.SOLVER) = struct
     (** The "driver" for OCaml constraint generation. Takes care of catching all
         errors and returning an understandable error message. *)
     try
-      let e_constraint, str = generate_constraint_structure structure in
+      let e_constraint, str = generate_constraint_structure env structure in
       `Ok (e_constraint, str)
     with
       | Error e -> `Error e
