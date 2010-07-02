@@ -189,6 +189,7 @@ let _ =
       flush stdout; flush stderr;
       print_string (Translator.string_of_struct camlx_ast);
     end;
+    Error.debug "\n[Driver] Translation done, now desugaring...\n";
     (* Translate to the core language *)
     let core_ast = Desugar.desugar camlx_ast in
     if !arg_print_core_ast then begin

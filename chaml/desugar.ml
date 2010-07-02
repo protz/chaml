@@ -627,8 +627,7 @@ and doc_of_struct: structure -> Pprint.document =
       let pdoc = doc_of_pat pat in
       let e1 = doc_of_expr e1 in
       letdoc ^^ space ^^ pdoc ^^ space ^^ equals ^^ 
-        (nest 2 (break1 ^^ e1)) ^^
-      break1
+        (nest 2 (break1 ^^ e1))
 
     | `LetRec l ->
         let letdoc = pcolor colors.yellow "let rec" in
@@ -645,11 +644,10 @@ and doc_of_struct: structure -> Pprint.document =
           l
         in
         let branches = concat
-          (fun x y -> x ^^ break1 ^^ anddoc ^^ space ^^ y)
+          (fun x y -> x ^^ break1 ^^ break1 ^^ anddoc ^^ space ^^ y)
           branches
         in
-        letdoc ^^ space ^^ branches ^^ 
-        break1
+        letdoc ^^ space ^^ branches
     | `Type _ ->
         failwith "TODO: pretty-printing type decls in Core"
   in
