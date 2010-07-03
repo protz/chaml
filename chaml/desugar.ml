@@ -259,6 +259,9 @@ and desugar_pat env ?rebind pat =
       Error.debug "[DOr] Orpat out\n";
       `Or (p1, p2), a1
 
+  | `Construct _ ->
+      failwith "TODO: desugar construct patterns"
+
   | `Const c ->
       `Const (desugar_const c), []
 
@@ -565,6 +568,9 @@ and doc_of_pat: pattern -> Pprint.document =
 
     | `Var atom ->
         string (Atom.string_of_atom atom)
+
+    (* | `Construct _ ->
+        failwith "TODO: pretty-print" *)
 
     | `Const c ->
         doc_of_const c

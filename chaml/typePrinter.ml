@@ -40,7 +40,9 @@ let prec =
     (fun x -> Hashtbl.add tbl x 3)
     ["int"; "char"; "float"; "string"; "unit"];
   fun op ->
-    Hashtbl.find tbl op
+    match Jhashtbl.find_opt tbl op with
+      | Some p -> p
+      | None -> 0
 
 let string_of_types
     ~(string_of_key: ('var, 'uniq) var_printer)
@@ -101,8 +103,8 @@ let string_of_types
       | `Var key ->
           string_of_key key
 
-      | `Cons (cons_name, cons_args) ->
-          if cons_name = Algebra.TypeCons.head_symbol_arrow then
+      | `Cons (head_symbol, cons_args) ->
+          if head_symbol == Algebra.TypeCons.head_symbol_arrow then
             let op =
               if opt_caml_types then "->" else "→"
             in
@@ -119,7 +121,7 @@ let string_of_types
               Printf.sprintf "(%s %s %s)" t1 op t2
             else
                   Printf.sprintf "%s %s %s" t1 op t2
-          else if cons_name = Algebra.TypeCons.head_symbol_tuple (List.length cons_args) then
+          else if head_symbol == Algebra.TypeCons.head_symbol_tuple (List.length cons_args) then
             let types = List.map (print_type true) cons_args in
             let types = (String.concat " * " types) in
             if paren then
@@ -129,10 +131,12 @@ let string_of_types
           else
             let types = List.map (print_type true) cons_args in
             let args = String.concat ", " types in
-            if List.length types > 0 then
-              Printf.sprintf "(%s (%s))" cons_name.cons_name args
+            if List.length types > 1 then
+              Printf.sprintf "((%s) %s)" args head_symbol.cons_name
+            else if List.length types = 1 then
+              Printf.sprintf "(%s %s)" args head_symbol.cons_name
             else
-              Printf.sprintf "%s" cons_name.cons_name
+              Printf.sprintf "%s" head_symbol.cons_name
   in
   let print_with_scheme uvar =
     let typ = print_type false uvar in

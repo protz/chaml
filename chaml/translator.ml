@@ -185,8 +185,9 @@ let translate =
   (* [translate_pat] just generates patterns as needed. It doesn't try to
    * assign schemes to variables if those are on the left-hand side of a pattern. *)
   and translate_pat: env -> pattern -> f_pattern =
-    fun env upat ->
-    match upat with
+    fun _env upat ->
+      (upat: pattern :> f_pattern)
+    (* match upat with
       | `Any as r ->
           r
 
@@ -201,6 +202,9 @@ let translate =
 
       | `Var ident ->
           `Var ident
+
+      | `Construct (c, pats) ->
+          `Construct (c, List.map (translate_pat env) pats) *)
 
   (* The thing is here, we're only renaming types, and types of top-level
    * bindings are closed, so there's nothing to forward across structure items.
@@ -369,6 +373,9 @@ and doc_of_pat: f_pattern -> Pprint.document =
         let pdoc1 = doc_of_pat p1 in
         let pdoc2 = doc_of_pat p2 in
         pdoc1 ^^ space ^^ bar ^^ space ^^ pdoc2
+
+    | `Construct _ ->
+        failwith "TODO: pretty-print construct patterns"
 
     | `Const c ->
         doc_of_const c

@@ -70,8 +70,7 @@ module Make(S: Algebra.SOLVER) = struct
           print_loc loc
     | TypeConstructorArguments (s, n1, n2, loc) ->
         Printf.sprintf
-          "%a: the type constructor %s expects %d arguments, but you gave it %d\
-          arguments"
+          "%a: type constructor %s expects %d arguments, but you gave it %d"
           print_loc loc s n1 n2
     | AlgebraError e ->
         Algebra.Core.string_of_error e
@@ -217,13 +216,13 @@ module Make(S: Algebra.SOLVER) = struct
     let type_terms =
       let rec convert = function
         | `Var i ->
-            mapping.(i)
+            tv_tt mapping.(i)
         | `Cons (head_symbol, args) ->
             `Cons (head_symbol, List.map convert args)
       in
       List.map convert type_terms
     in
-    Array.to_list mapping, type_terms
+    head_symbol, Array.to_list mapping, type_terms
 
   let parse_typedecl: env -> (string * type_declaration) list -> env * camlx_user_type =
     let parse_typedecl: env -> string * type_declaration -> env * camlx_user_type =
@@ -308,8 +307,8 @@ module Make(S: Algebra.SOLVER) = struct
   let constr_conj = function
     | hd :: tl ->
         List.fold_left (fun x y -> `Conj (x, y)) hd tl
-    | _ ->
-        assert false
+    | [] ->
+        `True
 
   (* We nest functions that way so that all the options that are passed to
    * generate_constraint are available to generate_constraint_pattern,
@@ -426,6 +425,64 @@ module Make(S: Algebra.SOLVER) = struct
               introduced_vars = [];
               pat = `Const constant
             }
+        | Ppat_construct (Longident.Lident c, pat, _) ->
+            let pats = match pat with
+              | None ->
+                  []
+              | Some { ppat_desc = Ppat_tuple pats; _ } ->
+                  pats
+              | Some pat ->
+                  [pat]
+            in
+            let head_symbol, type_vars, type_terms = copy_data_constructor env c in
+            let x0 = fresh_type_var ~letter:'c' () in
+            let c0: type_constraint = `Equals (x0, `Cons (head_symbol, tvl_ttl type_vars)) in
+            (* let xi sont égaux à type_term[i] *)
+            (* generate_constraint_pattern pi xi *)
+            let l1 = List.length type_terms in
+            let l2 = List.length pats in
+            let pats =
+              if l1 = 1 && l2 > 1 then
+                [ { ppat_desc = Ppat_tuple pats; ppat_loc } ]
+              else if l1 >= 0 && l1 = l2 then
+                pats
+              else
+                raise_error (TypeConstructorArguments (c, l1, l2, ppat_loc))
+            in
+            let patterns = List.map2
+              (fun pat type_term ->
+                let xi = fresh_type_var ~letter:'e' () in
+                let { p_constraint; var_map; introduced_vars; pat } =
+                  generate_constraint_pattern env xi pat
+                in
+                let konstraint = `Equals (xi, type_term) in
+                let konstraint = `Conj (konstraint, p_constraint) in
+                konstraint, var_map, xi :: introduced_vars, pat)
+              pats
+              type_terms
+            in
+            let konstraint = constr_conj (List.map (fun (x, _, _, _) -> x) patterns) in
+            let var_map = List.fold_left
+              (fun known_map sub_map ->
+                dont_bind_several_times ppat_loc known_map sub_map;
+                IdentMap.union known_map sub_map
+              )
+              IdentMap.empty
+              (List.map (fun (_, x, _, _) -> x) patterns)
+            in
+            let introduced_vars =
+              x0 :: type_vars
+              @ List.flatten (List.map (fun (_, _, x, _) -> x) patterns)
+            in
+            let konstraint = `Conj (konstraint, c0) in
+            let pat = `Construct (c, List.map (fun (_, _, _, x) -> x) patterns) in
+            {
+              p_constraint = konstraint;
+              var_map;
+              introduced_vars;
+              pat;
+            }
+
         | _ ->
             raise_error (NotImplemented ("some pattern", ppat_loc))
 

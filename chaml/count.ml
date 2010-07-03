@@ -66,6 +66,8 @@ let count_camlx_nodes e =
         1 + List.fold_left (fun acc p -> acc + count_pat p) 0 p
     | `Or (p1, p2) ->
         1 + count_pat p1 + count_pat p2
+    | `Construct (_, p) ->
+        1 + List.fold_left (fun acc p -> acc + count_pat p) 0 p
     | `Const _
     | `Any ->
         1

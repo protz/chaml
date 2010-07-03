@@ -28,6 +28,16 @@ open Algebra.Identifiers
 
 module Make (S: Algebra.SOLVER): sig
 
+  type user_type_var = int
+  type user_type_term = user_type_var Algebra.Core.type_term
+  type user_type_kind = [ `Variant | `Record ]
+  type user_label = string
+  type user_type = <
+    user_type_arity: int;
+    user_type_kind: user_type_kind;
+    user_type_fields: (user_label * user_type_term list) list;
+  >
+
   type expression = [
     | `Let of bool * (pattern * S.pscheme * expression) list * expression 
         (** The boolean is true if this is recursive *)
@@ -51,6 +61,7 @@ module Make (S: Algebra.SOLVER): sig
     | `Or of pattern * pattern
     | `Const of const
     | `Any
+    | `Construct of user_label * pattern list
   ]
   and const = [
     | `Char of char
@@ -58,16 +69,6 @@ module Make (S: Algebra.SOLVER): sig
     | `Float of string
     | `String of string
   ]
-
-  type user_type_var = int
-  type user_type_term = user_type_var Algebra.Core.type_term
-  type user_type_kind = [ `Variant | `Record ]
-  type user_label = string
-  type user_type = <
-    user_type_arity: int;
-    user_type_kind: user_type_kind;
-    user_type_fields: (user_label * user_type_term list) list;
-  >
 
   type structure_item = [
     | `Let of bool * (pattern * S.pscheme * expression) list
@@ -77,6 +78,17 @@ module Make (S: Algebra.SOLVER): sig
   type structure = structure_item list
 
 end
+
+(* XXX this has been changed since *)
+type f_user_type_var = string
+type f_user_type_term = f_user_type_var Algebra.Core.type_term
+type f_user_type_kind = [ `Variant | `Record ]
+type f_user_label = string
+type f_user_type = <
+  user_type_vars: f_user_type_var list;
+  user_type_kind: f_user_type_kind;
+  user_type_fields: (f_user_label * f_user_type) list;
+>
 
 type f_type_term = DeBruijn.type_term
 type f_instance = f_type_term list
@@ -103,6 +115,7 @@ and f_pattern = [
   | `Tuple of f_pattern list
   | `Or of f_pattern * f_pattern
   | `Const of f_const
+  | `Construct of f_user_label * f_pattern list
   | `Any
 ]
 and f_const = [
@@ -116,17 +129,6 @@ and f_clblock = {
   young_vars: int;
   f_type_term: f_type_term;
 }
-
-(* XXX this has been changed since *)
-type f_user_type_var = string
-type f_user_type_term = f_user_type_var Algebra.Core.type_term
-type f_user_type_kind = [ `Variant | `Record ]
-type f_user_label = string
-type f_user_type = <
-  user_type_vars: f_user_type_var list;
-  user_type_kind: f_user_type_kind;
-  user_type_fields: (f_user_label * f_user_type) list;
->
 
 type f_structure_item = [
   | `Let of bool * (f_pattern * f_clblock * f_expression) list
