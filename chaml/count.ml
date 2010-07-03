@@ -54,6 +54,8 @@ let count_camlx_nodes e =
         + count_expr e) 0 pe) + count_type f_type_term
     | `Tuple es ->
         1 + (List.fold_left (fun acc e -> acc + count_expr e) 0 es)
+    | `Construct (_, e) ->
+        1 + List.fold_left (fun acc e -> acc + count_expr e) 0 e
     | `Const _ ->
         1
     | `Magic _ ->

@@ -185,6 +185,9 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
       let exprs = List.map (desugar_expr env) exprs in
       `Tuple exprs
 
+  | `Construct _ ->
+      failwith "TODO: implement construct in desugar"
+
   | `Const c ->
       let c = desugar_const c in
       `Const c

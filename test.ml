@@ -1,9 +1,4 @@
-type t = A | B
-type t = B
-
-let f = function A -> "a" | B -> "b"
-
-(* type 'a t = Nil | Cons of 'a * 'a t
+type 'a list = Nil | Cons of 'a * 'a list
 
 let length =
   let rec length acc = function
@@ -12,12 +7,20 @@ let length =
   in
   length 0
 
+let rev =
+  let rec rev acc = function
+    | Cons (hd, tl) ->
+        rev (Cons (hd, acc)) tl
+    | Nil ->
+        acc
+  in
+  rev Nil
+
 let map f =
   let rec map acc = function
     | Nil ->
         rev acc
     | Cons (hd, tl) ->
-        map ((f hd) :: acc) tl
+        map (Cons ((f hd), acc)) tl
   in
-  map []
- *)
+  map Nil

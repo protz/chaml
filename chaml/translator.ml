@@ -129,6 +129,9 @@ let translate =
       | `Tuple (exprs) ->
           `Tuple (List.map (translate_expr env) exprs)
 
+      | `Construct (c, exprs) ->
+          `Construct (c, List.map (translate_expr env) exprs)
+
       | `Const _ as x ->
           x
 
@@ -354,6 +357,9 @@ let rec doc_of_expr: f_expression -> Pprint.document =
 
     | `Const c ->
         doc_of_const c
+
+    | `Construct _ ->
+        failwith "TODO: implement construct pretty-printing in translator"
 
     | `Magic t ->
         (string "%magic: ") ^^ (string (DeBruijn.string_of_type_term t))

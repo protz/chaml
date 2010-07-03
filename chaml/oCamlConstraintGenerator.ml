@@ -285,6 +285,7 @@ module Make(S: Algebra.SOLVER) = struct
                 method user_type_kind  = `Variant
                 method user_type_fields = constructors
               end
+
           | _ ->
               failwith "Unsupported data type"
     in
@@ -351,6 +352,7 @@ module Make(S: Algebra.SOLVER) = struct
               introduced_vars = [];
               pat = `Any;
             }
+
         | Ppat_var v ->
             let var = ident v ppat_loc in
             let solver_scheme = new_scheme x in
@@ -361,6 +363,7 @@ module Make(S: Algebra.SOLVER) = struct
               introduced_vars = [];
               pat = `Var var;
             }
+
         | Ppat_tuple patterns ->
             let xis = List.map (fun _ -> fresh_type_var ()) patterns in
             let patterns = List.map2
@@ -391,6 +394,7 @@ module Make(S: Algebra.SOLVER) = struct
               introduced_vars = pattern_vars;
               pat;
             }
+
         | Ppat_or (pat1, pat2) ->
             (* match e1 with p1 | p2 -> *)
             let { p_constraint = c1; var_map = map1; introduced_vars = vars1; pat = lp1 } =
@@ -415,6 +419,7 @@ module Make(S: Algebra.SOLVER) = struct
               introduced_vars = vars1 @ vars2;
               pat = `Or (lp1, lp2);
             }
+
         | Ppat_constant const ->
             let konstraint, constant =
               generate_constraint_constant env ppat_loc x const
@@ -425,7 +430,10 @@ module Make(S: Algebra.SOLVER) = struct
               introduced_vars = [];
               pat = `Const constant
             }
+
         | Ppat_construct (Longident.Lident c, pat, _) ->
+            let head_symbol, type_vars, type_terms = copy_data_constructor env c in
+            let c0: type_constraint = `Equals (x, `Cons (head_symbol, tvl_ttl type_vars)) in
             let pats = match pat with
               | None ->
                   []
@@ -434,10 +442,6 @@ module Make(S: Algebra.SOLVER) = struct
               | Some pat ->
                   [pat]
             in
-            let head_symbol, type_vars, type_terms = copy_data_constructor env c in
-            let c0: type_constraint = `Equals (x, `Cons (head_symbol, tvl_ttl type_vars)) in
-            (* let xi sont égaux à type_term[i] *)
-            (* generate_constraint_pattern pi xi *)
             let l1 = List.length type_terms in
             let l2 = List.length pats in
             let pats =
@@ -470,8 +474,7 @@ module Make(S: Algebra.SOLVER) = struct
               (List.map (fun (_, x, _, _) -> x) patterns)
             in
             let introduced_vars =
-              type_vars
-              @ List.flatten (List.map (fun (_, _, x, _) -> x) patterns)
+              type_vars @ List.flatten (List.map (fun (_, _, x, _) -> x) patterns)
             in
             let konstraint = `Conj (konstraint, c0) in
             let pat = `Construct (c, List.map (fun (_, _, _, x) -> x) patterns) in
@@ -527,11 +530,13 @@ module Make(S: Algebra.SOLVER) = struct
           let e_constraint = `Instance (ident, t, solver_instance) in
           let expr = `Instance (ident, solver_instance) in
           { e_constraint; expr; }
+
       | Pexp_constant c ->
           let e_constraint, expr =
             generate_constraint_constant env pexp_loc t c
           in
           { e_constraint; expr = `Const expr; }
+
       | Pexp_function (_, _, pat_expr_list) ->
           (* As in the definition. We could generate fresh variables for each
            * branch of the pattern-matching. The conjunction would then force
@@ -572,6 +577,7 @@ module Make(S: Algebra.SOLVER) = struct
            * we're good! *)
           let pscheme = new_pscheme x1 in
           { e_constraint; expr = `Function (pscheme, patexprs) }
+
       | Pexp_apply (e1, label_expr_list) ->
           (* ti: xi *)
           let xis, sub_constraints = List.split
@@ -607,6 +613,7 @@ module Make(S: Algebra.SOLVER) = struct
             e_constraint = `Exists (x1 :: xis, konstraint);
             expr =  `App (e1, terms)
           }
+
       | Pexp_let (rec_flag, pat_expr_list, e2) ->
           (* Once again, the list of pattern/expressions is here because of
            * let ... and ... in e2 (multiple simultaneous definitions *)
@@ -725,6 +732,7 @@ module Make(S: Algebra.SOLVER) = struct
               e_constraint = `Exists ([x1], constr_conj (constr_e1 :: constraints));
               expr = `Match (term_e1, pscheme, pat_exprs);
             }
+
       | Pexp_tuple (expressions) ->
           let generate exp =
             let xi = fresh_type_var ~letter:'u' () in
@@ -740,6 +748,47 @@ module Make(S: Algebra.SOLVER) = struct
           let konstraint = `Exists (xis, konstraint) in
           let expr = `Tuple (expressions) in
           { e_constraint = konstraint; expr; }
+
+      | Pexp_construct (Longident.Lident c, expr, _) ->
+          let head_symbol, type_vars, type_terms = copy_data_constructor env c in
+          let c0: type_constraint = `Equals (t, `Cons (head_symbol, tvl_ttl type_vars)) in
+          let exprs = match expr with
+            | None ->
+                []
+            | Some { pexp_desc = Pexp_tuple exprs; _ } ->
+                exprs
+            | Some expr ->
+                [expr]
+          in
+          let l1 = List.length type_terms in
+          let l2 = List.length exprs in
+          let exprs =
+            if l1 = 1 && l2 > 1 then
+              [ { pexp_desc = Pexp_tuple exprs; pexp_loc } ]
+            else if l1 >= 0 && l1 = l2 then
+              exprs
+            else
+              raise_error (TypeConstructorArguments (c, l1, l2, pexp_loc))
+          in
+          let xis, constraints, exprs = Jlist.split3 (List.map2
+            (fun expr type_term ->
+              let xi = fresh_type_var ~letter:'e' () in
+              let { e_constraint; expr; } =
+                generate_constraint_expression env xi expr
+              in
+              let konstraint = `Equals (xi, type_term) in
+              let konstraint = `Conj (konstraint, e_constraint) in
+              xi, konstraint, expr)
+            exprs
+            type_terms)
+          in
+          let konstraint = `Exists (xis @ type_vars, constr_conj (c0 :: constraints)) in
+          let expr = `Construct (c, exprs) in
+          {
+            e_constraint = konstraint;
+            expr;
+          }
+
       | _ ->
           raise_error (NotImplemented ("some expression", pexp_loc))
 
