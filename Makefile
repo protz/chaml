@@ -27,6 +27,17 @@ debug:
 		test.ml
 	./noyacchack.sh
 
+debug_ast_ddb:
+	./yacchack.sh
+	ocamlbuild -tag debug \
+	  $(BUILDFLAGS) -tag use_unix chaml/chaml.byte
+	OCAMLRUNPARAM=b=1 ./chaml.byte --print-typed-ast --enable debug \
+		--print-core-ast\
+		--disable default-bindings\
+		--print-constraint\
+		test.ml
+	./noyacchack.sh
+
 debug_ast:
 	./yacchack.sh
 	ocamlbuild -tag debug \

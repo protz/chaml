@@ -435,8 +435,7 @@ module Make(S: Algebra.SOLVER) = struct
                   [pat]
             in
             let head_symbol, type_vars, type_terms = copy_data_constructor env c in
-            let x0 = fresh_type_var ~letter:'c' () in
-            let c0: type_constraint = `Equals (x0, `Cons (head_symbol, tvl_ttl type_vars)) in
+            let c0: type_constraint = `Equals (x, `Cons (head_symbol, tvl_ttl type_vars)) in
             (* let xi sont égaux à type_term[i] *)
             (* generate_constraint_pattern pi xi *)
             let l1 = List.length type_terms in
@@ -471,7 +470,7 @@ module Make(S: Algebra.SOLVER) = struct
               (List.map (fun (_, x, _, _) -> x) patterns)
             in
             let introduced_vars =
-              x0 :: type_vars
+              type_vars
               @ List.flatten (List.map (fun (_, _, x, _) -> x) patterns)
             in
             let konstraint = `Conj (konstraint, c0) in
