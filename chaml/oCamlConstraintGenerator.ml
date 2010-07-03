@@ -982,15 +982,67 @@ module Make(S: Algebra.SOLVER) = struct
           in
           List.split [plus_scheme; minus_scheme; mult_scheme]
         in
-        let topmost_constraint, structure_items =
-          generate_structure_items env structure
+        let default_type_decls =
+          let ptyp ptyp_desc = { ptyp_desc; ptyp_loc = Location.none } in
+          [
+            {
+              pstr_desc = Pstr_type ["list",
+                { ptype_params = ["a"];
+                  ptype_cstrs = [];
+                  ptype_kind = Ptype_variant
+                    ["[]", [], Location.none;
+                     "::", [ptyp (Ptyp_var "a");
+                            ptyp (Ptyp_constr (Longident.Lident "list",
+                                  [ptyp (Ptyp_var "a")]));
+                           ], Location.none;
+                    ];
+                  ptype_private = Asttypes.Public;
+                  ptype_manifest = None;
+                  ptype_variance = [];
+                  ptype_loc = Location.none;
+                }
+              ];
+              pstr_loc = Location.none;
+            };
+            {
+              pstr_desc = Pstr_type ["bool",
+                { ptype_params = [];
+                  ptype_cstrs = [];
+                  ptype_kind = Ptype_variant
+                    ["true", [], Location.none;
+                     "false", [], Location.none;
+                    ];
+                  ptype_private = Asttypes.Public;
+                  ptype_manifest = None;
+                  ptype_variance = [];
+                  ptype_loc = Location.none;
+                }
+              ];
+              pstr_loc = Location.none;
+            };
+            {
+              pstr_desc = Pstr_type ["unit",
+                { ptype_params = [];
+                  ptype_cstrs = [];
+                  ptype_kind = Ptype_variant ["()", [], Location.none];
+                  ptype_private = Asttypes.Public;
+                  ptype_manifest = None;
+                  ptype_variance = [];
+                  ptype_loc = Location.none;
+                }
+              ];
+              pstr_loc = Location.none;
+            }
+          ]
         in
         if opt_default_bindings then
+          let topmost_constraint, structure_items =
+            generate_structure_items env (default_type_decls @ structure)
+          in
           `Let (default_bindings, topmost_constraint),
           `Let (false, default_let_bindings) :: structure_items
         else
-          topmost_constraint,
-          structure_items
+          generate_structure_items env structure
 
     (* This is only used by Pexp_let case. Still, it's a nice standalone block. *)
     and generate_constraint_scheme: env -> pattern * expression -> constraint_scheme =
