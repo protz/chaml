@@ -273,6 +273,8 @@ module Make(S: Algebra.SOLVER) = struct
                     failwith "Dunno what to do with this core type"
               in
               let parse_constructor (cons_name, core_types, _cons_loc) =
+                if cons_name = "()" then
+                  failwith "Don't redefine the () type constructor, it's insane!";
                 (cons_name, List.map convert_core_type core_types)
               in
               let constructors = List.map parse_constructor constructors in
@@ -750,6 +752,7 @@ module Make(S: Algebra.SOLVER) = struct
           { e_constraint = konstraint; expr; }
 
       | Pexp_construct (Longident.Lident c, expr, _) ->
+          Error.debug "[CG] Found constructor %s\n" c;
           let head_symbol, type_vars, type_terms = copy_data_constructor env c in
           let c0: type_constraint = `Equals (t, `Cons (head_symbol, tvl_ttl type_vars)) in
           let exprs = match expr with
@@ -788,6 +791,21 @@ module Make(S: Algebra.SOLVER) = struct
             e_constraint = konstraint;
             expr;
           }
+
+      | Pexp_sequence (e1, e2) ->
+          let t1 = fresh_type_var ~letter:'s' () in
+          let { e_constraint = c1; expr = e1 } =
+            generate_constraint_expression env t1 e1
+          in
+          let { e_constraint = c2; expr = e2 } =
+            generate_constraint_expression env t e2
+          in
+          let unit_head_symbol, _ = data_type_of_constructor env "()" in
+          let e_constraint = `Equals (t1, `Cons (unit_head_symbol, [])) in
+          let e_constraint = constr_conj [e_constraint; c1; c2] in
+          let e_constraint = `Exists ([t1], e_constraint) in
+          let expr = `Sequence (e1, e2) in
+          { e_constraint; expr }
 
       | _ ->
           raise_error (NotImplemented ("some expression", pexp_loc))
@@ -982,62 +1000,26 @@ module Make(S: Algebra.SOLVER) = struct
           in
           List.split [plus_scheme; minus_scheme; mult_scheme]
         in
-        let default_type_decls =
-          let ptyp ptyp_desc = { ptyp_desc; ptyp_loc = Location.none } in
-          [
-            {
-              pstr_desc = Pstr_type ["list",
-                { ptype_params = ["a"];
-                  ptype_cstrs = [];
-                  ptype_kind = Ptype_variant
-                    ["[]", [], Location.none;
-                     "::", [ptyp (Ptyp_var "a");
-                            ptyp (Ptyp_constr (Longident.Lident "list",
-                                  [ptyp (Ptyp_var "a")]));
-                           ], Location.none;
-                    ];
-                  ptype_private = Asttypes.Public;
-                  ptype_manifest = None;
-                  ptype_variance = [];
-                  ptype_loc = Location.none;
-                }
-              ];
-              pstr_loc = Location.none;
-            };
-            {
-              pstr_desc = Pstr_type ["bool",
-                { ptype_params = [];
-                  ptype_cstrs = [];
-                  ptype_kind = Ptype_variant
-                    ["true", [], Location.none;
-                     "false", [], Location.none;
-                    ];
-                  ptype_private = Asttypes.Public;
-                  ptype_manifest = None;
-                  ptype_variance = [];
-                  ptype_loc = Location.none;
-                }
-              ];
-              pstr_loc = Location.none;
-            };
-            {
-              pstr_desc = Pstr_type ["unit",
-                { ptype_params = [];
-                  ptype_cstrs = [];
-                  ptype_kind = Ptype_variant ["()", [], Location.none];
-                  ptype_private = Asttypes.Public;
-                  ptype_manifest = None;
-                  ptype_variance = [];
-                  ptype_loc = Location.none;
-                }
-              ];
-              pstr_loc = Location.none;
-            }
-          ]
-        in
         if opt_default_bindings then
+          (* We're registering unit, bool, and list *)
+          let head_symbol_unit = { cons_arity = 0; cons_name = "unit" } in
+          let env = register_data_type env head_symbol_unit in
+          let env = register_data_constructors env head_symbol_unit ["()", []] in
+          let head_symbol_bool = { cons_arity = 0; cons_name = "bool" } in
+          let env = register_data_type env head_symbol_bool in
+          let env =
+            register_data_constructors env head_symbol_unit ["true", []; "false", []]
+          in
+          let head_symbol_list = { cons_arity = 1; cons_name = "list" } in
+          let env = register_data_type env head_symbol_list in
+          let env =
+            register_data_constructors
+              env
+              head_symbol_list
+              ["[]", []; "::", [`Var 0; `Cons (head_symbol_list, [`Var 0])]]
+          in
           let topmost_constraint, structure_items =
-            generate_structure_items env (default_type_decls @ structure)
+            generate_structure_items env structure
           in
           `Let (default_bindings, topmost_constraint),
           `Let (false, default_let_bindings) :: structure_items

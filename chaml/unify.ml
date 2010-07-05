@@ -365,6 +365,12 @@ let unify unifier_env v1 v2 =
         repr1.rank <- r;
       in
       debug_unify v2 v1;
+      (* Is this assertion thrown? You probably forgot to introduce your type
+       * variables in the constraint. Use --enable debug and check the last
+       * line: you should have [UUnify] Unifying v1(-2) with v2(-2)
+       *
+       * This means you should introduce the variables that have rank -2 with
+       * `Exists ([v1; v2], ...) in your generated constraint. *)
       assert (repr1.rank >= 0 && repr2.rank >= 0);
       match repr1, repr2 with
         | { term = Some t1; _ }, { term = Some t2; _ } ->

@@ -135,6 +135,9 @@ let translate =
       | `Const _ as x ->
           x
 
+      | `Sequence (e1, e2) ->
+          failwith "ToDo implement sequence in translator.ml"
+
       | `Magic ->
           raise Magic
 

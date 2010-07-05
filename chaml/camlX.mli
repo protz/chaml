@@ -54,6 +54,7 @@ module Make (S: Algebra.SOLVER): sig
     | `Tuple of expression list
     | `Construct of user_label * expression list
     | `Const of const
+    | `Sequence of expression * expression
     | `Magic (** For builtins, gets a special treatment later on *)
   ]
   and pattern = [
