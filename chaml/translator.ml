@@ -135,8 +135,14 @@ let translate =
       | `Const _ as x ->
           x
 
-      | `Sequence (e1, e2) ->
+      | `Sequence _ ->
           failwith "ToDo implement sequence in translator.ml"
+
+      | `IfThenElse _ ->
+          failwith "ToDo implement ifthenelse in translator.ml"
+
+      | `AssertFalse ->
+          failwith "ToDo implement assert false in translator.ml"
 
       | `Magic ->
           raise Magic

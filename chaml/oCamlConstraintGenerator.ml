@@ -205,6 +205,7 @@ module Make(S: Algebra.SOLVER) = struct
 
   let copy_data_constructor env k =
     (* XXX bad complexity, maybe change the abstractions? *)
+    Error.debug "[CG] Copying data constructor %s\n" k;
     let head_symbol, data_constructors = data_type_of_constructor env k in
     let cons_name, type_terms =
       List.find (fun (k', _) -> k = k') data_constructors
@@ -807,6 +808,43 @@ module Make(S: Algebra.SOLVER) = struct
           let expr = `Sequence (e1, e2) in
           { e_constraint; expr }
 
+      | Pexp_ifthenelse (if_expr, then_expr, else_expr) ->
+          let t_bool = fresh_type_var ~letter:'i' () in
+          let { e_constraint = c_if; expr = e_if } =
+            generate_constraint_expression env t_bool if_expr
+          in
+          let bool_head_symbol, _ = data_type_of_constructor env "true" in
+          let konstraint = `Equals (t_bool, `Cons (bool_head_symbol, [])) in
+          let konstraint = `Exists ([t_bool], `Conj (konstraint, c_if)) in
+          let { e_constraint = c_then; expr = e_then } =
+            generate_constraint_expression env t then_expr
+          in
+          let konstraint, expr = match else_expr with
+            | None ->
+                let unit_head_symbol, _ = data_type_of_constructor env "()" in
+                let konstraint = constr_conj
+                  [`Equals (t, `Cons (unit_head_symbol, [])); konstraint; c_then]
+                in
+                konstraint,
+                `IfThenElse (e_if, e_then, None)
+            | Some else_expr ->
+                let { e_constraint = c_else; expr = e_else } =
+                  generate_constraint_expression env t else_expr
+                in
+                constr_conj [konstraint; c_then; c_else],
+                `IfThenElse (e_if, e_then, Some e_else)
+          in
+          {
+            e_constraint = konstraint;
+            expr = expr
+          }
+
+      | Pexp_assertfalse ->
+          {
+            e_constraint = `True;
+            expr = `AssertFalse
+          }
+
       | _ ->
           raise_error (NotImplemented ("some expression", pexp_loc))
 
@@ -998,7 +1036,20 @@ module Make(S: Algebra.SOLVER) = struct
             ([mult_var], `Equals (mult_var, mult_type), mult_map, Some solver_pscheme),
             (`Var ident, solver_pscheme, `Magic)
           in
-          List.split [plus_scheme; minus_scheme; mult_scheme]
+          let failwith_scheme =
+            let failwith_var = fresh_type_var ~letter:'z' () in
+            let failwith_type =
+              type_cons_arrow type_cons_string failwith_var
+            in
+            let pos = Location.none in
+            let solver_scheme = new_scheme failwith_var in
+            let solver_pscheme = new_pscheme failwith_var in
+            let ident = ident "failwith" pos in
+            let failwith_map = IdentMap.add ident (failwith_var, solver_scheme) IdentMap.empty in
+            ([failwith_var], `Equals (failwith_var, failwith_type), failwith_map, Some solver_pscheme),
+            (`Var ident, solver_pscheme, `Magic)
+          in
+          List.split [plus_scheme; minus_scheme; mult_scheme; failwith_scheme]
         in
         if opt_default_bindings then
           (* We're registering unit, bool, and list *)

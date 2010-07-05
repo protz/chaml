@@ -55,6 +55,8 @@ module Make (S: Algebra.SOLVER): sig
     | `Construct of user_label * expression list
     | `Const of const
     | `Sequence of expression * expression
+    | `IfThenElse of expression * expression * expression option
+    | `AssertFalse
     | `Magic (** For builtins, gets a special treatment later on *)
   ]
   and pattern = [

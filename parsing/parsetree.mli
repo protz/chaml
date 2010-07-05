@@ -91,16 +91,18 @@ and expression_desc =
   | Pexp_function of label * expression option * (pattern * expression) list
   | Pexp_apply of expression * (label * expression) list
   | Pexp_match of expression * (pattern * expression) list
-  | Pexp_try of expression * (pattern * expression) list
   | Pexp_tuple of expression list
   | Pexp_construct of Longident.t * expression option * bool
+  | Pexp_ifthenelse of expression * expression * expression option
+  | Pexp_sequence of expression * expression
+  | Pexp_assertfalse
+
+  | Pexp_try of expression * (pattern * expression) list
   | Pexp_variant of label * expression option
   | Pexp_record of (Longident.t * expression) list * expression option
   | Pexp_field of expression * Longident.t
   | Pexp_setfield of expression * Longident.t * expression
   | Pexp_array of expression list
-  | Pexp_ifthenelse of expression * expression * expression option
-  | Pexp_sequence of expression * expression
   | Pexp_while of expression * expression
   | Pexp_for of string * expression * expression * direction_flag * expression
   | Pexp_constraint of expression * core_type option * core_type option
@@ -111,7 +113,6 @@ and expression_desc =
   | Pexp_override of (string * expression) list
   | Pexp_letmodule of string * module_expr * expression
   | Pexp_assert of expression
-  | Pexp_assertfalse
   | Pexp_lazy of expression
   | Pexp_poly of expression * core_type option
   | Pexp_object of class_structure
