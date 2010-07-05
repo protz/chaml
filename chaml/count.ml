@@ -192,8 +192,6 @@ let count_ocaml_nodes str =
 
   and count_expr { pexp_desc; _ } =
     match pexp_desc with
-    | Pexp_done ->
-        1
     | Pexp_ident _ ->
         1
     | Pexp_constant _ ->
