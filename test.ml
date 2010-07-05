@@ -15,6 +15,8 @@
 
 (* List operations *)
 
+let invalid_arg = failwith
+
 let rec length_aux len = function
     [] -> len
   | a::l -> length_aux (len + 1) l
@@ -37,14 +39,16 @@ let nth l n =
     | a::l -> if n = 0 then a else nth_aux l (n-1)
   in nth_aux l n
 
-let append = (@)
-
 let rec rev_append l1 l2 =
   match l1 with
     [] -> l2
   | a :: l -> rev_append l (a :: l2)
 
 let rev l = rev_append l []
+
+let append l1 l2 = rev (rev_append l1 l2)
+
+let (@) = append
 
 let rec flatten = function
     [] -> []

@@ -835,6 +835,7 @@ module Make(S: Algebra.SOLVER) = struct
           in
           let konstraint, expr = match else_expr with
             | None ->
+                Error.debug "[CGIfThenElse] Else is empty, enforcing unit\n";
                 let unit_head_symbol, _ = data_type_of_constructor env "()" in
                 let konstraint = constr_conj
                   [`Equals (t, `Cons (unit_head_symbol, [])); konstraint; c_then]
@@ -1010,73 +1011,114 @@ module Make(S: Algebra.SOLVER) = struct
           | [] ->
               `Done, []
         in
-        let default_bindings, default_let_bindings =
-          let plus_scheme =
-            let plus_var = fresh_type_var ~letter:'z' () in
-            let plus_type =
-              type_cons_arrow type_cons_int (type_cons_arrow type_cons_int type_cons_int)
-            in
-            let pos = Location.none in
-            let solver_scheme = new_scheme plus_var in
-            let solver_pscheme = new_pscheme plus_var in
-            let ident = ident "+" pos in
-            let plus_map = IdentMap.add ident (plus_var, solver_scheme) IdentMap.empty in
-            ([plus_var], `Equals (plus_var, plus_type), plus_map, Some solver_pscheme),
-            (`Var ident, solver_pscheme, `Magic)
-          in
-          let minus_scheme =
-            let minus_var = fresh_type_var ~letter:'z' () in
-            let minus_type =
-              type_cons_arrow type_cons_int (type_cons_arrow type_cons_int type_cons_int)
-            in
-            let pos = Location.none in
-            let solver_scheme = new_scheme minus_var in
-            let solver_pscheme = new_pscheme minus_var in
-            let ident = ident "-" pos in
-            let minus_map = IdentMap.add ident (minus_var, solver_scheme) IdentMap.empty in
-            ([minus_var], `Equals (minus_var, minus_type), minus_map, Some solver_pscheme),
-            (`Var ident, solver_pscheme, `Magic)
-          in
-          let mult_scheme =
-            let mult_var = fresh_type_var ~letter:'z' () in
-            let mult_type =
-              type_cons_arrow type_cons_int (type_cons_arrow type_cons_int type_cons_int)
-            in
-            let pos = Location.none in
-            let solver_scheme = new_scheme mult_var in
-            let solver_pscheme = new_pscheme mult_var in
-            let ident = ident "*" pos in
-            let mult_map = IdentMap.add ident (mult_var, solver_scheme) IdentMap.empty in
-            ([mult_var], `Equals (mult_var, mult_type), mult_map, Some solver_pscheme),
-            (`Var ident, solver_pscheme, `Magic)
-          in
-          let failwith_scheme =
-            let failwith_var = fresh_type_var ~letter:'z' () in
-            let alpha = fresh_type_var ~letter:'a' () in
-            let failwith_type =
-              type_cons_arrow type_cons_string alpha
-            in
-            let pos = Location.none in
-            let solver_scheme = new_scheme failwith_var in
-            let solver_pscheme = new_pscheme failwith_var in
-            let ident = ident "failwith" pos in
-            let failwith_map = IdentMap.add ident (failwith_var, solver_scheme) IdentMap.empty in
-            ([failwith_var], `Equals (failwith_var, failwith_type), failwith_map, Some solver_pscheme),
-            (`Var ident, solver_pscheme, `Magic)
-          in
-          List.split [plus_scheme; minus_scheme; mult_scheme; failwith_scheme]
-        in
         if opt_default_bindings then
-          (* We're registering unit, bool, and list *)
           let head_symbol_unit = { cons_arity = 0; cons_name = "unit" } in
+          let head_symbol_bool = { cons_arity = 0; cons_name = "bool" } in
+          let head_symbol_list = { cons_arity = 1; cons_name = "list" } in
+          let type_cons_bool = `Cons (head_symbol_bool, []) in
+          let default_bindings, default_let_bindings =
+            let arithmetic_operator_scheme op =
+              let op_var = fresh_type_var ~letter:'z' () in
+              let op_type =
+                type_cons_arrow type_cons_int (type_cons_arrow type_cons_int type_cons_int)
+              in
+              let pos = Location.none in
+              let solver_scheme = new_scheme op_var in
+              let solver_pscheme = new_pscheme op_var in
+              let ident = ident op pos in
+              let op_map = IdentMap.add ident (op_var, solver_scheme) IdentMap.empty in
+              ([op_var], `Equals (op_var, op_type), op_map, Some solver_pscheme),
+              (`Var ident, solver_pscheme, `Magic)
+            in
+            let mult_scheme = arithmetic_operator_scheme "*" in
+            let minus_scheme = arithmetic_operator_scheme "-" in
+            let plus_scheme = arithmetic_operator_scheme "+" in
+            let asr_scheme = arithmetic_operator_scheme "asr" in
+            let andand_scheme =
+              let andand_var = fresh_type_var ~letter:'z' () in
+              let andand_type =
+                type_cons_arrow type_cons_bool (type_cons_arrow type_cons_bool type_cons_bool)
+              in
+              let pos = Location.none in
+              let solver_scheme = new_scheme andand_var in
+              let solver_pscheme = new_pscheme andand_var in
+              let ident = ident "&&" pos in
+              let andand_map = IdentMap.add ident (andand_var, solver_scheme) IdentMap.empty in
+              ([andand_var], `Equals (andand_var, andand_type), andand_map, Some solver_pscheme),
+              (`Var ident, solver_pscheme, `Magic)
+            in
+            let oror_scheme =
+              let oror_var = fresh_type_var ~letter:'z' () in
+              let oror_type =
+                type_cons_arrow type_cons_bool (type_cons_arrow type_cons_bool type_cons_bool)
+              in
+              let pos = Location.none in
+              let solver_scheme = new_scheme oror_var in
+              let solver_pscheme = new_pscheme oror_var in
+              let ident = ident "||" pos in
+              let oror_map = IdentMap.add ident (oror_var, solver_scheme) IdentMap.empty in
+              ([oror_var], `Equals (oror_var, oror_type), oror_map, Some solver_pscheme),
+              (`Var ident, solver_pscheme, `Magic)
+            in
+            let failwith_scheme =
+              let failwith_var = fresh_type_var ~letter:'z' () in
+              let alpha = fresh_type_var ~letter:'a' () in
+              let failwith_type =
+                type_cons_arrow type_cons_string alpha
+              in
+              let pos = Location.none in
+              let solver_scheme = new_scheme failwith_var in
+              let solver_pscheme = new_pscheme failwith_var in
+              let ident = ident "failwith" pos in
+              let failwith_map = IdentMap.add ident (failwith_var, solver_scheme) IdentMap.empty in
+              ([failwith_var; alpha], `Equals (failwith_var, failwith_type), failwith_map, Some solver_pscheme),
+              (`Var ident, solver_pscheme, `Magic)
+            in
+            let compare_scheme =
+              let compare_var = fresh_type_var ~letter:'z' () in
+              let alpha = fresh_type_var ~letter:'a' () in
+              let compare_type =
+                type_cons_arrow
+                  alpha
+                  (type_cons_arrow alpha type_cons_int)
+              in
+              let pos = Location.none in
+              let solver_scheme = new_scheme compare_var in
+              let solver_pscheme = new_pscheme compare_var in
+              let ident = ident "compare" pos in
+              let compare_map = IdentMap.add ident (compare_var, solver_scheme) IdentMap.empty in
+              ([compare_var; alpha], `Equals (compare_var, compare_type), compare_map, Some solver_pscheme),
+              (`Var ident, solver_pscheme, `Magic)
+            in
+            let polymorphic_scheme op =
+              let op_var = fresh_type_var ~letter:'z' () in
+              let alpha = fresh_type_var ~letter:'a' () in
+              let op_type =
+                type_cons_arrow
+                  alpha
+                  (type_cons_arrow alpha type_cons_bool)
+              in
+              let pos = Location.none in
+              let solver_scheme = new_scheme op_var in
+              let solver_pscheme = new_pscheme op_var in
+              let ident = ident op pos in
+              let op_map = IdentMap.add ident (op_var, solver_scheme) IdentMap.empty in
+              ([op_var; alpha], `Equals (op_var, op_type), op_map, Some solver_pscheme),
+              (`Var ident, solver_pscheme, `Magic)
+            in
+            List.split (
+              [plus_scheme; minus_scheme; mult_scheme; failwith_scheme;
+                andand_scheme; oror_scheme; compare_scheme; asr_scheme ] @
+              (List.map polymorphic_scheme ["<"; "<="; ">"; ">="; "=="; "="; "<>"])
+            )
+          in
+          (* We're registering unit, bool, and list *)
           let env = register_data_type env head_symbol_unit in
           let env = register_data_constructors env head_symbol_unit ["()", []] in
-          let head_symbol_bool = { cons_arity = 0; cons_name = "bool" } in
           let env = register_data_type env head_symbol_bool in
           let env =
-            register_data_constructors env head_symbol_unit ["true", []; "false", []]
+            register_data_constructors env head_symbol_bool ["true", []; "false", []]
           in
-          let head_symbol_list = { cons_arity = 1; cons_name = "list" } in
           let env = register_data_type env head_symbol_list in
           let env =
             register_data_constructors
