@@ -66,6 +66,7 @@ module Make (S: Algebra.SOLVER): sig
     | `Const of const
     | `Any
     | `Construct of user_label * pattern list
+    | `Alias of pattern * ident
   ]
   and const = [
     | `Char of char
@@ -121,6 +122,7 @@ and f_pattern = [
   | `Or of f_pattern * f_pattern
   | `Const of f_const
   | `Construct of f_user_label * f_pattern list
+  | `Alias of f_pattern * ident
   | `Any
 ]
 and f_const = [

@@ -395,6 +395,9 @@ and doc_of_pat: f_pattern -> Pprint.document =
     | `Const c ->
         doc_of_const c
 
+    | `Alias _ ->
+        failwith "TODO pretty-print pattern alias in translator"
+
     | `Var ident ->
         string (string_of_ident ident)
 

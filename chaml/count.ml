@@ -73,6 +73,8 @@ let count_camlx_nodes e =
     | `Const _
     | `Any ->
         1
+    | `Alias (p, _) ->
+        1 + count_pat p
 
   and count_type = function
     | `Var _ ->

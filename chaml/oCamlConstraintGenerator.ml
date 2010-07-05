@@ -423,6 +423,20 @@ module Make(S: Algebra.SOLVER) = struct
               pat = `Or (lp1, lp2);
             }
 
+        | Ppat_alias (pat, s) ->
+            let { p_constraint; var_map; introduced_vars; pat; } =
+              generate_constraint_pattern env x pat
+            in
+            let var = ident s ppat_loc in
+            let solver_scheme = new_scheme x in
+            let var_map = IdentMap.add var (x, solver_scheme) var_map in
+            {
+              p_constraint;
+              var_map;
+              introduced_vars;
+              pat = `Alias (pat, var)
+            }
+
         | Ppat_constant const ->
             let konstraint, constant =
               generate_constraint_constant env ppat_loc x const
@@ -1038,8 +1052,9 @@ module Make(S: Algebra.SOLVER) = struct
           in
           let failwith_scheme =
             let failwith_var = fresh_type_var ~letter:'z' () in
+            let alpha = fresh_type_var ~letter:'a' () in
             let failwith_type =
-              type_cons_arrow type_cons_string failwith_var
+              type_cons_arrow type_cons_string alpha
             in
             let pos = Location.none in
             let solver_scheme = new_scheme failwith_var in

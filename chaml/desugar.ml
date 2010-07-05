@@ -265,6 +265,9 @@ and desugar_pat env ?rebind pat =
   | `Construct _ ->
       failwith "TODO: desugar construct patterns"
 
+  | `Alias _ ->
+      failwith "TODO: desugar alias patterns"
+
   | `Const c ->
       `Const (desugar_const c), []
 
