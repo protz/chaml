@@ -49,9 +49,6 @@ let find: ident -> env -> Atom.t =
   fun ident { atom_of_ident } ->
     IdentMap.find ident atom_of_ident
 
-let concat f l =
-  List.fold_left f (List.hd l) (List.tl l)
-
 let rec wrap_lambda i e =
   if i > 0 then
     wrap_lambda (i - 1) (`TyAbs e)
@@ -301,7 +298,7 @@ and generate_coerc env cenv =
         in
         (* We have the first coercion *)
         let patterns, coercions = List.split (Jlist.map2i gen patterns cons_args) in
-        let c = concat compose coercions in
+        let c = Jlist.concat compose coercions in
         (* Explain that we inject all the variables inside the branches *)
         let rec fold forall =
           if forall = 0 then
@@ -475,7 +472,7 @@ module PrettyPrinting = struct
               (nest 2 (break1 ^^ edoc)))
             map
           in
-          let branches = concat
+          let branches = Jlist.concat
             (fun x y -> x ^^ break1 ^^ anddoc ^^ space ^^ y)
             branches
           in
@@ -498,7 +495,7 @@ module PrettyPrinting = struct
 
       | `App (e1, args) ->
           let e1 = lparen ^^ (doc_of_expr e1) ^^ rparen in
-          concat (fun x y -> x ^^ space ^^ y) (e1 :: (List.map doc_of_expr args))
+          Jlist.concat (fun x y -> x ^^ space ^^ y) (e1 :: (List.map doc_of_expr args))
 
       | `Match (e, pat_exprs) ->
           let edoc = doc_of_expr e in
@@ -517,7 +514,7 @@ module PrettyPrinting = struct
               (nest 4 (break1 ^^ edoc))
           in
           let pat_exprs = List.map gen pat_exprs in
-          let pat_exprs = concat (fun x y -> x ^^ break1 ^^ y) pat_exprs in
+          let pat_exprs = Jlist.concat (fun x y -> x ^^ break1 ^^ y) pat_exprs in
           let matchdoc = pcolor colors.yellow "match" in
           let withdoc = pcolor colors.yellow "with" in
           matchdoc ^^
@@ -535,7 +532,7 @@ module PrettyPrinting = struct
                 may_break (doc_of_expr x)
           in
           let edocs = List.map paren_if_needed exprs in
-          let edoc = concat (fun x y -> x ^^ comma ^^ space ^^ y) edocs in
+          let edoc = Jlist.concat (fun x y -> x ^^ comma ^^ space ^^ y) edocs in
           lparen ^^ edoc ^^ rparen
 
       | `Const c ->
@@ -559,7 +556,7 @@ module PrettyPrinting = struct
 
       | `Tuple patterns ->
           let pdocs = List.map doc_of_pat patterns in
-          let pdoc = concat (fun x y -> x ^^ comma ^^ space ^^ y) pdocs in
+          let pdoc = Jlist.concat (fun x y -> x ^^ comma ^^ space ^^ y) pdocs in
           lparen ^^ pdoc ^^ rparen
 
       | `Or (p1, p2) ->
@@ -650,7 +647,7 @@ module PrettyPrinting = struct
               (nest 2 (break1 ^^ edoc)))
             l
           in
-          let branches = concat
+          let branches = Jlist.concat
             (fun x y -> x ^^ break1 ^^ break1 ^^ anddoc ^^ space ^^ y)
             branches
           in
@@ -660,7 +657,7 @@ module PrettyPrinting = struct
     in
     fun str ->
       let l = List.map doc_of_str str in
-      concat (fun x y -> x ^^ break1 ^^ break1 ^^ y) l
+      Jlist.concat (fun x y -> x ^^ break1 ^^ break1 ^^ y) l
 
   let string_of_struct str =
     let buf = Buffer.create 16 in

@@ -59,3 +59,7 @@ val mapi: (int -> 'a -> 'b) -> 'a list -> 'b list
 (** Same as [fold_left] except that the function takes the current index in the
    list *)
 val fold_lefti: (int -> 'a -> 'b -> 'a) -> 'a -> 'b list -> 'a
+
+(** Same as fold left, but start folding on the head of the list instead of
+    giving an initial element. *)
+val concat: ('a -> 'a -> 'a) -> 'a list -> 'a

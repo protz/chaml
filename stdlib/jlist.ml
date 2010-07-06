@@ -120,3 +120,6 @@ let fold_lefti f init l =
         acc
   in
   fold_lefti 0 init l
+
+let concat f l =
+  List.fold_left f (List.hd l) (List.tl l)

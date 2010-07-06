@@ -45,9 +45,6 @@ let lift_add env uvar =
   Error.debug "[TLiftAdd] Adding %a\n" uvar_name uvar;
   { fvar_of_uvar = new_map }
 
-let concat f l =
-  List.fold_left f (List.hd l) (List.tl l)
-
 (* Once all the right variables are in the environment, we simply transcribe a
  * scheme into the right fscheme structure (it's a f_type_term) *)
 let type_term_of_uvar env uvar =
@@ -261,7 +258,7 @@ module PrettyPrinting = struct
           in
           let pat_expr_list = List.map gen pat_expr_list in
           let anddoc = fancystring (color 208 "and") 3 in
-          let pat_expr_list = concat
+          let pat_expr_list = Jlist.concat
             (fun x y -> x ^^ break1 ^^ anddoc ^^ space ^^ y)
             pat_expr_list
           in
@@ -286,7 +283,7 @@ module PrettyPrinting = struct
               rparen ^^ space ^^ minus ^^ rangle ^^ (nest 4 (break1 ^^ edoc))
             in
             let pat_expr_list = List.map gen pat_expr_list in
-            let pat_expr_list = concat
+            let pat_expr_list = Jlist.concat
               (fun x y -> x ^^ hardline ^^ y)
               pat_expr_list
             in
@@ -302,7 +299,7 @@ module PrettyPrinting = struct
           let ident = string (string_of_ident ident) in
           if List.length instance > 0 then
             let instance = List.map (fun x -> string (DeBruijn.string_of_type_term x)) instance in
-            let instance = concat (fun x y -> x ^^ comma ^^ space ^^ y) instance in
+            let instance = Jlist.concat (fun x y -> x ^^ comma ^^ space ^^ y) instance in
             let lb = fancystring (color colors.red "[") 1 in
             let rb = fancystring (color colors.red "]") 1 in
             ident ^^ space ^^ lb ^^ instance ^^ rb
@@ -310,7 +307,7 @@ module PrettyPrinting = struct
             ident
 
       | `App (e1, args) ->
-          concat (fun x y -> x ^^ space ^^ y) (List.map doc_of_expr (e1 :: args))
+          Jlist.concat (fun x y -> x ^^ space ^^ y) (List.map doc_of_expr (e1 :: args))
 
       | `Match (expr, { young_vars; f_type_term }, pat_expr_list) ->
           let ldoc = gen_lambdas young_vars in
@@ -325,7 +322,7 @@ module PrettyPrinting = struct
             )
           in
           let pat_expr_list = List.map gen pat_expr_list in
-          let pat_expr_list = concat
+          let pat_expr_list = Jlist.concat
             (fun x y -> x ^^ break1 ^^ y)
             pat_expr_list
           in
@@ -346,7 +343,7 @@ module PrettyPrinting = struct
                 doc_of_expr x
           in
           let edocs = List.map paren_if_needed exprs in
-          let edoc = concat (fun x y -> x ^^ comma ^^ space ^^ y) edocs in
+          let edoc = Jlist.concat (fun x y -> x ^^ comma ^^ space ^^ y) edocs in
           lparen ^^ edoc ^^ rparen
 
       | `Const c ->
@@ -366,7 +363,7 @@ module PrettyPrinting = struct
 
       | `Tuple patterns ->
           let pdocs = List.map doc_of_pat patterns in
-          let pdoc = concat (fun x y -> x ^^ comma ^^ space ^^ y) pdocs in
+          let pdoc = Jlist.concat (fun x y -> x ^^ comma ^^ space ^^ y) pdocs in
           lparen ^^ pdoc ^^ rparen
 
       | `Or (p1, p2) ->
@@ -425,7 +422,7 @@ module PrettyPrinting = struct
           in
           let pat_expr_list = List.map gen pat_expr_list in
           let anddoc = fancystring (color 208 "and") 3 in
-          let pat_expr_list = concat
+          let pat_expr_list = Jlist.concat
             (fun x y -> x ^^ break1 ^^ anddoc ^^ space ^^ y)
             pat_expr_list
           in
@@ -438,7 +435,7 @@ module PrettyPrinting = struct
     in
     fun str ->
       let l = List.map doc_of_str str in
-      concat (fun x y -> x ^^ break1 ^^ break1 ^^ y) l
+      Jlist.concat (fun x y -> x ^^ break1 ^^ break1 ^^ y) l
 
   let string_of_struct str =
     let buf = Buffer.create 16 in
