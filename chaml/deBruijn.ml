@@ -22,7 +22,7 @@ type t = { index: int; }
 type type_var = t Algebra.Core.type_var
 type type_term = [
     type_var
-  | `Cons of Algebra.TypeCons.type_cons * type_term list
+  | `Cons of Algebra.TypeCons.head_symbol * type_term list
   | `Forall of type_term
 ]
 
@@ -39,8 +39,8 @@ let lift t =
         else `Var { index = j + 1 }
     | `Forall t ->
         `Forall (lift (i+1) t)
-    | `Cons (cons_name, cons_args) ->
-        `Cons (cons_name, List.map (lift i) cons_args)
+    | `Cons (head_symbol, cons_args) ->
+        `Cons (head_symbol, List.map (lift i) cons_args)
   in
   lift 0 t
 
@@ -52,8 +52,8 @@ let rec subst t2 { index = i } t1 =
         else if j < i then `Var { index = j }
         else if j > i then `Var { index = j - 1 }
         else assert false
-    | `Cons (cons_name, cons_args) ->
-        `Cons (cons_name, List.map (subst t2 i) cons_args)
+    | `Cons (head_symbol, cons_args) ->
+        `Cons (head_symbol, List.map (subst t2 i) cons_args)
     | `Forall t1 ->
         `Forall (subst (lift t2) (i + 1) t1)
   in

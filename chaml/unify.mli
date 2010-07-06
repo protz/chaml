@@ -25,7 +25,6 @@ open Algebra.TypeCons
 open Algebra.Identifiers
 open Algebra.Core
 
-
 (** {3 Error handling} *)
 
 (** In case two terms cannot be unified, an error will be returned. *)
@@ -59,7 +58,7 @@ and unifier_var
 
     When a term is equated with another one, they are unified on-the-fly in
     {!unify}. *)
-and unifier_term = [ `Cons of type_cons * unifier_var list ]
+and unifier_term = [ `Cons of head_symbol * unifier_var list ]
 
 (** A scheme is a list of young variables and a constraint. *)
 and unifier_scheme = {
@@ -122,7 +121,6 @@ val rank: unifier_var -> int
 module Pool: sig
   type t = { rank: int; mutable members: unifier_var list; }
   val add: t -> unifier_var -> unit
-  val add_list: t -> unifier_var list -> unit
   val base_pool: t
   val next: t -> t
 end
@@ -138,7 +136,7 @@ type unifier_env
 val get_pool: unifier_env -> int -> Pool.t
 
 (** If you need a sub-pool, call this function. The one above asserts that the
-    pool is in the current authorized range. *)
+    pool is in the current authorized range. This one does not. *)
 val sub_pool: unifier_env -> Pool.t
 
 (** This is just a wrapper to get the current pool. *)
@@ -165,10 +163,6 @@ val fresh_env: unit -> unifier_env
     equations. This is for tracing/debugging. Use like this:
     [Jstring.bsprintf "%a" uvar_name uvar] *)
 val uvar_name: Buffer.t -> unifier_var -> unit
-
-(** Print a unification variable as a type, useful for error messages. *)
-val string_of_uvar: ?debug:unit -> ?caml_types:bool ->
-      unifier_var -> string
 
 (** Print a scheme. Use it to get the type of top-level bindings as a string
     "val f: 'a -> ...". *)

@@ -40,7 +40,7 @@ type descriptor = {
 
 and unifier_var = descriptor UnionFind.point
 and unifier_term = [
-  `Cons of type_cons * unifier_var list
+  `Cons of head_symbol * unifier_var list
 ]
 and unifier_scheme = {
   mutable scheme_var: unifier_var;
@@ -68,9 +68,6 @@ module Pool = struct
 
   let add t v =
     t.members <- v :: t.members
-
-  let add_list t l =
-    t.members <- l @ t.members
 
   let base_pool = {
     rank = 0;
@@ -275,12 +272,12 @@ let fresh_copy unifier_env { scheme_var = scheme_uvar } =
                     let new_uvar = fresh_unifier_var unifier_env in
                     Uhashtbl.add mapping repr new_uvar;
                     new_uvar
-              | Some (`Cons (cons_name, cons_args)) ->
+              | Some (`Cons (head_symbol, cons_args)) ->
                     let new_uvar = fresh_unifier_var unifier_env in
                     let new_repr = UnionFind.find new_uvar in
                     Uhashtbl.add mapping repr new_uvar;
-                    let cons_args' = List.map fresh_copy cons_args in
-                    let term = Some (`Cons (cons_name, cons_args')) in
+                    let cons_args = List.map fresh_copy cons_args in
+                    let term = Some (`Cons (head_symbol, cons_args)) in
                     new_repr.term <- term;
                     new_uvar
           else
@@ -308,6 +305,7 @@ let fresh_copy unifier_env { scheme_var = scheme_uvar } =
   { scheme_var; }, young_vars
 
 let is_not_ready repr = repr.rank = (-2)
+let is_ready { rank; _ } = rank <> (-2)
 
 (* This actually sets up the rank properly and adds the variable in the current
  * pool if this hasn't been done already. Extremely useful when the solver
@@ -320,7 +318,7 @@ let ensure_ready unifier_env uvar =
   repr.rank <- current_rank unifier_env;
   let open Pool in
   (current_pool unifier_env).members <- (uvar :: (current_pool unifier_env).members);
-  assert (not (is_not_ready repr))
+  assert (is_ready repr)
 
 (* This function does two things: first, it makes sure the variable is ready.
  * Then, it replaces type_constructors by unifier_vars whose term is that
@@ -402,6 +400,7 @@ let string_of_error = function
           | _ -> assert false
         in
         Printf.sprintf "Cannot unify %s with %s\n" s1 s2
+
     | ArityMismatch (v1, l1, v2, l2) ->
         Printf.sprintf
           "Type constructor %s with %d arguments cannot be unified with %s which has %d arguments\n"

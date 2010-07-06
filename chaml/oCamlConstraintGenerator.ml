@@ -19,77 +19,78 @@
 
 open Parsetree
 open Error
+open Algebra.Core
+open Algebra.TypeCons
+open Algebra.Identifiers
+module StringMap = Jmap.Make(String)
+
+(* This is error handling. Add new errors here *)
+type error =
+  | NotImplemented of string * Location.t
+  | VariableBoundSeveralTimes of string * Location.t
+  | VariableMustOccurBothSides of string * Location.t
+  | AlgebraError of Algebra.Core.error
+  | OnlyIdentInLetRec of Location.t
+  | TypeConstructorArguments of string * int * int * Location.t
+
+exception Error of error
+let raise_error e = raise (Error e)
+
+let string_of_error =
+  let print_loc () { Location.loc_start; Location.loc_end; Location.loc_ghost } =
+    let open Lexing in
+    assert (not loc_ghost);
+    let { pos_fname; pos_lnum; pos_bol; _ } = loc_start in
+    let { pos_bol = pos_end; _ } = loc_end in
+    Printf.sprintf "File %s, line %d, characters %d-%d"
+      pos_fname pos_lnum pos_bol pos_end
+  in function
+  | NotImplemented (r, loc) ->
+      Printf.sprintf
+        "%a: the following OCaml feature is not implemented: %s\n"
+        print_loc loc r
+  | VariableBoundSeveralTimes (v, loc) ->
+      Printf.sprintf
+        "%a: variable %s is bound several times in the matching\n"
+        print_loc loc v
+  | VariableMustOccurBothSides (v, loc) ->
+      Printf.sprintf
+        "%a: variable %s must occur on both sides of this pattern\n"
+        print_loc loc v
+  | OnlyIdentInLetRec loc ->
+      Printf.sprintf
+        "%a: only variables are allowed as the left-hand side of `let rec'\n"
+        print_loc loc
+  | TypeConstructorArguments (s, n1, n2, loc) ->
+      Printf.sprintf
+        "%a: type constructor %s expects %d arguments, but you provided %d\n"
+        print_loc loc s n1 n2
+  | AlgebraError e ->
+      Algebra.Core.string_of_error e
+
+(* Small helpers functions that don't belong to the main logic. *)
+let dont_bind_several_times pexp_loc map new_map =
+  let inter = IdentMap.inter map new_map in
+  if (not (IdentMap.is_empty inter)) then begin
+    let bad_ident = List.hd (IdentMap.keys inter) in
+    let bad_ident = string_of_ident bad_ident in
+    raise_error (VariableBoundSeveralTimes (bad_ident, pexp_loc));
+  end
+
+let bind_both_sides ppat_loc map1 map2 =
+  let xor_map = IdentMap.xor map1 map2 in
+  if not (IdentMap.is_empty xor_map) then begin
+    let bad_ident = string_of_ident (List.hd (IdentMap.keys xor_map)) in
+    raise_error (VariableMustOccurBothSides (bad_ident, ppat_loc))
+  end
 
 module Make(S: Algebra.SOLVER) = struct
 
-  module StringMap = Jmap.Make(String)
   module Constraint_ = Constraint.Make(S)
   open Constraint_
-  open Algebra.Core
-  open Algebra.TypeCons
-  open Algebra.Identifiers
 
   let string_of_constraint = PrettyPrinter.string_of_constraint
 
-  (* This is error handling. Add new errors here *)
-  type error =
-    | NotImplemented of string * Location.t
-    | VariableBoundSeveralTimes of string * Location.t
-    | VariableMustOccurBothSides of string * Location.t
-    | AlgebraError of Algebra.Core.error
-    | OnlyIdentInLetRec of Location.t
-    | TypeConstructorArguments of string * int * int * Location.t
-
-  exception Error of error
-  let raise_error e = raise (Error e)
-
-  let string_of_error =
-    let print_loc () { Location.loc_start; Location.loc_end; Location.loc_ghost } =
-      let open Lexing in
-      assert (not loc_ghost);
-      let { pos_fname; pos_lnum; pos_bol; _ } = loc_start in
-      let { pos_bol = pos_end; _ } = loc_end in
-      Printf.sprintf "File %s, line %d, characters %d-%d"
-        pos_fname pos_lnum pos_bol pos_end
-    in function
-    | NotImplemented (r, loc) ->
-        Printf.sprintf
-          "%a: the following OCaml feature is not implemented: %s\n"
-          print_loc loc r
-    | VariableBoundSeveralTimes (v, loc) ->
-        Printf.sprintf
-          "%a: variable %s is bound several times in the matching\n"
-          print_loc loc v
-    | VariableMustOccurBothSides (v, loc) ->
-        Printf.sprintf
-          "%a: variable %s must occur on both sides of this pattern\n"
-          print_loc loc v
-    | OnlyIdentInLetRec loc ->
-        Printf.sprintf
-          "%a: only variables are allowed as the left-hand side of `let rec'\n"
-          print_loc loc
-    | TypeConstructorArguments (s, n1, n2, loc) ->
-        Printf.sprintf
-          "%a: type constructor %s expects %d arguments, but you gave it %d"
-          print_loc loc s n1 n2
-    | AlgebraError e ->
-        Algebra.Core.string_of_error e
-
-  (* Small helpers functions that don't belong to the main logic. *)
-  let dont_bind_several_times pexp_loc map new_map =
-    let inter = IdentMap.inter map new_map in
-    if (not (IdentMap.is_empty inter)) then begin
-      let bad_ident = List.hd (IdentMap.keys inter) in
-      let bad_ident = string_of_ident bad_ident in
-      raise_error (VariableBoundSeveralTimes (bad_ident, pexp_loc));
-    end
-
-  let bind_both_sides ppat_loc map1 map2 =
-    let xor_map = IdentMap.xor map1 map2 in
-    if not (IdentMap.is_empty xor_map) then begin
-      let bad_ident = string_of_ident (List.hd (IdentMap.keys xor_map)) in
-      raise_error (VariableMustOccurBothSides (bad_ident, ppat_loc))
-    end
 
   (* Convenience shortcuts *)
   type camlx_pattern = CamlX.Make(S).pattern
@@ -139,18 +140,20 @@ module Make(S: Algebra.SOLVER) = struct
    *
    * Example:
    *   type ('a, 'b) t = Nil | Cons of 'a * ('a, 'b) t
-   * becomes
-   *   tc == { "t"; 2 },
-   *   [("Nil", []); ("Cons", [0; `Cons (t, [0; 1])])]
+   * gives, for the data_type:
+   *   { cons_name = list; cons_arity = 2 },
+   *   ["Nil", []: data_constructor;
+   *    "Cons", [`Var 1, `Cons ({ ... same cons ... }, [`Var 0; `Var 1]: data_constructor;
+   *   ]
    * *)
   type data_constructor = string * int type_term list
-  type data_type = type_cons * data_constructor list
+  type data_type = head_symbol * data_constructor list
 
   (* Because we're using physical equality for head symbols, we keep a mapping
    * from type names to head symbols. *)
   type env = {
     data_type_of_constructor: data_type StringMap.t;
-    head_symbol_of_type: type_cons StringMap.t;
+    head_symbol_of_type: head_symbol StringMap.t;
   }
   let env = {
     data_type_of_constructor = StringMap.empty;
@@ -159,11 +162,11 @@ module Make(S: Algebra.SOLVER) = struct
 
   (* This enriches the environment with a mapping from the type name to the
    * globally unique head symbol *)
-  let register_data_type: env -> type_cons -> env =
-    fun { data_type_of_constructor; head_symbol_of_type } type_cons -> {
+  let register_data_type: env -> head_symbol -> env =
+    fun { data_type_of_constructor; head_symbol_of_type } head_symbol -> {
       data_type_of_constructor;
       head_symbol_of_type =
-        StringMap.add type_cons.cons_name type_cons head_symbol_of_type
+        StringMap.add head_symbol.cons_name head_symbol head_symbol_of_type
     }
 
   (* This enriches the environment with a mapping from one constructor (Nil,
@@ -177,7 +180,7 @@ module Make(S: Algebra.SOLVER) = struct
 
   (* This functions is used to register in the environment all the constructors
    * for a given data type. *)
-  let register_data_constructors: env -> type_cons -> data_constructor list -> env =
+  let register_data_constructors: env -> head_symbol -> data_constructor list -> env =
     fun env head_symbol data_constructors ->
       let data_type = head_symbol, data_constructors in
       let env = List.fold_left

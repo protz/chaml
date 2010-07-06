@@ -63,7 +63,7 @@ module TypeCons: sig
   (** This describes a type constructor. The trick is to use one instance per
       constructor so that we can use referential equality == to quickly test
       whether two types are equal. *)
-  type type_cons = {
+  type head_symbol = {
     cons_name: string;
     cons_arity: int;
   }
@@ -74,34 +74,34 @@ module TypeCons: sig
       ground types. The only exception is the "*" constructor that can be used
       with any number of arguments. The different versions will be created as
       needed. *)
-  val type_cons : string -> 'a list -> [> `Cons of type_cons * 'a list ]
+  val type_cons : string -> 'a list -> [> `Cons of head_symbol * 'a list ]
 
   (** A convenient wrapper to quickly access the arrow constructor. *)
-  val type_cons_arrow : 'a -> 'a -> [> `Cons of type_cons * 'a list ]
+  val type_cons_arrow : 'a -> 'a -> [> `Cons of head_symbol * 'a list ]
 
   (** A convenient wrapper to quickly access the tuple constructor of any length *)
-  val type_cons_tuple : 'a list -> [> `Cons of type_cons * 'a list ]
+  val type_cons_tuple : 'a list -> [> `Cons of head_symbol * 'a list ]
 
   (** A convenient wrapper to quickly access the int constructor. *)
-  val type_cons_int : [> `Cons of type_cons * 'a list ]
+  val type_cons_int : [> `Cons of head_symbol * 'a list ]
 
   (** A convenient wrapper to quickly access the char constructor. *)
-  val type_cons_char : [> `Cons of type_cons * 'a list ]
+  val type_cons_char : [> `Cons of head_symbol * 'a list ]
 
   (** A convenient wrapper to quickly access the string constructor. *)
-  val type_cons_string : [> `Cons of type_cons * 'a list ]
+  val type_cons_string : [> `Cons of head_symbol * 'a list ]
 
   (** A convenient wrapper to quickly access the float constructor. *)
-  val type_cons_float : [> `Cons of type_cons * 'a list ]
+  val type_cons_float : [> `Cons of head_symbol * 'a list ]
 
   (** The bottom type is a internal type, not to be used by others! *)
-  val type_cons_bottom : [> `Cons of type_cons * 'a list ]
+  val type_cons_bottom : [> `Cons of head_symbol * 'a list ]
 
   (** Get the head symbol for the arrow type *)
-  val head_symbol_arrow: type_cons
+  val head_symbol_arrow: head_symbol
 
   (** And for n-ary tuples *)
-  val head_symbol_tuple: int -> type_cons
+  val head_symbol_tuple: int -> head_symbol
 
 end
 
@@ -159,7 +159,7 @@ module Core: sig
       places. *)
   type 'var type_term = [
       'var type_var
-    | `Cons of TypeCons.type_cons * 'var type_term list
+    | `Cons of TypeCons.head_symbol * 'var type_term list
   ]
 
 end

@@ -70,8 +70,7 @@ module Identifiers = struct
     in
     string_of_ident ident
 
-  (* The mapping from all the bound identifiers in a pattern to the corresponding
-   * type variables in the scheme. *)
+  (* This is used in various places throughout the ChaML code. *)
   module IdentMap = Jmap.Make (struct
     type t = ident
     let compare (x, _pos1) (y, _pos2) =
@@ -100,9 +99,9 @@ module TypeCons = struct
 
   open Errors
 
-  (* The trick is to use one instance per constructor so that we can use
+  (* The trick is to use one instance per head symbol so that we can use
    * referential equality == to quickly test whether two types are equal. *)
-  type type_cons = {
+  type head_symbol = {
     cons_name: string;
     cons_arity: int;
   }
@@ -127,21 +126,21 @@ module TypeCons = struct
   let type_cons =
     fun cons_name args ->
       begin match Jhashtbl.find_opt global_constructor_table cons_name with
-      | Some cons ->
-          if List.length args <> cons.cons_arity then
+      | Some head_symbol ->
+          if List.length args <> head_symbol.cons_arity then
             raise_error (BadNumberOfArguments cons_name);
-          `Cons (cons, args)
+          `Cons (head_symbol, args)
       | None ->
           if cons_name = "*" then
             let cons_arity = List.length args in
             let cons_key = "*" ^ (string_of_int cons_arity) in
             match Jhashtbl.find_opt global_constructor_table cons_key with
             | None ->
-                let cons = { cons_name; cons_arity } in
-                Hashtbl.add global_constructor_table cons_key cons;
-                `Cons (cons, args)
-            | Some cons ->
-                `Cons (cons, args)
+                let head_symbol = { cons_name; cons_arity } in
+                Hashtbl.add global_constructor_table cons_key head_symbol;
+                `Cons (head_symbol, args)
+            | Some head_symbol ->
+                `Cons (head_symbol, args)
           else
             raise_error (UnboundTypeConstructor cons_name)
       end
@@ -176,7 +175,7 @@ module Core = struct
       places. *)
   type 'var type_term = [
       'var type_var
-    | `Cons of TypeCons.type_cons * 'var type_term list
+    | `Cons of TypeCons.head_symbol * 'var type_term list
   ]
 
 end

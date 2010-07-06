@@ -26,13 +26,13 @@
     parts of the OCaml source code. One might want to write another custom
     front-end for another language, though. *)
 
+(** This describes an error encountered during constraint generation. *)
+type error
+
+(** Creates a human-readable representation of an error *)
+val string_of_error: error -> string
+
 module Make: functor (S: Algebra.SOLVER) -> sig
-
-  (** This describes an error encountered during constraint generation. *)
-  type error
-
-  (** Creates a human-readable representation of an error *)
-  val string_of_error: error -> string
 
   (** This follows the global convention: modules that are called by the driver
    * are expected to provide pretty-printers. *)

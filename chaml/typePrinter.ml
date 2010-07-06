@@ -22,7 +22,7 @@ open Algebra.TypeCons
 
 type 'var inspected_var = [
     'var type_var
-  | `Cons of type_cons * 'var inspected_var list
+  | `Cons of head_symbol * 'var inspected_var list
   | `Alias of 'var inspected_var * 'var type_var
   | `Forall of 'var inspected_var
 ]

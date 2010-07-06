@@ -17,12 +17,54 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Unify
 module BaseSolver = Unify.BaseSolver
-
-module Constraint_ = Constraint.Make(BaseSolver) open Constraint_
+module Constraint_ = Constraint.Make(BaseSolver)
+open Constraint_
+open Unify
 open Algebra.Identifiers
 open Algebra.Core
+
+module Debug = struct
+  let debug_which_schemes buf var_map =
+    let idents = IdentMap.keys var_map in
+    let idents = List.map string_of_ident idents in
+    let idents = String.concat ", " idents in
+    Buffer.add_string buf (Bash.color 219 "[SLeft] Solving scheme for %s\n" idents)
+
+  let debug_inpool buf (prev_ranks, l, sub_env) =
+    let rank = current_rank sub_env in
+    let members = match prev_ranks with
+      | None ->
+          List.map
+            (fun x ->
+               let repr = find x in
+                 Printf.sprintf "%s(%d)" repr.name repr.rank)
+            l
+      | Some ranks ->
+          List.map2
+            (fun var old_rank ->
+              let repr = find var in
+              if old_rank <> repr.rank then
+                Bash.color 42 "%s(%d)" repr.name repr.rank
+              else
+                Printf.sprintf "%s(%d)" repr.name repr.rank)
+            l ranks
+    in
+    let str = Bash.color 208 "[InPool] %d: %s\n" rank (String.concat ", " members) in
+    Buffer.add_string buf str
+
+  let debug_scheme buf (scheme, ident) =
+    let scheme_str = string_of_scheme
+      ~debug:()
+      (string_of_ident ident)
+      scheme
+    in
+    let str = Bash.color 185 "[SScheme] Got %s\n" scheme_str in
+    Buffer.add_string buf str
+end
+
+(* As usual, we define the errors that belong to unify, and we expose a way to
+ * describe them. *)
 
 type error =
   | UnifyError of Unify.error
@@ -49,13 +91,23 @@ let unify_or_raise unifier_env uvar1 uvar2 =
   | `Ok -> ();
   | `Error e -> raise_error (UnifyError e)
 
+
+
 (* This function runs a DFS when we exit the left branch of a [`Let]. It takes
  * care of:
  * - propagating ranks
  * - marking variables on the fly and detecting cycles (if recursive types are
  * disabled)
+ * - returning a hashtbl of all the variables that have been seen
+ *
+ * It is run on all the variables of the pool.
  * *)
 let run_dfs ~occurs_check young_vars =
+  (* For key uvar, the value in the Hashtbl below is:
+   * - no value if we haven't seen that variable yet
+   * - true if we entered the sub-graph and we haven't returned out of it yet
+   * - false if we've walked its sub-graph and returned out of it
+   * *)
   let seen = Uhashtbl.create 64 in
   let rec propagate_ranks: int -> descriptor -> int = fun parent_rank repr ->
     (* Top-down *)
@@ -97,50 +149,16 @@ let run_dfs ~occurs_check young_vars =
   List.iter f young_vars;
   seen
 
-(* Some useful debug helpers *)
-let debug_which_schemes buf var_map =
-  let idents = IdentMap.keys var_map in
-  let idents = List.map string_of_ident idents in
-  let idents = String.concat ", " idents in
-  Buffer.add_string buf (Bash.color 219 "[SLeft] Solving scheme for %s\n" idents)
-
-let debug_inpool buf (prev_ranks, l, sub_env) =
-  let rank = current_rank sub_env in
-  let members = match prev_ranks with
-    | None ->
-        List.map
-          (fun x ->
-             let repr = find x in
-               Printf.sprintf "%s(%d)" repr.name repr.rank)
-          l
-    | Some ranks ->
-        List.map2
-          (fun var old_rank ->
-            let repr = find var in
-            if old_rank <> repr.rank then
-              Bash.color 42 "%s(%d)" repr.name repr.rank
-            else
-              Printf.sprintf "%s(%d)" repr.name repr.rank)
-          l ranks
-  in
-  let str = Bash.color 208 "[InPool] %d: %s\n" rank (String.concat ", " members) in
-  Buffer.add_string buf str
-
-let debug_scheme buf (scheme, ident) =
-  let scheme_str = string_of_scheme
-    ~debug:()
-    (string_of_ident ident)
-    scheme
-  in
-  let str = Bash.color 185 "[SScheme] Got %s\n" scheme_str in
-  Buffer.add_string buf str
-
+(* Sort variables according to the global order. The invariant is that the
+ * variables in a scheme and the variables in a instance for this scheme are in
+ * the same order. *)
 let sort_global young_vars =
   let c x y = id x - id y in
   let young_vars = List.sort c young_vars in
   young_vars
 
-
+(* This allows us to throw the environment once we've reached the end of the
+ * constraints *)
 exception Done of unifier_scheme IdentMap.t
 
 let solve =
@@ -154,23 +172,26 @@ let solve =
     match type_constraint with
       | `Done ->
           raise (Done (get_scheme_of_ident unifier_env))
+
       | `True ->
           Error.debug "[STrue] Returning from True\n";
+
       | `Equals (`Var uvar1, t2) ->
           let uvar2 = uvar_of_term unifier_env t2 in
           Error.debug "[SEquals] %a = %a\n" uvar_name uvar1 uvar_name uvar2;
           unify_or_raise unifier_env uvar1 uvar2;
+
       | `Instance (ident, `Var uvar, solver_instance) ->
-          (* For instance: ident = f (with let f x = x), and t = int -> int
-           * scheme is basically what came out of solving the left branch of the
-           * let. young_vars is all the young variables that are possibly
-           * quantified inside that scheme *)
+          (* As an example, if we define let f x = x, then we have
+           *    ident = f
+           *    solver_instance = [int]
+           *)
           let scheme =
             match IdentMap.find_opt ident (get_scheme_of_ident unifier_env) with
               | Some v ->
-                v
+                  v
               | None ->
-                raise_error (UnboundIdentifier ident)
+                  raise_error (UnboundIdentifier ident)
           in
           let ident_s = string_of_ident ident in
           let { scheme_var = instance }, young_vars =
@@ -180,20 +201,22 @@ let solve =
               "[SInstance] Taking an instance of %s: %a\n" ident_s uvar_name instance;
           unify_or_raise unifier_env instance uvar;
           solver_instance := young_vars;
+
       | `Conj (c1, c2) ->
-          (* Do *NOT* forward _unifier_env! Algebra.Identifiers in c1's scope must not
-           * go through c2's scope, this would be fatal. *)
           analyze unifier_env c2;
           analyze unifier_env c1
+
       | `Exists (xis, c) ->
           (* This makes sure we add the existentially defined variables as
            * universally quantified within the currently enclosing let
            * definition.  *)
           List.iter (fun (`Var x) -> ensure_ready unifier_env x) xis;
           analyze unifier_env c
+
       | `Let (schemes, c2) ->
           (* We take all the schemes, and schedule them for execution. *)
           schedule_schemes unifier_env schemes c2
+
   (* This one only implements scheduling and merging multiple simultaneous let
    * definitions. This roughly corresponds to S-SOLVE-LET. *)
   and schedule_schemes: unifier_env -> type_scheme list -> type_constraint -> unit =
@@ -202,6 +225,8 @@ let solve =
        * - solves the constraint
        * - generalizes variables as needed
        * - associates schemes to identifiers in the environment
+       *
+       * There are multiple branches if we write let p1 = e1 and p2 = e2 and ...
        * *)
       let solve_branch: unifier_scheme IdentMap.t -> type_scheme -> unifier_scheme IdentMap.t =
         fun new_map scheme ->
@@ -210,7 +235,7 @@ let solve =
          * existentially quantified variables in it. *)
         let sub_env = step_env unifier_env in
         let vars, konstraint, var_map, pscheme = scheme in
-        Error.debug "%a" debug_which_schemes var_map;
+        Error.debug "%a" Debug.debug_which_schemes var_map;
 
         (* Make sure we register the variables that haven't been initialized yet
          * into the sub environment's pool. *)
@@ -244,11 +269,11 @@ let solve =
         let pool_vars = List.sort (fun a b -> rank a - rank b) pool_vars in
 
         (* This is rank propagation. See lemma 10.6.7 in ATTAPL. This is needed. *)
-        Error.debug "%a" debug_inpool (None, pool_vars, sub_env);
+        Error.debug "%a" Debug.debug_inpool (None, pool_vars, sub_env);
         let prev_ranks = List.map rank pool_vars in
         let occurs_check = not opt_recursive_types in
         let _reachable = run_dfs ~occurs_check pool_vars in
-        Error.debug "%a" debug_inpool (Some prev_ranks, pool_vars, sub_env);
+        Error.debug "%a" Debug.debug_inpool (Some prev_ranks, pool_vars, sub_env);
 
         (* Young variables are marked as belonging to a scheme, they are
          * generalized. Old variables are sent back to their pools.
@@ -288,7 +313,7 @@ let solve =
               (* Maintain the invariant that these variables are sorted in the
                * global order. *)
               let young_vars = sort_global young_vars in
-              Error.debug "%a" debug_inpool (None, young_vars, sub_env);
+              Error.debug "%a" Debug.debug_inpool (None, young_vars, sub_env);
               pscheme.p_young_vars <- young_vars
         end;
 
@@ -305,7 +330,7 @@ let solve =
          * the beginning of [solve_branch]. *)
         IdentMap.fold
           (fun ident (`Var _uvar, scheme) new_map ->
-            Error.debug "%a" debug_scheme (scheme, ident);
+            Error.debug "%a" Debug.debug_scheme (scheme, ident);
             IdentMap.add ident scheme new_map)
           var_map new_map
 
@@ -316,9 +341,8 @@ let solve =
       let new_env = set_scheme_of_ident unifier_env new_map in
       analyze new_env c
   in
-  let initial_env = fresh_env () in
   try
-    analyze initial_env konstraint;
+    analyze (fresh_env ()) konstraint;
     raise (Error MalformedConstraint)
   with
     | Done knowledge ->

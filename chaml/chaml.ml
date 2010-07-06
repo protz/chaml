@@ -20,7 +20,7 @@
 exception Error
 exception Outdated_version
 
-module OCamlConstraintGenerator = OCamlConstraintGenerator.Make(Solver.BaseSolver)
+module TheConstraintGenerator = OCamlConstraintGenerator.Make(Solver.BaseSolver)
 
 (* Stolen from driver/pparse.ml *)
 (* val file : formatter -> string -> (Lexing.lexbuf -> 'a) -> string -> 'a *)
@@ -149,7 +149,7 @@ let _ =
     (* Constraint generation *)
     let generalize_match = Options.get_opt "generalize-match" in
     let default_bindings = Options.get_opt "default-bindings" in
-    let konstraint = OCamlConstraintGenerator.generate_constraint ~generalize_match ~default_bindings ast in
+    let konstraint = TheConstraintGenerator.generate_constraint ~generalize_match ~default_bindings ast in
     let konstraint, hterm = match konstraint with
       | `Error e ->
           let e = OCamlConstraintGenerator.string_of_error e in
@@ -159,10 +159,11 @@ let _ =
       | `Ok v ->
           v
     in
+    (* Print the constraint, possibly with pretty-printing *)
     if !arg_print_constraint then begin
       let pretty_printing = Options.get_opt "pretty-printing" in
       let str =
-        OCamlConstraintGenerator.string_of_constraint ~pretty_printing konstraint
+        TheConstraintGenerator.string_of_constraint ~pretty_printing konstraint
       in
       print_endline str;
       flush stdout
@@ -181,6 +182,8 @@ let _ =
       | `Ok ->
           ()
     end;
+    (* By default, we type-check. This is usually disabled in the tests for
+     * recursive types. *)
     if not !arg_type_check then
       exit(0);
     (* Translate to the first intermediate language *)
@@ -199,6 +202,7 @@ let _ =
     (* The final type-checking part *)
     TypeCheck.check core_ast;
     Error.debug "[Driver] Done.\n";
+    (* Statistics *)
     if !arg_print_useless then begin
       Printf.printf "[Driver] %d nodes in the OCaml ast\n"
         (Count.count_ocaml_nodes ast);

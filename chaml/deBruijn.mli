@@ -29,7 +29,7 @@ type type_var = t Algebra.Core.type_var
     not in {!Desugar}. *)
 type type_term = [
     type_var
-  | `Cons of Algebra.TypeCons.type_cons * type_term list
+  | `Cons of Algebra.TypeCons.head_symbol * type_term list
   | `Forall of type_term
 ]
 
