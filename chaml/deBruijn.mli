@@ -45,6 +45,9 @@ val index: t -> int
 (** The 0-th variable *)
 val zero: t
 
+(** The i-th variables *)
+val of_int: int -> t
+
 (** [subst t2 n t1] substitutes t2 for n in t1. *)
 val subst: type_term -> t -> type_term -> type_term
 

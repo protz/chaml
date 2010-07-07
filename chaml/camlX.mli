@@ -33,6 +33,7 @@ module Make (S: Algebra.SOLVER): sig
   type user_type_kind = [ `Variant | `Record ]
   type user_label = string
   type user_type = <
+    user_type_name: string;
     user_type_arity: int;
     user_type_kind: user_type_kind;
     user_type_fields: (user_label * user_type_term list) list;
@@ -84,15 +85,14 @@ module Make (S: Algebra.SOLVER): sig
 
 end
 
-(* XXX this has been changed since *)
-type f_user_type_var = string
-type f_user_type_term = f_user_type_var Algebra.Core.type_term
+type f_user_type_term = DeBruijn.type_term
 type f_user_type_kind = [ `Variant | `Record ]
 type f_user_label = string
 type f_user_type = <
-  user_type_vars: f_user_type_var list;
+  user_type_name: string;
+  user_type_arity: int;
   user_type_kind: f_user_type_kind;
-  user_type_fields: (f_user_label * f_user_type) list;
+  user_type_fields: (f_user_label * f_user_type_term list) list;
 >
 
 type f_type_term = DeBruijn.type_term
@@ -112,6 +112,9 @@ type f_expression = [
          needed for each branch of the generalizing match. **)
   | `Tuple of f_expression list
   | `Construct of f_user_label * f_expression list
+  | `Sequence of f_expression * f_expression
+  | `IfThenElse of f_expression * f_expression * f_expression option
+  | `AssertFalse
   | `Const of f_const
   | `Magic of f_type_term
       (** For builtins, gets a special treatment later on *)

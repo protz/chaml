@@ -28,6 +28,7 @@ type type_term = [
 
 let index { index } = index
 let zero = { index = 0 }
+let of_int index = { index }
 
 let lift_t { index } = { index = index + 1 }
 

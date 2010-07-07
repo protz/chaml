@@ -124,6 +124,9 @@ let rec infer_expr: env -> Core.expression -> DeBruijn.type_term =
     | `Magic t ->
         t
 
+    | `Sequence _ ->
+        failwith "TODO type-check sequence"
+
     (* | `Coerce (e, c) ->
         apply_coerc (infer_expr env e) c *)
 

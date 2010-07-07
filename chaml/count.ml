@@ -56,9 +56,15 @@ let count_camlx_nodes e =
         1 + (List.fold_left (fun acc e -> acc + count_expr e) 0 es)
     | `Construct (_, e) ->
         1 + List.fold_left (fun acc e -> acc + count_expr e) 0 e
+    | `IfThenElse (i, t, e) ->
+        1 + count_expr i + count_expr t + (match e with
+        | Some e -> count_expr e
+        | None -> 0)
+    | `Sequence (e1, e2) ->
+        1 + count_expr e1 + count_expr e2
+    | `AssertFalse
+    | `Magic _
     | `Const _ ->
-        1
-    | `Magic _ ->
         1
 
   and count_pat = function
@@ -123,12 +129,13 @@ let count_core_nodes e =
 
     | `Tuple es ->
         1 + (List.fold_left (fun acc e -> acc + count_expr e) 0 es)
-    | `Instance _ ->
-        1
-    | `Const _ ->
-        1
+    | `Instance _
+    | `Const _
     | `Magic _ ->
         1
+
+    | `Sequence (e1, e2) ->
+        1 + count_expr e1 + count_expr e2
 
     | `Coerce (e, c) ->
         1 + count_expr e + count_coerc c

@@ -287,6 +287,7 @@ module Make(S: Algebra.SOLVER) = struct
                 head_symbol
                 constructors,
               object
+                method user_type_name = ptype_name
                 method user_type_arity = arity
                 method user_type_kind  = `Variant
                 method user_type_fields = constructors

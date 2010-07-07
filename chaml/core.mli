@@ -76,6 +76,8 @@ type expression = [
   | `Instance of var
   | `Const of const
 
+  | `Sequence of expression * expression
+
   | `Magic of type_term
 ]
 

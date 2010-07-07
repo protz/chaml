@@ -188,6 +188,15 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
       let c = desugar_const c in
       `Const c
 
+  | `Sequence (e1, e2) ->
+      `Sequence (desugar_expr env e1, desugar_expr env e2)
+
+  | `IfThenElse (if_expr, then_expr, else_expr) ->
+      assert false
+
+  | `AssertFalse ->
+      assert false
+
   | `Magic _ as x ->
       x
 
@@ -520,6 +529,9 @@ module PrettyPrinting = struct
           matchdoc ^^
             (nest 2 (break1 ^^ edoc)) ^^ break1 ^^ withdoc ^^
           (nest 2 (break1 ^^ pat_exprs))
+
+      | `Sequence (e1, e2) ->
+          (doc_of_expr e1) ^^ semi ^^ break1 ^^ (doc_of_expr e2)
 
       | `Tuple (exprs) ->
           (* XXX compute operator priorities cleanly here *)

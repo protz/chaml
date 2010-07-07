@@ -133,14 +133,15 @@ let translate =
       | `Const _ as x ->
           x
 
-      | `Sequence _ ->
-          failwith "ToDo implement sequence in translator.ml"
+      | `Sequence (e1, e2) ->
+          `Sequence (translate_expr env e1, translate_expr env e2)
 
-      | `IfThenElse _ ->
-          failwith "ToDo implement ifthenelse in translator.ml"
+      | `IfThenElse (i, t, e) ->
+          `IfThenElse (translate_expr env i, translate_expr env t,
+            Option.map (translate_expr env) e)
 
       | `AssertFalse ->
-          failwith "ToDo implement assert false in translator.ml"
+          `AssertFalse
 
       | `Magic ->
           raise Magic
@@ -212,8 +213,24 @@ let translate =
             env rec_flag pat_expr_list
             (fun pat_expr_list ->
               `Let (rec_flag, pat_expr_list))
-      | `Type _ ->
-          failwith "TODO: implement type decls in translator.ml"
+      | `Type t ->
+          let rec debruijnize = function
+            | `Var i ->
+                `Var (DeBruijn.of_int i)
+            | `Cons (head_symbol, args) ->
+                `Cons (head_symbol, List.map debruijnize args)
+            | `Forall t ->
+                `Forall (debruijnize t)
+          in
+          `Type (object
+            method user_type_name = t # user_type_name
+            method user_type_arity = t # user_type_arity
+            method user_type_kind = t # user_type_kind
+            method user_type_fields =
+              List.map
+                (fun (l, ts) -> (l, List.map debruijnize ts))
+                (t # user_type_fields)
+          end)
 
   in
 
@@ -230,6 +247,13 @@ module PrettyPrinting = struct
     lambdas
 
   let gen_lambdas = make "Λ"
+
+  let keyword k =
+    let open Pprint in
+    let open Bash in
+    fancystring (color 208 "%s" k) (String.length k)
+
+  let string_of_type_term t = Pprint.string (DeBruijn.string_of_type_term t)
 
   (* Pretty-printing stuff *)
   let rec doc_of_expr: f_expression -> Pprint.document = 
@@ -249,7 +273,7 @@ module PrettyPrinting = struct
               else
                 empty
             in
-            let scheme = string (DeBruijn.string_of_type_term scheme) in
+            let scheme = string_of_type_term scheme in
             pdoc ^^ colon ^^ space ^^
             fdoc ^^ lb' ^^ scheme ^^ rb' ^^ space ^^ equals ^^
             space ^^ ldoc ^^
@@ -257,15 +281,15 @@ module PrettyPrinting = struct
             )
           in
           let pat_expr_list = List.map gen pat_expr_list in
-          let anddoc = fancystring (color 208 "and") 3 in
+          let anddoc = keyword "and" in
           let pat_expr_list = Jlist.concat
             (fun x y -> x ^^ break1 ^^ anddoc ^^ space ^^ y)
             pat_expr_list
           in
           let e2 = doc_of_expr e2 in
-          let letdoc = fancystring (color 208 "let") 3 in
-          let indoc = fancystring (color 208 "in") 2 in
-          let recdoc = if rec_flag then string "rec " else empty in
+          let letdoc = keyword "let" in
+          let indoc = keyword "in" in
+          let recdoc = if rec_flag then keyword "rec " else empty in
           letdoc ^^ space ^^ recdoc ^^ pat_expr_list ^^ break1 ^^
           indoc ^^ break1 ^^
           e2
@@ -274,7 +298,7 @@ module PrettyPrinting = struct
           (* type_term of the argument as a whole; it might be a pattern so
            * we have the type of the whole first argument. This is needed for
            * [Desugar] to translate this `Function into a `Fun (`Match...) *)
-          let tdoc = string (DeBruijn.string_of_type_term type_term) in
+          let tdoc = string_of_type_term type_term in
           if (List.length pat_expr_list > 1) then
             let gen (pat, expr) =
               let pdoc = doc_of_pat pat in
@@ -287,18 +311,18 @@ module PrettyPrinting = struct
               (fun x y -> x ^^ hardline ^^ y)
               pat_expr_list
             in
-            (string "function") ^^ (nest 2 (hardline ^^ pat_expr_list))
+            (keyword "function") ^^ (nest 2 (hardline ^^ pat_expr_list))
           else
             let pat, expr = List.hd pat_expr_list in
             let pdoc = doc_of_pat pat in
             let edoc = doc_of_expr expr in
-            (string "fun") ^^ space ^^ lparen ^^ pdoc ^^ colon ^^ space ^^
+            (keyword "fun") ^^ space ^^ lparen ^^ pdoc ^^ colon ^^ space ^^
             tdoc ^^ rparen ^^ space ^^ minus ^^ rangle ^^ space ^^ edoc
 
       | `Instance (ident, instance) ->
           let ident = string (string_of_ident ident) in
           if List.length instance > 0 then
-            let instance = List.map (fun x -> string (DeBruijn.string_of_type_term x)) instance in
+            let instance = List.map (fun x -> string_of_type_term x) instance in
             let instance = Jlist.concat (fun x y -> x ^^ comma ^^ space ^^ y) instance in
             let lb = fancystring (color colors.red "[") 1 in
             let rb = fancystring (color colors.red "]") 1 in
@@ -313,7 +337,7 @@ module PrettyPrinting = struct
           let ldoc = gen_lambdas young_vars in
           let lb' = fancystring (color colors.blue "[") 1 in
           let rb' = fancystring (color colors.blue "]") 1 in
-          let scheme = string (DeBruijn.string_of_type_term f_type_term) in
+          let scheme = string_of_type_term f_type_term in
           let gen (pat, expr) =
             let pdoc = doc_of_pat pat in
             let edoc = doc_of_expr expr in
@@ -326,9 +350,9 @@ module PrettyPrinting = struct
             (fun x y -> x ^^ break1 ^^ y)
             pat_expr_list
           in
-          let matchdoc = fancystring (color 208 "match") 5 in
+          let matchdoc = keyword "match" in
           let exprdoc = doc_of_expr expr in
-          let withdoc = fancystring (color 208 "with") 4 in
+          let withdoc = keyword "with" in
           matchdoc ^^ space ^^ exprdoc ^^ colon ^^ space ^^
           ldoc ^^ dot ^^ space ^^ lb' ^^ scheme ^^ rb' ^^ space ^^
           withdoc ^^ break1 ^^
@@ -349,11 +373,41 @@ module PrettyPrinting = struct
       | `Const c ->
           doc_of_const c
 
-      | `Construct _ ->
-          failwith "TODO: implement construct pretty-printing in translator"
+      | `Construct (c, exprs) ->
+          let doc =
+            match exprs with
+            | [] ->
+                empty
+            | [x] ->
+                space ^^ (doc_of_expr x)
+            | xs ->
+                space ^^ lparen ^^ (Jlist.concat (fun x y -> x ^^ comma ^^ space ^^
+                y) (List.map doc_of_expr xs)) ^^ rparen
+          in
+          (string c) ^^ doc
+
+      | `AssertFalse ->
+          string "assert false"
+
+      | `Sequence (e1, e2) ->
+          (doc_of_expr e1) ^^ semi ^^ break1 ^^ (doc_of_expr e2)
+
+      | `IfThenElse (i, t, e) ->
+          (keyword "if") ^^ space ^^ (doc_of_expr i) ^^ space ^^ (keyword "then")
+          ^^ space ^^ (keyword "begin")
+          ^^ (nest 2 (break1 ^^ (doc_of_expr t))) ^^ break1 ^^ (keyword "end") ^^
+          begin
+            match e with
+            | None ->
+                empty
+            | Some e ->
+                (keyword " else begin") ^^
+                (nest 2 (break1 ^^ (doc_of_expr e))) ^^ break1 ^^ (keyword
+                "end")
+          end
 
       | `Magic t ->
-          (string "%magic: ") ^^ (string (DeBruijn.string_of_type_term t))
+          (string "%magic: ") ^^ (string_of_type_term t)
 
   and doc_of_pat: f_pattern -> Pprint.document =
     let open Pprint in
@@ -371,14 +425,26 @@ module PrettyPrinting = struct
           let pdoc2 = doc_of_pat p2 in
           pdoc1 ^^ space ^^ bar ^^ space ^^ pdoc2
 
-      | `Construct _ ->
-          failwith "TODO: pretty-print construct patterns"
+      | `Construct (c, pats) ->
+          let doc =
+            match pats with
+            | [] ->
+                empty
+            | [x] ->
+                space ^^ (doc_of_pat x)
+            | xs ->
+                space ^^ lparen ^^ (Jlist.concat (fun x y -> x ^^ comma ^^ space ^^
+                y) (List.map doc_of_pat xs)) ^^ rparen
+          in
+          (string c) ^^ doc
+
 
       | `Const c ->
           doc_of_const c
 
-      | `Alias _ ->
-          failwith "TODO pretty-print pattern alias in translator"
+      | `Alias (pat, ident) ->
+          lparen ^^ (doc_of_pat pat) ^^ (string " as ") ^^
+            (string (string_of_ident ident)) ^^ rparen
 
       | `Var ident ->
           string (string_of_ident ident)
@@ -413,7 +479,7 @@ module PrettyPrinting = struct
               else
                 empty
             in
-            let scheme = string (DeBruijn.string_of_type_term scheme) in
+            let scheme = string_of_type_term scheme in
             pdoc ^^ colon ^^ space ^^
             fdoc ^^ lb' ^^ scheme ^^ rb' ^^ space ^^ equals ^^
             space ^^ ldoc ^^
@@ -427,11 +493,58 @@ module PrettyPrinting = struct
             pat_expr_list
           in
           let letdoc = fancystring (color 208 "let") 3 in
-          let recdoc = if rec_flag then string "rec " else empty in
+          let recdoc = if rec_flag then (keyword "rec ") else empty in
           letdoc ^^ space ^^ recdoc ^^ pat_expr_list
 
-      | `Type _ ->
-          failwith "TODO: pretty-printing type decls in Core"
+      | `Type t ->
+          let arity = t # user_type_arity in
+          let args =
+            if arity > 0 then
+              let int i = string (string_of_int i) in
+              let onetwothree =
+                let rec build i =
+                  if i > 0 then
+                    (int i) :: (build (i-1))
+                  else
+                    [(int 0)]
+                in
+                List.rev (build arity)
+              in
+              let args = Jlist.concat (fun x y -> x ^^ comma ^^ space ^^ y) onetwothree in
+              let args = if arity > 1 then lparen ^^ args ^^ rparen else args in
+              args ^^ space
+            else
+              empty
+          in
+          let constructors =
+            let build (label, terms) =
+              let label = string label in
+              let terms =
+                match terms with
+                | [] ->
+                    empty
+                | [t] ->
+                    (string " of ") ^^ (string_of_type_term t)
+                | terms ->
+                    let terms =
+                      List.map (string_of_type_term) terms
+                    in
+                    let terms =
+                      Jlist.concat (fun x y -> x ^^ space ^^ star ^^ space ^^ y) terms
+                    in
+                    (string " of ") ^^ terms
+              in
+              label ^^ terms
+            in
+            let constructors = List.map build (t # user_type_fields) in
+            let constructors =
+              Jlist.concat (fun x y -> x ^^ space ^^ bar ^^ space ^^ y) constructors
+            in
+            constructors
+          in
+          (keyword "type ") ^^ args ^^ (string (t # user_type_name)) ^^ space ^^ equals ^^
+          space ^^ constructors
+
     in
     fun str ->
       let l = List.map doc_of_str str in
