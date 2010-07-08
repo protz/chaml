@@ -159,7 +159,7 @@ let _ =
     (* Disable all warnings. It's a test, so there WILL be useless things such as
      * redundant patterns. *)
     let o' = Ocamlbuild_plugin.run_and_read
-      ("ocamlc -i -w a " ^ filename)
+      ("ocamlc -strict-sequence -i -w a " ^ filename)
     in
     let o'' = Ocamlbuild_plugin.run_and_read
       ("./chaml.native --enable caml-types " ^ filename)
@@ -185,7 +185,7 @@ let _ =
       ("./chaml.native --enable recursive-types --im-feeling-lucky --enable caml-types --disable generalize-match " ^ filename)
     in
     let o' = Ocamlbuild_plugin.run_and_read
-      ("ocamlc -rectypes -i -w a " ^ filename)
+      ("ocamlc -strict-sequence -rectypes -i -w a " ^ filename)
     in
     let o'' = Ocamlbuild_plugin.run_and_read
       ("./chaml.native --enable recursive-types --im-feeling-lucky --enable caml-types " ^ filename)
