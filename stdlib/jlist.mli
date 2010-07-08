@@ -48,7 +48,7 @@ val max: int list -> int
 val filter_some: 'a option list -> 'a list
 
 (** Create a list filled with [elt] repeated [n] times. *)
-val make: int -> 'a -> 'a list
+val make: int -> (int -> 'a) -> 'a list
 
 (** Same as [map2] but pass an extra parameter that represents the index *)
 val map2i: (int -> 'a -> 'b -> 'c) -> 'a list -> 'b list -> 'c list

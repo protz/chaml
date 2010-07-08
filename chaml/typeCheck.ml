@@ -135,7 +135,7 @@ and infer_letrec: 'a. env -> _ -> (env -> 'a) -> 'a =
     (* First we add into the environment all the identifiers *)
     let env = List.fold_left
       (fun acc (p, t, _e) ->
-        let `Var a | `Coerce (`Var a, _) = p in
+        let `Var a = p in
         add a t acc)
       env pat_type_exprs
     in
@@ -146,25 +146,11 @@ and infer_letrec: 'a. env -> _ -> (env -> 'a) -> 'a =
      * annotated type in the AST. That way, we erase all previous type
      * definitions and we possibly apply coercions on-the-fly yeah. *)
     let env = List.fold_left
-      (fun env_acc (p, t, e) ->
-        let rec strip = function
-          | `TyAbs e ->
-              let c_type, n_type = strip e in
-              c_type, `Forall n_type
-          | e ->
-              let t = infer_expr env e in
-              t, t
-        in
-        let c_type, n_type = strip e in
-        if c_type <> t then
+      (fun env_acc (`Var a, announced_type, e) ->
+        let inferred_type = infer_expr env e in
+        if inferred_type <> announced_type then
           fail "Letrec";
-        let `Var a | `Coerce (`Var a, _) = p in
-        let n_type =
-          match p with
-            | `Var _ -> t
-            | `Coerce (`Var _, c) -> apply_coerc n_type c
-        in
-        add a n_type env_acc)
+        add a inferred_type env_acc)
       env
       pat_type_exprs
     in

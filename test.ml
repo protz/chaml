@@ -1,4 +1,4 @@
-type ('a, 'b) list = Nil | Cons of 'a * 'b * ('a, 'b) list
+(* type ('a, 'b) list = Nil | Cons of 'a * 'b * ('a, 'b) list*)
 
 let fst (x, y) = x
 

@@ -25,6 +25,7 @@ module AtomMap = Jmap.Make(Atom)
 
 type env = {
   atom_of_ident: Atom.t IdentMap.t;
+  rec_atoms: int AtomMap.t;
 }
 
 type cenv = {
@@ -36,17 +37,27 @@ type cenv = {
 (* Introduce new identifiers in scope, possibly overriding previously defined
  * ones. *)
 let introduce: Atom.t list -> env -> env =
-  fun atoms { atom_of_ident } ->
+  fun atoms { atom_of_ident; rec_atoms } ->
     let atom_of_ident = List.fold_left
       (fun map atom ->
         IdentMap.add (Atom.ident atom) atom map)
       atom_of_ident
       atoms
     in
-    { atom_of_ident }
+    { atom_of_ident; rec_atoms }
+
+let enter_letrec: env -> Atom.t list -> int -> env =
+  fun { atom_of_ident; rec_atoms } atoms i ->
+    let rec_atoms = List.fold_left
+      (fun map atom ->
+        AtomMap.add atom i map)
+      rec_atoms
+      atoms
+    in
+    { atom_of_ident; rec_atoms }
 
 let find: ident -> env -> Atom.t =
-  fun ident { atom_of_ident } ->
+  fun ident { atom_of_ident; _ } ->
     IdentMap.find ident atom_of_ident
 
 let rec wrap_lambda i e =
@@ -55,7 +66,11 @@ let rec wrap_lambda i e =
   else
     e
 
-(* let v_vc = fun (v: var) -> (v :> [ var | `Coerce of var * coercion]) *)
+let rec wrap_forall i t =
+  if i = 0 then
+    t
+  else
+    `Forall (wrap_forall (i - 1) t)
 
 let rec desugar_expr: env -> CamlX.f_expression -> expression =
   fun env expr ->
@@ -72,11 +87,25 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
       let new_env = introduce (List.flatten new_atoms) env in
       let e2 = desugar_expr new_env e2 in
       if rec_flag then
-        desugar_letrec
-          new_env
-          pat_coerc_exprs
-          (fun var_type_exprs ->
-            ((`LetRec (var_type_exprs, e2)) :> Core.expression))
+        let var_type_exprs = desugar_letrec new_env pat_coerc_exprs in
+        let e2 = List.fold_left
+          (fun acc (var, typ, _expr) ->
+            let new_pat =
+              let var = (var :> pattern) in
+              generate_coerc new_env { pattern = var; forall = 0; type_term = typ }
+            in
+            match new_pat with
+            | `Coerce _ ->
+                `Match (`Instance var, [new_pat, acc])
+            | `Var _ ->
+                acc
+            | _ ->
+                assert false
+          )
+          e2
+          var_type_exprs
+        in
+        `LetRec (var_type_exprs, e2)
       else
         (* And then we desugar all of the initial branches in the same previous
          * scope *)
@@ -113,7 +142,16 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
       let app expr type_term =
         `TyApp (expr, type_term)
       in
-      let instance = `Instance (`Var (find ident env)) in
+      let atom = find ident env in
+      let type_terms =
+        match AtomMap.find_opt atom env.rec_atoms with
+        | None ->
+            type_terms
+        | Some i ->
+            assert (type_terms = []);
+            Jlist.make i (fun i' -> `Var (DeBruijn.of_int (i-i'-1)))
+      in
+      let instance = `Instance (`Var atom) in
       List.fold_left app instance type_terms
 
   | `App (expr, exprs) ->
@@ -191,7 +229,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
   | `Sequence (e1, e2) ->
       `Sequence (desugar_expr env e1, desugar_expr env e2)
 
-  | `IfThenElse (if_expr, then_expr, else_expr) ->
+  | `IfThenElse (_if_expr, _then_expr, _else_expr) ->
       assert false
 
   | `AssertFalse ->
@@ -200,45 +238,32 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
   | `Magic _ as x ->
       x
 
-and desugar_letrec: 'a.
-    env ->
-    (f_pattern * f_clblock * f_expression) list ->
-    (([ var | `Coerce of var * coercion] * type_term * expression) list -> 'a) ->
-    'a
-  =
-  fun new_env pat_coerc_exprs k ->
+and desugar_letrec:
+      env ->
+      (f_pattern * f_clblock * f_expression) list ->
+      (var * type_term * expression) list
+    =
+  fun new_env pat_coerc_exprs ->
+    let rec_atoms = List.map
+      (fun i -> find i new_env)
+      (List.map (function `Var i, _, _ -> i | _ -> assert false) pat_coerc_exprs)
+    in
+    let _, { young_vars; _ }, _ = List.hd pat_coerc_exprs in
+    let new_env = enter_letrec new_env rec_atoms young_vars in
     let var_type_exprs = List.map
-      (fun (pat, { young_vars; f_type_term = instanciated_type; }, expr) ->
+      (fun (pat, { young_vars; f_type_term }, expr) ->
         match pat with
         | `Var ident ->
             let a = find ident new_env in
             let e = desugar_expr new_env expr in
             let e = wrap_lambda young_vars e in
-            let f_type_term =
-              let rec wrap i t =
-                if i = 0 then
-                  t
-                else
-                  `Forall (wrap (i - 1) t)
-              in
-              wrap young_vars instanciated_type
-            in
-            let new_pat = generate_coerc new_env
-              { pattern = `Var a; forall = young_vars; type_term = f_type_term}
-            in
-            begin match new_pat with
-            | `Coerce (`Var _, _) as p ->
-                (p, instanciated_type, e)
-            | `Var _ as p ->
-                (p, instanciated_type, e)
-            | _ ->
-                assert false
-            end
+            let f_type_term = wrap_forall young_vars f_type_term in
+            (`Var a, f_type_term, e)
         | _ ->
             assert false)
       pat_coerc_exprs
     in
-    k var_type_exprs
+    var_type_exprs
 
 and desugar_pat env ?rebind pat =
   match pat with
@@ -390,13 +415,19 @@ and desugar_struct (env, acc) str =
         List.split
           (List.map (fun (pat, _, _) -> desugar_pat env pat) pat_coerc_exprs)
       in
-      let new_env = introduce (List.flatten new_atoms) env in
+      let new_atoms = List.flatten new_atoms in
+      let new_env = introduce new_atoms env in
       if rec_flag then
-          new_env,
+        let _, { young_vars; _ }, _ = List.hd pat_coerc_exprs in
+        let new_env = enter_letrec new_env new_atoms young_vars in
+        let var_type_exprs =
           desugar_letrec
             new_env
             pat_coerc_exprs
-            (fun var_type_exprs -> `LetRec var_type_exprs) :: acc
+        in
+        new_env,
+        (* FIXME still need to generate coercions here! *)
+        [`LetRec var_type_exprs]
       else
           (* And then we desugar all of the initial branches in the same previous
            * scope *)
@@ -419,7 +450,7 @@ and desugar_struct (env, acc) str =
 
 
 let desugar structure =
-  let env = { atom_of_ident = IdentMap.empty } in
+  let env = { atom_of_ident = IdentMap.empty; rec_atoms = AtomMap.empty } in
   let _toplevel_env, structure =
     List.fold_left desugar_struct (env, []) structure
   in
@@ -472,9 +503,7 @@ module PrettyPrinting = struct
           let anddoc = pcolor colors.yellow "and" in
           let branches = List.map
             (fun (p, t, e) ->
-              let pdoc = doc_of_pat
-                ((p: [ var | `Coerce of var * coercion]) :> pattern)
-              in
+              let pdoc = doc_of_pat (p: var :> pattern) in
               let tdoc = string (DeBruijn.string_of_type_term t) in
               let edoc = doc_of_expr e in
               pdoc ^^ colon ^^ space ^^ tdoc ^^ space ^^ equals ^^ space ^^
@@ -650,9 +679,7 @@ module PrettyPrinting = struct
           let anddoc = pcolor colors.yellow "and" in
           let branches = List.map
             (fun (p, t, e) ->
-              let pdoc = doc_of_pat
-                ((p: [ var | `Coerce of var * coercion]) :> pattern)
-              in
+              let pdoc = doc_of_pat (p: var :> pattern) in
               let tdoc = string (DeBruijn.string_of_type_term t) in
               let edoc = doc_of_expr e in
               pdoc ^^ colon ^^ space ^^ tdoc ^^ space ^^ equals ^^ space ^^

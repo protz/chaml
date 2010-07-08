@@ -241,7 +241,7 @@ module PrettyPrinting = struct
   let make lambda n = 
     let open Bash in
     let open Pprint in
-    let lambdas = String.concat "" (Jlist.make n lambda) in
+    let lambdas = String.concat "" (Jlist.make n (fun _ -> lambda)) in
     let lambdas = color colors.blue "%s" lambdas in
     let lambdas = fancystring lambdas n in
     lambdas
