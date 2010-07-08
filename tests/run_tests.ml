@@ -235,11 +235,7 @@ let _ =
     in
     while try
       let file = Unix.readdir dir in
-      if String.length file < 2 then begin
-        skip file;
-        print_newline ();
-        true
-      end else begin
+      if String.length file > 2 && file.[0] <> '.' then begin
         begin match String.sub file 0 2 with
         | "t1" ->
             run test1 file
@@ -250,6 +246,12 @@ let _ =
         | _ ->
             skip file
         end;
+        print_newline ();
+        true
+      end else if file.[0] = '.' then
+        true
+      else begin
+        skip file;
         print_newline ();
         true
       end
@@ -309,6 +311,7 @@ let _ =
   _test3 (); *)
   let open Bash in
   Printf.printf
-    "--- %s --- %s ---\n"
+    "--- %s --- %s --- (%d total)\n"
     (color colors.green "%d%% good" (100 * !good / (!bad + !good)))
-    (color colors.red "%d%% bad" (100 * !bad / (!bad + !good)));
+    (color colors.red "%d%% bad" (100 * !bad / (!bad + !good)))
+    (!bad + !good);

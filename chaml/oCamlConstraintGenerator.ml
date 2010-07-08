@@ -146,7 +146,7 @@ module Make(S: Algebra.SOLVER) = struct
    *    "Cons", [`Var 1, `Cons ({ ... same cons ... }, [`Var 0; `Var 1]: data_constructor;
    *   ]
    * *)
-  type data_constructor = string * int type_term list
+  type data_constructor = CamlX.Make(S).user_label * CamlX.Make(S).user_type_term list
   type data_type = head_symbol * data_constructor list
 
   (* Because we're using physical equality for head symbols, we keep a mapping
@@ -1130,11 +1130,34 @@ module Make(S: Algebra.SOLVER) = struct
               head_symbol_list
               ["[]", []; "::", [`Var 0; `Cons (head_symbol_list, [`Var 0])]]
           in
+          let type_decls = [
+            object
+              method user_type_name = "unit";
+              method user_type_arity = 0;
+              method user_type_kind = `Variant;
+              method user_type_fields = ["()", []];
+            end;
+            object
+              method user_type_name = "bool";
+              method user_type_arity = 0;
+              method user_type_kind = `Variant;
+              method user_type_fields = ["false", []; "true", []];
+            end;
+            object
+              method user_type_name = "list";
+              method user_type_arity = 1;
+              method user_type_kind = `Variant;
+              method user_type_fields =
+                ["[]", []; "::", [`Var 0; `Cons (head_symbol_list, [`Var 0])]];
+            end
+          ] in
+          let type_decls: camlx_structure = List.map (fun x -> `Type x) type_decls in
           let topmost_constraint, structure_items =
             generate_structure_items env structure
           in
           `Let (default_bindings, topmost_constraint),
-          `Let (false, default_let_bindings) :: structure_items
+          List.flatten
+            [type_decls; [`Let (false, default_let_bindings)]; structure_items]
         else
           generate_structure_items env structure
 
