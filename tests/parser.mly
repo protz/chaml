@@ -20,28 +20,25 @@
 %{
   open ParserTypes
   open Algebra.TypeCons
+
+  let type_cons cons_name args =
+    `Cons ({ cons_name; cons_arity = List.length args }, args)
 %}
 
 %token <string> IDENT
-%token VAL INT UNIT FLOAT CHAR STRING FORALL DOT
-%token QUOTE UNDERSCORE COLON
+%token <string> OPERATOR
+%token VAL FORALL DOT COMMA
+%token QUOTE COLON
 %token ARROW
-%token TIMES
+%token STAR
 %token RPAREN LPAREN
 %token AS
-%nonassoc AS
 %token EOL EOF
 
-%right ARROW
+%right    ARROW                  /* core_type2 (t -> t -> t) */
 
-/* Don't know why it is necessary to specify the full path here */
 %start <(string * ParserTypes.pvar) list> main
 %type <string * ParserTypes.pvar> type_decl
-%type <ParserTypes.pvar> type_expr
-%type <[`Var of string]> type_var
-%type <ParserTypes.pvar> type_constr
-%type <ParserTypes.pvar list> type_product
-%type <ParserTypes.pvar> type_product_elt
 
 %%
 
@@ -49,53 +46,67 @@ main:
 | l = list(type_decl) list(EOL) EOF
   { l }
 
+val_ident:
+    IDENT                                      { $1 }
+  | LPAREN OPERATOR RPAREN                      { $2 }
+;
+
 type_decl:
-| VAL i = IDENT COLON list(EOL) e = type_expr EOL
+| VAL i = val_ident COLON list(EOL) e = core_type EOL
   { (i, e) }
-| VAL i = IDENT COLON FORALL list(IDENT) DOT e = type_expr EOL
+| VAL i = val_ident COLON FORALL list(IDENT) DOT e = core_type EOL
   { (i, e) }
 
-type_expr:
-| v = type_var
-  { (v :> ParserTypes.pvar) }
-| v = type_constr
-  { v }
-| LPAREN e = type_expr RPAREN
-  { e }
-| e = type_expr AS v = type_var
-  { `Alias (e, v) }
-| e1 = type_expr ARROW option(EOL) e2 = type_expr
-  { type_cons_arrow e1 e2 }
-| e = type_product
-  { type_cons "*" e }
+ident:
+| i = IDENT
+  { i }
 
-type_var:
-| QUOTE UNDERSCORE v = IDENT
-  { `Var v }
-| QUOTE v = IDENT
-  { `Var v }
-| v = IDENT
-  { `Var v }
+type_longident:
+| i = IDENT
+  { i }
 
-type_constr:
-| INT
-  { type_cons_int }
-| CHAR
-  { type_cons_char }
-| STRING
-  { type_cons_string }
-| FLOAT
-  { type_cons_float }
-(*| UNIT
-  { type_cons_unit }*)
+core_type:
+    t = core_type2
+      { t }
+  | t = core_type2 AS QUOTE i = ident
+      { `Alias (t, `Var i) }
+;
+core_type2:
+    simple_core_type_or_tuple
+      { $1 }
+  | core_type2 ARROW core_type2
+      { type_cons_arrow $1 $3 }
+;
 
-type_product:
-| e = type_product_elt TIMES option(EOL) es = type_product
-  { e :: es }
-| e1 = type_product_elt TIMES option(EOL) e2 = type_product_elt
-  { [e1; e2] }
+simple_core_type:
+    simple_core_type2
+      { $1 }
+  | LPAREN core_type_comma_list RPAREN
+      { match $2 with [sty] -> sty | _ -> assert false }
+;
+simple_core_type2:
+    QUOTE ident
+      { `Var $2 }
+  | type_longident
+      { type_cons $1 [] }
+  | simple_core_type2 type_longident
+      { type_cons $2 [$1] }
+  | LPAREN core_type_comma_list RPAREN type_longident
+      { type_cons $4 (List.rev $2) }
+;
 
-type_product_elt:
-  | LPAREN e = type_expr RPAREN { e }
-  | v = type_var { (v :> ParserTypes.pvar) }
-  | v = type_constr { (v :> ParserTypes.pvar) }
+simple_core_type_or_tuple:
+    simple_core_type                            { $1 }
+  | simple_core_type STAR core_type_list
+      { type_cons_tuple ($1 :: List.rev $3) }
+;
+
+core_type_comma_list:
+    core_type                                   { [$1] }
+  | core_type_comma_list COMMA core_type        { $3 :: $1 }
+;
+
+core_type_list:
+    simple_core_type                            { [$1] }
+  | core_type_list STAR simple_core_type        { $3 :: $1 }
+;

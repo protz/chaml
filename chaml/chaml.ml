@@ -200,7 +200,7 @@ let _ =
       print_string (Desugar.string_of_struct core_ast);
     end;
     (* The final type-checking part *)
-    TypeCheck.check core_ast;
+    (* TypeCheck.check core_ast; *)
     Error.debug "[Driver] Done.\n";
     (* Statistics *)
     if !arg_print_useless then begin

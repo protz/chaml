@@ -54,6 +54,9 @@ tests:
 	./run_tests.byte
 	./noyacchack.sh
 
+test_parser:
+	ocamlbuild $(BUILDFLAGS) -menhir "menhir --trace" -I chaml tests/test_parser.native
+
 stdlib_tests:
 	ocamlbuild stdlib/tests.native
 	./tests.native

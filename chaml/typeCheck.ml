@@ -109,6 +109,8 @@ let rec infer_expr: env -> Core.expression -> DeBruijn.type_term =
         List.fold_left apply t0 ti
 
     | `Instance (`Var x) ->
+        Error.debug "[OInstance] Taking an instance of %s\n"
+          (Atom.string_of_atom x);
         let t = find x env in
         Error.debug "[OInstance] Scheme for %s is %s\n"
           (Atom.string_of_atom x)
@@ -136,6 +138,7 @@ and infer_letrec: 'a. env -> _ -> (env -> 'a) -> 'a =
     let env = List.fold_left
       (fun acc (p, t, _e) ->
         let `Var a = p in
+        Error.debug "[TC] Adding %s in the environment\n" (Atom.string_of_atom a);
         add a t acc)
       env pat_type_exprs
     in

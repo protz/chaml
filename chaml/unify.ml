@@ -229,7 +229,15 @@ let string_of_uvars ?caml_types uvars =
 (* For printing type schemes *)
 let string_of_scheme ?debug ?caml_types ident scheme =
   let { scheme_var } = scheme in
-  Printf.sprintf "val %s: %s" ident (string_of_uvar ?debug ?caml_types scheme_var)
+  let wrap_operator ident =
+    let operators = ["@"] in
+    if List.mem ident operators then
+      Printf.sprintf "( %s )" ident
+    else
+      ident
+  in
+  Printf.sprintf
+    "val %s: %s" (wrap_operator ident) (string_of_uvar ?debug ?caml_types scheme_var)
 
 (* Small debugging helper *)
 let debug_pairs buf mapping =

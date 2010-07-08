@@ -27,12 +27,6 @@
         (fun (keyword, token) -> Hashtbl.add t keyword token)
         [
           "val", VAL;
-          "int", INT;
-          "unit", UNIT;
-          "float", FLOAT;
-          "string", STRING;
-          "char", CHAR;
-          "forall", FORALL;
           "as", AS;
         ];
       t
@@ -54,14 +48,11 @@ rule token = parse
 | '\n'
   { EOL }
 
-| '\''
+| '\'' | '\'' '_'
   { QUOTE }
 
-| '_'
-  { UNDERSCORE }
-
 | '*'
-  { TIMES }
+  { STAR }
 
 | '('
   { LPAREN }
@@ -75,11 +66,17 @@ rule token = parse
 | ':'
   { COLON }
 
+| ','
+  { COMMA }
+
 | '.'
   { DOT }
 
 | lowercase (lowercase|number|'\''|'_')*
   { filter lexbuf }
+
+| '@'
+  { OPERATOR ("@") }
 
 | whitespace
   { token lexbuf }

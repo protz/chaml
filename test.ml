@@ -1,9 +1,8 @@
-(* type ('a, 'b) list = Nil | Cons of 'a * 'b * ('a, 'b) list*)
+let rec fib n =
+  match n with
+  | 0 -> 1
+  | 1 -> 1
+  | _ ->
+      fib (n-1) + fib (n-2)
 
-let fst (x, y) = x
-
-let rec1 =
-  let rec f x = (x, x)
-  and g (y, x) = fst (f y)
-  in
-  f
+let a = 2 and b = 3

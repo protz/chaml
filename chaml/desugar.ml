@@ -427,7 +427,7 @@ and desugar_struct (env, acc) str =
         in
         new_env,
         (* FIXME still need to generate coercions here! *)
-        [`LetRec var_type_exprs]
+        `LetRec var_type_exprs :: acc
       else
           (* And then we desugar all of the initial branches in the same previous
            * scope *)

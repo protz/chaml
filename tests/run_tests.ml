@@ -135,29 +135,40 @@ let _ =
           | None ->
               false
       end do () done;
-    with Lexer.LexingError e ->
-      error "Lexing Error: %s" e;
-      Printf.printf "The output was:\n%s\n" (List.hd outputs);
+    with 
+    | Lexer.LexingError e ->
+        error "Lexing Error: %s" e;
+        Printf.printf "The output was:\n%s\n" (List.hd outputs);
+    | e ->
+      error "Error. The output was \n";
+      List.iter print_endline outputs;
+      raise e
   in
-  let test1 () =
-    print_endline (Bash.box "Constraint Solving - standard tests");
+  (* We have four sorts of tests.
+   * i) Type-1 tests: run ocaml, run chaml, run chaml with generalizing match,
+   * and compare the results, and enable chaml type-checking
+   * ii) Type-2 tests: same thing, but don't enable chaml type-checking
+   * iii) Type-3 tests: (special tests) just run chaml (including type-checking)
+   * and compare the output against the expected types
+   * iv) Type-4 tests: these are supposed to fail
+   * *)
+  let test1 filename =
     let o = Ocamlbuild_plugin.run_and_read
-      "./chaml.native --enable caml-types --disable generalize-match tests/good/test_solving.ml"
+      ("./chaml.native --enable caml-types --disable generalize-match " ^ filename)
     in
     (* Disable all warnings. It's a test, so there WILL be useless things such as
      * redundant patterns. *)
     let o' = Ocamlbuild_plugin.run_and_read
-      "ocamlc -i -w a tests/good/test_solving.ml"
+      ("ocamlc -i -w a " ^ filename)
     in
     let o'' = Ocamlbuild_plugin.run_and_read
-      "./chaml.native --enable caml-types tests/good/test_solving.ml"
+      ("./chaml.native --enable caml-types " ^ filename)
     in
     compare [o; o'; o''];
   in
-  let test2 () =
-    print_endline (Bash.box "Constraint Solving - ChaML extra features");
+  let test3_generalizing_match filename =
     let o = Ocamlbuild_plugin.run_and_read
-      "./chaml.native --enable caml-types --im-feeling-lucky tests/good/test_solving_chaml_only.ml"
+      ("./chaml.native --enable caml-types --im-feeling-lucky " ^ filename)
     in
     let o' = String.concat "\n" [
       "val generalize_under_match: 'a -> 'b -> 'b";
@@ -169,16 +180,15 @@ let _ =
     in
     compare [o; o'];
   in
-  let test2' () =
-    print_endline (Bash.box "Constraint Solving - recursive types");
+  let test2 filename =
     let o = Ocamlbuild_plugin.run_and_read
-      "./chaml.native --enable recursive-types --im-feeling-lucky --enable caml-types --disable generalize-match tests/good/tests_recursive_types.ml"
+      ("./chaml.native --enable recursive-types --im-feeling-lucky --enable caml-types --disable generalize-match " ^ filename)
     in
     let o' = Ocamlbuild_plugin.run_and_read
-      "ocamlc -rectypes -i -w a tests/good/tests_recursive_types.ml"
+      ("ocamlc -rectypes -i -w a " ^ filename)
     in
     let o'' = Ocamlbuild_plugin.run_and_read
-      "./chaml.native --enable recursive-types --im-feeling-lucky --enable caml-types tests/good/tests_recursive_types.ml"
+      ("./chaml.native --enable recursive-types --im-feeling-lucky --enable caml-types " ^ filename)
     in
     compare [o'; o''; o];
   in
@@ -211,8 +221,47 @@ let _ =
     Unix.unlink "_constraint2";
     compare [o; o'; o''];
   in
-  let test4 () =
-    print_endline (Bash.box "Wrong tests");
+  let test_good () =
+    print_endline (Bash.box "Positive tests");
+    let dirname = "tests/good" in
+    let dir = Unix.opendir "tests/good" in
+    let p f = Printf.sprintf "%s/%s" dirname f in
+    let run f file =
+      Printf.printf "--- In file %s\n" (p file);
+      f (p file)
+    in
+    let skip file =
+      Printf.printf "... skipped %s\n" (p file)
+    in
+    while try
+      let file = Unix.readdir dir in
+      if String.length file < 2 then begin
+        skip file;
+        print_newline ();
+        true
+      end else begin
+        begin match String.sub file 0 2 with
+        | "t1" ->
+            run test1 file
+        | "t2" ->
+            run test2 file
+        | "t3" when file = "t3_generalizing_match.ml" ->
+            run test3_generalizing_match file
+        | _ ->
+            skip file
+        end;
+        print_newline ();
+        true
+      end
+    with End_of_file ->
+      false
+    do
+      ()
+    done;
+    Unix.closedir dir;
+  in
+  let test_bad () =
+    print_endline (Bash.box "Negative tests");
     let dir = Unix.opendir "tests/bad" in
     while try
       let file = Unix.readdir dir in
@@ -252,16 +301,12 @@ let _ =
     done;
     Unix.closedir dir;
   in
-  test1 ();
+  test_good ();
   print_newline ();
-  test2 ();
+  test_bad ();
   print_newline ();
-  test2' ();
   (* print_newline ();
-  test3 (); *)
-  print_newline ();
-  test4 ();
-  print_newline ();
+  _test3 (); *)
   let open Bash in
   Printf.printf
     "--- %s --- %s ---\n"
