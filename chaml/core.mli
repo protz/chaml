@@ -84,6 +84,6 @@ type expression = [
 type structure = [
   | `Let of pattern * expression
   | `LetRec of (var * type_term * expression) list
-  | `Type of int * string * type_term
+  | `Type of int * Atom.t * type_term
       (* (type arity, type name, anonymous sum or product) *)
 ] list

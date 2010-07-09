@@ -33,7 +33,7 @@ type type_term = [
   | `Forall of type_term
   | `Sum of (string * type_term list) list
   | `Prod of (string * type_term list) list
-  | `Named of string * type_term list
+  | `Named of Atom.t * type_term list
 ]
 
 (** Lift a single variable *)

@@ -35,7 +35,7 @@ type 'var inspected_var = [
   | `Forall of 'var inspected_var
   | `Prod of (string * 'var inspected_var list) list
   | `Sum of (string * 'var inspected_var list) list
-  | `Named of string * 'var inspected_var list
+  | `Named of Atom.t * 'var inspected_var list
 ]
 
 (** When printing a type, you can choose to provide the conversion function from

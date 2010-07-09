@@ -22,9 +22,11 @@ open CamlX
 open Core
 open DeBruijn
 module AtomMap = Jmap.Make(Atom)
+module StringMap = Jmap.Make(String)
 
 type env = {
   atom_of_ident: Atom.t IdentMap.t;
+  atom_of_type: Atom.t StringMap.t;
   rec_atoms: int AtomMap.t;
 }
 
@@ -40,24 +42,24 @@ let ftt_dtt type_term = (type_term: f_type_term :> DeBruijn.type_term)
 (* Introduce new identifiers in scope, possibly overriding previously defined
  * ones. *)
 let introduce: Atom.t list -> env -> env =
-  fun atoms { atom_of_ident; rec_atoms } ->
+  fun atoms -> function { atom_of_ident; _ } as env ->
     let atom_of_ident = List.fold_left
       (fun map atom ->
         IdentMap.add (Atom.ident atom) atom map)
       atom_of_ident
       atoms
     in
-    { atom_of_ident; rec_atoms }
+    { env with atom_of_ident }
 
 let enter_letrec: env -> Atom.t list -> int -> env =
-  fun { atom_of_ident; rec_atoms } atoms i ->
+  function { rec_atoms; _ } as env -> fun atoms i ->
     let rec_atoms = List.fold_left
       (fun map atom ->
         AtomMap.add atom i map)
       rec_atoms
       atoms
     in
-    { atom_of_ident; rec_atoms }
+    { env with rec_atoms }
 
 let find: ident -> env -> Atom.t =
   fun ident { atom_of_ident; _ } ->
@@ -502,6 +504,8 @@ and desugar_struct
       let name = user_type # name in
       let arity = user_type # arity in
       let fields = user_type # fields in
+      let name = Atom.fresh (ident name Location.none) in
+      (* XXX todo faire un desugar_type ici et remplacer les type_cons par des `Named *)
       match user_type # kind with
       | `Variant ->
           let t =
@@ -513,7 +517,7 @@ and desugar_struct
 
 
 let desugar structure =
-  let env = { atom_of_ident = IdentMap.empty; rec_atoms = AtomMap.empty } in
+  let env = { atom_of_ident = IdentMap.empty; rec_atoms = AtomMap.empty; atom_of_type = StringMap.empty } in
   let _toplevel_env, structure =
     List.fold_left desugar_struct (env, []) structure
   in
@@ -779,7 +783,7 @@ module PrettyPrinting = struct
           in
           let typedoc = pcolor colors.yellow "type" in
           let tdoc = string_of_type_term t in
-          typedoc ^^ space ^^ args ^^ (string name)
+          typedoc ^^ space ^^ args ^^ (string (Atom.string_of_atom name))
           ^^ space ^^ equals ^^ space ^^ tdoc ^^ break1
     in
     fun str ->

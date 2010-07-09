@@ -27,7 +27,7 @@ type 'var inspected_var = [
   | `Forall of 'var inspected_var
   | `Prod of (string * 'var inspected_var list) list
   | `Sum of (string * 'var inspected_var list) list
-  | `Named of string * 'var inspected_var list
+  | `Named of Atom.t * 'var inspected_var list
 ]
 
 type ('var, 'uniq) var_printer = [
@@ -168,6 +168,7 @@ let string_of_types
           Printf.sprintf "∏ %s" items
 
       | `Named (t, args) ->
+          let t = Atom.string_of_atom t in
           let args = List.map (print_type paren) args in
           let args = String.concat ", " args in
           Printf.sprintf "(%s) %s" args t
