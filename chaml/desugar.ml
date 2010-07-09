@@ -18,6 +18,8 @@
 (*****************************************************************************)
 
 open Algebra.Identifiers
+open Algebra.Core
+open Algebra.TypeCons
 open CamlX
 open Core
 open DeBruijn
@@ -60,6 +62,14 @@ let enter_letrec: env -> Atom.t list -> int -> env =
       atoms
     in
     { env with rec_atoms }
+
+let register_user_type
+    (env: env)
+    (name: string)
+    (atom: Atom.t)
+    : env =
+  let atom_of_type = StringMap.add name atom env.atom_of_type in
+  { env with atom_of_type }
 
 let find: ident -> env -> Atom.t =
   fun ident { atom_of_ident; _ } ->
@@ -504,16 +514,37 @@ and desugar_struct
       let name = user_type # name in
       let arity = user_type # arity in
       let fields = user_type # fields in
-      let name = Atom.fresh (ident name Location.none) in
+      let atom = Atom.fresh (ident name Location.none) in
+      let env = register_user_type env name atom in
       (* XXX todo faire un desugar_type ici et remplacer les type_cons par des `Named *)
+      let fields = List.map
+        (fun (l, ts) -> (l, List.map (desugar_type env) ts)) fields in
       match user_type # kind with
       | `Variant ->
           let t =
-            `Type (arity, name, `Sum (fields :> (string * DeBruijn.type_term list) list))
+            `Type (arity, atom, `Sum fields)
           in
           env, t :: acc
       | `Record ->
           failwith "TODO: implement `Record data types in core"
+
+
+and desugar_type
+    (env: env)
+    (t: f_type_term)
+    : DeBruijn.type_term =
+  (match t with
+  | `Var _ as v ->
+      (v: f_type_term :> DeBruijn.type_term)
+  | `Cons ( { cons_name; _ }, cons_args ) as c ->
+      begin match StringMap.find_opt cons_name env.atom_of_type with
+      | Some atom ->
+          `Named (atom, (cons_args: f_type_term list :> DeBruijn.type_term list))
+      | None ->
+          (c: f_type_term :> DeBruijn.type_term)
+      end
+  | `Forall t ->
+      `Forall (desugar_type env t))
 
 
 let desugar structure =
