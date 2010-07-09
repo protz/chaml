@@ -160,6 +160,10 @@ let count_core_nodes e =
         1 + (List.fold_left (fun acc t -> acc + count_type t) 0 ts)
     | `Forall t ->
         1 + count_type t
+    | `Named (_, ts)
+    | `Sum ts
+    | `Prod ts ->
+        1 + (List.fold_left (fun acc t -> acc + count_type t) 0 ts)
 
   and count_coerc = function
     | `Id | `ForallIntro | `DistribTuple ->

@@ -34,6 +34,7 @@
 
 module Constraint_ = Constraint.Make(ParserTypes.BaseSolver) open Constraint_
 open TypePrinter
+open Bash
 
 let parse_output output =
   let lexbuf = Lexing.from_string output in
@@ -43,16 +44,16 @@ let parse_output output =
 let test_pass, test_fail =
   let fill s =
     let l = String.length s in
-    let l = Bash.twidth - 3 - l in
+    let l = twidth - 3 - l in
     let rec fill l =
-      if l < 0 then fill (l + Bash.twidth) else l
+      if l < 0 then fill (l + twidth) else l
     in
     let l = fill l in
     let spaces = String.make l ' ' in
     s ^ spaces
   in
-  let pass = Bash.color Bash.colors.Bash.green "✓" in
-  let fail = Bash.color Bash.colors.Bash.red "✗" in
+  let pass = color colors.green "✓" in
+  let fail = color colors.red "✗" in
   (fun x -> Printf.printf "%s%s  \n" (fill x) pass),
   (fun x -> Printf.printf "%s%s  \n" (fill x) fail)
 
@@ -67,7 +68,7 @@ let conversions =
 
 let _ =
   let error f =
-    Printf.kprintf (fun s -> print_endline (Bash.color Bash.colors.Bash.red "%s\n" s)) f
+    Printf.kprintf (fun s -> print_endline (color colors.red "%s\n" s)) f
   in
   let good = ref 0 in
   let bad = ref 0 in
@@ -153,18 +154,24 @@ let _ =
    * iv) Type-4 tests: these are supposed to fail
    * *)
   let test1 filename =
-    let o = Ocamlbuild_plugin.run_and_read
-      ("./chaml.native --enable caml-types --disable generalize-match " ^ filename)
-    in
-    (* Disable all warnings. It's a test, so there WILL be useless things such as
-     * redundant patterns. *)
-    let o' = Ocamlbuild_plugin.run_and_read
-      ("ocamlc -strict-sequence -i -w a " ^ filename)
-    in
-    let o'' = Ocamlbuild_plugin.run_and_read
-      ("./chaml.native --enable caml-types " ^ filename)
-    in
-    compare [o; o'; o''];
+    try
+      let o = Ocamlbuild_plugin.run_and_read
+        ("./chaml.native --enable caml-types --disable generalize-match " ^ filename)
+      in
+      (* Disable all warnings. It's a test, so there WILL be useless things such as
+       * redundant patterns. *)
+      let o' = Ocamlbuild_plugin.run_and_read
+        ("ocamlc -strict-sequence -i -w a " ^ filename)
+      in
+      let o'' = Ocamlbuild_plugin.run_and_read
+        ("./chaml.native --enable caml-types " ^ filename)
+      in
+      compare [o; o'; o'']
+    with Failure msg ->
+      Printf.printf "%s -- here's the error message\n"
+        (color colors.red "\t\t\t!!! FAILED !!!");
+      test_fail msg;
+      bad := !bad + 1
   in
   let test3_generalizing_match filename =
     let o = Ocamlbuild_plugin.run_and_read
@@ -193,7 +200,7 @@ let _ =
     compare [o'; o''; o];
   in
   let _test3 () =
-    print_endline (Bash.box "Constraint Generation - first series of tests");
+    print_endline (box "Constraint Generation - first series of tests");
     let o = Ocamlbuild_plugin.run_and_read
       ("./chaml.native --dont-print-types --disable generalize-match " ^
       "--im-feeling-lucky --disable default-bindings --print-constraint tests/good/test_constraint.ml")
@@ -222,7 +229,7 @@ let _ =
     compare [o; o'; o''];
   in
   let test_good () =
-    print_endline (Bash.box "Positive tests");
+    print_endline (box "Positive tests");
     let dirname = "tests/good" in
     let dir = Unix.opendir "tests/good" in
     let p f = Printf.sprintf "%s/%s" dirname f in
@@ -263,7 +270,7 @@ let _ =
     Unix.closedir dir;
   in
   let test_bad () =
-    print_endline (Bash.box "Negative tests");
+    print_endline (box "Negative tests");
     let dir = Unix.opendir "tests/bad" in
     while try
       let file = Unix.readdir dir in
@@ -309,7 +316,6 @@ let _ =
   print_newline ();
   (* print_newline ();
   _test3 (); *)
-  let open Bash in
   Printf.printf
     "--- %s --- %s --- (%d total)\n"
     (color colors.green "%d%% good" (100 * !good / (!bad + !good)))

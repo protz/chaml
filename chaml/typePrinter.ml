@@ -25,6 +25,9 @@ type 'var inspected_var = [
   | `Cons of head_symbol * 'var inspected_var list
   | `Alias of 'var inspected_var * 'var type_var
   | `Forall of 'var inspected_var
+  | `Prod of 'var inspected_var list
+  | `Sum of 'var inspected_var list
+  | `Named of string * 'var inspected_var list
 ]
 
 type ('var, 'uniq) var_printer = [
@@ -137,6 +140,25 @@ let string_of_types
               Printf.sprintf "(%s %s)" args head_symbol.cons_name
             else
               Printf.sprintf "%s" head_symbol.cons_name
+
+      | `Sum ts ->
+          let fake_cons = {
+            cons_name = "∑";
+            cons_arity = List.length ts
+          } in
+          print_type paren (`Cons (fake_cons, ts))
+
+      | `Prod ts ->
+          let fake_cons = {
+            cons_name = "∏";
+            cons_arity = List.length ts
+          } in
+          print_type paren (`Cons (fake_cons, ts))
+
+      | `Named (t, args) ->
+          let args = List.map (print_type paren) args in
+          let args = String.concat ", " args in
+          Printf.sprintf "(%s) %s" args t
   in
   let print_with_scheme uvar =
     let typ = print_type false uvar in

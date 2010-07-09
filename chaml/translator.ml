@@ -224,13 +224,13 @@ let translate =
                 `Forall (debruijnize t)
           in
           `Type (object
-            method user_type_name = t # user_type_name
-            method user_type_arity = t # user_type_arity
-            method user_type_kind = t # user_type_kind
-            method user_type_fields =
+            method name = t # name
+            method arity = t # arity
+            method kind = t # kind
+            method fields =
               List.map
                 (fun (l, ts) -> (l, List.map debruijnize ts))
-                (t # user_type_fields)
+                (t # fields)
           end)
 
   in
@@ -254,7 +254,8 @@ module PrettyPrinting = struct
     let open Bash in
     fancystring (color 208 "%s" k) (String.length k)
 
-  let string_of_type_term t = Pprint.string (DeBruijn.string_of_type_term t)
+  let string_of_type_term t =
+    Pprint.string (DeBruijn.string_of_type_term (t: f_type_term :> DeBruijn.type_term))
 
   (* Pretty-printing stuff *)
   let rec doc_of_expr: f_expression -> Pprint.document = 
@@ -498,7 +499,7 @@ module PrettyPrinting = struct
           letdoc ^^ space ^^ recdoc ^^ pat_expr_list
 
       | `Type t ->
-          let arity = t # user_type_arity in
+          let arity = t # arity in
           let args =
             if arity > 0 then
               let int i = string (string_of_int i) in
@@ -537,13 +538,13 @@ module PrettyPrinting = struct
               in
               label ^^ terms
             in
-            let constructors = List.map build (t # user_type_fields) in
+            let constructors = List.map build (t # fields) in
             let constructors =
               Jlist.concat (fun x y -> x ^^ space ^^ bar ^^ space ^^ y) constructors
             in
             constructors
           in
-          (keyword "type ") ^^ args ^^ (string (t # user_type_name)) ^^ space ^^ equals ^^
+          (keyword "type ") ^^ args ^^ (string (t # name)) ^^ space ^^ equals ^^
           space ^^ constructors
 
     in

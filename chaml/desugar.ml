@@ -34,6 +34,9 @@ type cenv = {
   pattern: pattern;
 }
 
+(* Subtyping *)
+let ftt_dtt type_term = (type_term: f_type_term :> DeBruijn.type_term)
+
 (* Introduce new identifiers in scope, possibly overriding previously defined
  * ones. *)
 let introduce: Atom.t list -> env -> env =
@@ -117,6 +120,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
           (* Generate the coercion *)
           let new_pat =
             (* XXX FIXME why new_env here? *)
+            let type_term = ftt_dtt type_term in
             generate_coerc new_env { pattern = pat; forall = young_vars; type_term }
           in
           (* The pattern has already been translated in a first pass. Now check if
@@ -140,6 +144,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
       (* Remember, we have the invariant that the instance variables are in the
        * global order, and so are the scheme variables (fingers crossed)! *)
       let app expr type_term =
+        let type_term = ftt_dtt type_term in
         `TyApp (expr, type_term)
       in
       let atom = find ident env in
@@ -166,7 +171,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
               begin match desugar_pat env v with
               | (`Var _ as v), ([_] as atoms) ->
                   let new_env = introduce atoms env in
-                  `Fun (v, arg_type, desugar_expr new_env expr)
+                  `Fun (v, ftt_dtt arg_type, desugar_expr new_env expr)
               | _ ->
                   assert false
               end
@@ -195,7 +200,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
             in
             (* Finally return fun x -> match x with [...] *)
             let mmatch = `Match (instance, (List.map gen pat_exprs)) in
-            `Fun (var, arg_type, mmatch)
+            `Fun (var, ftt_dtt arg_type, mmatch)
       end
 
   | `Match (expr, { young_vars; f_type_term = type_term }, pat_exprs) ->
@@ -205,6 +210,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
         let pat, atoms = desugar_pat env pat in
         let sub_env = introduce atoms env in
         let pat =
+          let type_term = ftt_dtt type_term in
           generate_coerc sub_env { pattern = pat; forall = young_vars; type_term }
         in
         let expr = 
@@ -235,8 +241,8 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
   | `AssertFalse ->
       assert false
 
-  | `Magic _ as x ->
-      x
+  | `Magic t ->
+      `Magic (ftt_dtt t)
 
 and desugar_letrec:
       env ->
@@ -252,6 +258,7 @@ and desugar_letrec:
     let new_env = enter_letrec new_env rec_atoms young_vars in
     let var_type_exprs = List.map
       (fun (pat, { young_vars; f_type_term }, expr) ->
+        let f_type_term = ftt_dtt f_type_term in
         match pat with
         | `Var ident ->
             let a = find ident new_env in
@@ -364,6 +371,10 @@ and generate_coerc env cenv =
                   List.iter walk cons_args
               | `Forall t ->
                   walk t
+              | `Named (_, ts)
+              | `Prod ts
+              | `Sum ts ->
+                  List.iter walk ts
           in
           walk type_term;
           (* We remove quantifiers we don't use *)
@@ -419,10 +430,10 @@ and desugar_struct (env, acc) str =
       let new_env = introduce new_atoms env in
       if rec_flag then
         let _, { young_vars; _ }, _ = List.hd pat_coerc_exprs in
-        let new_env = enter_letrec new_env new_atoms young_vars in
+        let rec_env = enter_letrec new_env new_atoms young_vars in
         let var_type_exprs =
           desugar_letrec
-            new_env
+            rec_env
             pat_coerc_exprs
         in
         new_env,
@@ -438,6 +449,7 @@ and desugar_struct (env, acc) str =
             let e1 = wrap_lambda young_vars e1 in
             (* Generate the coercion *)
             let new_pat =
+              let type_term = ftt_dtt type_term in
               generate_coerc new_env { pattern = pat; forall = young_vars; type_term }
             in
             `Let (new_pat, e1)
@@ -445,8 +457,10 @@ and desugar_struct (env, acc) str =
           new_env,
           List.map2 gen_branch pat_coerc_exprs new_patterns @ acc
 
-  | `Type _ ->
-      failwith "TODO: top-level type decl in desugar"
+  | `Type _user_type ->
+      (* let type_name = user_type # user_type_name in
+      let arity = user_type # user_type_arity in *)
+      env, acc
 
 
 let desugar structure =

@@ -33,10 +33,10 @@ module Make (S: Algebra.SOLVER): sig
   type user_type_kind = [ `Variant | `Record ]
   type user_label = string
   type user_type = <
-    user_type_name: string;
-    user_type_arity: int;
-    user_type_kind: user_type_kind;
-    user_type_fields: (user_label * user_type_term list) list;
+    name: string;
+    arity: int;
+    kind: user_type_kind;
+    fields: (user_label * user_type_term list) list;
   >
 
   type expression = [
@@ -85,17 +85,24 @@ module Make (S: Algebra.SOLVER): sig
 
 end
 
-type f_user_type_term = DeBruijn.type_term
+type f_type_term = [
+    DeBruijn.type_var
+  | `Cons of Algebra.TypeCons.head_symbol * f_type_term list
+  | `Forall of f_type_term
+]
+
+(* We're accepting `Forall because we might want polymorphic record fields at
+ * some point.. *)
+type f_user_type_term = f_type_term
 type f_user_type_kind = [ `Variant | `Record ]
 type f_user_label = string
 type f_user_type = <
-  user_type_name: string;
-  user_type_arity: int;
-  user_type_kind: f_user_type_kind;
-  user_type_fields: (f_user_label * f_user_type_term list) list;
+  name: string;
+  arity: int;
+  kind: f_user_type_kind;
+  fields: (f_user_label * f_user_type_term list) list;
 >
 
-type f_type_term = DeBruijn.type_term
 type f_instance = f_type_term list
 
 type f_expression = [

@@ -81,16 +81,9 @@ type expression = [
   | `Magic of type_term
 ]
 
-type type_kind = [ `Variant | `Record ]
-type type_label = string
-type user_type = {
-  type_vars: DeBruijn.t list;
-  type_kind: type_kind;
-  type_fields: (type_label * type_term) list;
-}
-
 type structure = [
   | `Let of pattern * expression
   | `LetRec of (var * type_term * expression) list
-  | `Type of user_type
+  | `Type of int * string * type_term
+      (* (type arity, type name, anonymous sum or product) *)
 ] list

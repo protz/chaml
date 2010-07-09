@@ -31,6 +31,9 @@ type type_term = [
     type_var
   | `Cons of Algebra.TypeCons.head_symbol * type_term list
   | `Forall of type_term
+  | `Sum of type_term list
+  | `Prod of type_term list
+  | `Named of string * type_term list
 ]
 
 (** Lift a single variable *)

@@ -287,10 +287,10 @@ module Make(S: Algebra.SOLVER) = struct
                 head_symbol
                 constructors,
               object
-                method user_type_name = ptype_name
-                method user_type_arity = arity
-                method user_type_kind  = `Variant
-                method user_type_fields = constructors
+                method name = ptype_name
+                method arity = arity
+                method kind  = `Variant
+                method fields = constructors
               end
 
           | _ ->
@@ -1132,22 +1132,22 @@ module Make(S: Algebra.SOLVER) = struct
           in
           let type_decls = [
             object
-              method user_type_name = "unit";
-              method user_type_arity = 0;
-              method user_type_kind = `Variant;
-              method user_type_fields = ["()", []];
+              method name = "unit";
+              method arity = 0;
+              method kind = `Variant;
+              method fields = ["()", []];
             end;
             object
-              method user_type_name = "bool";
-              method user_type_arity = 0;
-              method user_type_kind = `Variant;
-              method user_type_fields = ["false", []; "true", []];
+              method name = "bool";
+              method arity = 0;
+              method kind = `Variant;
+              method fields = ["false", []; "true", []];
             end;
             object
-              method user_type_name = "list";
-              method user_type_arity = 1;
-              method user_type_kind = `Variant;
-              method user_type_fields =
+              method name = "list";
+              method arity = 1;
+              method kind = `Variant;
+              method fields =
                 ["[]", []; "::", [`Var 0; `Cons (head_symbol_list, [`Var 0])]];
             end
           ] in

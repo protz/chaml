@@ -33,6 +33,9 @@ type 'var inspected_var = [
   | `Cons of head_symbol * 'var inspected_var list
   | `Alias of 'var inspected_var * 'var type_var
   | `Forall of 'var inspected_var
+  | `Prod of 'var inspected_var list
+  | `Sum of 'var inspected_var list
+  | `Named of string * 'var inspected_var list
 ]
 
 (** When printing a type, you can choose to provide the conversion function from
