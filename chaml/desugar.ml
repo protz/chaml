@@ -75,6 +75,16 @@ let rec wrap_forall i t =
   else
     `Forall (wrap_forall (i - 1) t)
 
+let strip_forall =
+  let rec strip i =
+    function
+    | `Forall t ->
+        strip (i+1) t
+    | t ->
+        (i, t)
+  in
+  strip 0
+
 let rec desugar_expr: env -> CamlX.f_expression -> expression =
   fun env expr ->
   match expr with
@@ -95,7 +105,8 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
           (fun acc (var, typ, _expr) ->
             let new_pat =
               let var = (var :> pattern) in
-              generate_coerc new_env { pattern = var; forall = 0; type_term = typ }
+              let (forall, type_term) = strip_forall typ in
+              generate_coerc new_env { pattern = var; forall; type_term }
             in
             match new_pat with
             | `Coerce _ ->
@@ -436,9 +447,35 @@ and desugar_struct (env, acc) str =
             rec_env
             pat_coerc_exprs
         in
+        let extra_coercions = List.map
+          (fun (var, typ, _expr) ->
+            let new_pat =
+              let `Var a = var in
+              let var = (var :> pattern) in
+              Error.debug "%s Type for %s is %s\n"
+                (Bash.color 219 "[TopLevelLetRec]")
+                (Atom.string_of_atom a)
+                (DeBruijn.string_of_type_term typ);
+              let (forall, type_term) = strip_forall typ in
+              generate_coerc new_env { pattern = var; forall; type_term }
+            in
+            match new_pat with
+            | `Coerce _ ->
+                Some (`Let (new_pat, `Instance var))
+            | `Var _ ->
+                None
+            | _ ->
+                assert false
+          )
+          var_type_exprs
+        in
+        Error.debug "[TLetRec] In this let-rec, %d identifiers need coercions\n"
+          (List.length extra_coercions);
+        let extra_coercions = Jlist.filter_some extra_coercions in
+        Error.debug "[TLetRec] In this let-rec, %d identifiers need coercions\n"
+          (List.length extra_coercions);
         new_env,
-        (* FIXME still need to generate coercions here! *)
-        `LetRec var_type_exprs :: acc
+        List.flatten [extra_coercions; [`LetRec var_type_exprs]; acc]
       else
           (* And then we desugar all of the initial branches in the same previous
            * scope *)

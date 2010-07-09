@@ -3,4 +3,4 @@ let rec f (x, y) =
 and g x =
   x
 
-let v = g 1 + 2
+let v = match 1 with 1 -> (g 1, 2) | 2 -> (2, g 1)
