@@ -1,6 +1,5 @@
-let rec f (x, y) =
-  g x
-and g x =
-  x
+type 'a t = Nil | Cons of 'a * 'a t
 
-let v = match 1 with 1 -> (g 1, 2) | 2 -> (2, g 1)
+(* let hd = function Nil -> assert false | Cons (e, _) -> e *)
+
+let test = Cons (1, Nil)

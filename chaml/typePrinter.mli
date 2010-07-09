@@ -33,8 +33,8 @@ type 'var inspected_var = [
   | `Cons of head_symbol * 'var inspected_var list
   | `Alias of 'var inspected_var * 'var type_var
   | `Forall of 'var inspected_var
-  | `Prod of 'var inspected_var list
-  | `Sum of 'var inspected_var list
+  | `Prod of (string * 'var inspected_var list) list
+  | `Sum of (string * 'var inspected_var list) list
   | `Named of string * 'var inspected_var list
 ]
 

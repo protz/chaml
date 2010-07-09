@@ -31,8 +31,8 @@ type type_term = [
     type_var
   | `Cons of Algebra.TypeCons.head_symbol * type_term list
   | `Forall of type_term
-  | `Sum of type_term list
-  | `Prod of type_term list
+  | `Sum of (string * type_term list) list
+  | `Prod of (string * type_term list) list
   | `Named of string * type_term list
 ]
 

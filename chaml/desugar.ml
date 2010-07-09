@@ -382,10 +382,11 @@ and generate_coerc env cenv =
                   List.iter walk cons_args
               | `Forall t ->
                   walk t
-              | `Named (_, ts)
+              | `Named (_, ts) ->
+                  List.iter walk ts
               | `Prod ts
               | `Sum ts ->
-                  List.iter walk ts
+                  List.iter (fun (_, ts) -> List.iter walk ts) ts
           in
           walk type_term;
           (* We remove quantifiers we don't use *)
@@ -430,7 +431,10 @@ and desugar_const const =
   | `Char _ | `Int _ | `String _ as x ->
       x
 
-and desugar_struct (env, acc) str =
+and desugar_struct
+    ((env, acc): env * structure)
+    (str: f_structure_item)
+    : env * structure =
   match str with
   | `Let (rec_flag, pat_coerc_exprs) ->
       let new_patterns, new_atoms =
@@ -494,10 +498,18 @@ and desugar_struct (env, acc) str =
           new_env,
           List.map2 gen_branch pat_coerc_exprs new_patterns @ acc
 
-  | `Type _user_type ->
-      (* let type_name = user_type # user_type_name in
-      let arity = user_type # user_type_arity in *)
-      env, acc
+  | `Type user_type ->
+      let name = user_type # name in
+      let arity = user_type # arity in
+      let fields = user_type # fields in
+      match user_type # kind with
+      | `Variant ->
+          let t =
+            `Type (arity, name, `Sum (fields :> (string * DeBruijn.type_term list) list))
+          in
+          env, t :: acc
+      | `Record ->
+          failwith "TODO: implement `Record data types in core"
 
 
 let desugar structure =
@@ -515,6 +527,10 @@ module PrettyPrinting = struct
     Pprint.fancystring (Bash.color c "%s" s) l
 
   let arrow = pcolor Bash.colors.Bash.yellow "->"
+
+  let keyword k = pcolor Bash.colors.Bash.yellow k
+
+  let string_of_type_term t = Pprint.string (DeBruijn.string_of_type_term t)
 
   let rec doc_of_expr: expression -> Pprint.document = 
     let open Pprint in
@@ -742,8 +758,29 @@ module PrettyPrinting = struct
             branches
           in
           letdoc ^^ space ^^ branches
-      | `Type _ ->
-          failwith "TODO: pretty-printing type decls in Core"
+      | `Type (arity, name, t) ->
+          let args =
+            if arity > 0 then
+              let int i = string (string_of_int i) in
+              let onetwothree =
+                let rec build i =
+                  if i > 0 then
+                    (int i) :: (build (i-1))
+                  else
+                    [(int 0)]
+                in
+                List.rev (build (arity-1))
+              in
+              let args = Jlist.concat (fun x y -> x ^^ comma ^^ space ^^ y) onetwothree in
+              let args = if arity > 1 then lparen ^^ args ^^ rparen else args in
+              args ^^ space
+            else
+              empty
+          in
+          let typedoc = pcolor colors.yellow "type" in
+          let tdoc = string_of_type_term t in
+          typedoc ^^ space ^^ args ^^ (string name)
+          ^^ space ^^ equals ^^ space ^^ tdoc ^^ break1
     in
     fun str ->
       let l = List.map doc_of_str str in

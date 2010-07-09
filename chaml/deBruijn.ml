@@ -24,8 +24,8 @@ type type_term = [
     type_var
   | `Cons of Algebra.TypeCons.head_symbol * type_term list
   | `Forall of type_term
-  | `Sum of type_term list
-  | `Prod of type_term list
+  | `Sum of (string * type_term list) list
+  | `Prod of (string * type_term list) list
   | `Named of string * type_term list
 ]
 
@@ -46,9 +46,9 @@ let lift t =
     | `Cons (head_symbol, cons_args) ->
         `Cons (head_symbol, List.map (lift i) cons_args)
     | `Prod ts ->
-        `Prod (List.map (lift i) ts)
+        `Prod (List.map (fun (l, ts) -> (l, List.map (lift i) ts)) ts)
     | `Sum ts ->
-        `Sum (List.map (lift i) ts)
+        `Sum (List.map (fun (l, ts) -> (l, List.map (lift i) ts)) ts)
     | `Named (t, ts) ->
         `Named (t, List.map (lift i) ts)
   in
@@ -67,9 +67,9 @@ let rec subst t2 { index = i } t1 =
     | `Forall t1 ->
         `Forall (subst (lift t2) (i + 1) t1)
     | `Prod ts ->
-        `Prod (List.map (subst t2 i) ts)
+        `Prod (List.map (fun (l, ts) -> (l, List.map (subst t2 i) ts)) ts)
     | `Sum ts ->
-        `Sum (List.map (subst t2 i) ts)
+        `Sum (List.map (fun (l, ts) -> (l, List.map (subst t2 i) ts)) ts)
     | `Named (t, ts) ->
         `Named (t, List.map (subst t2 i) ts)
   in

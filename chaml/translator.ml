@@ -510,7 +510,7 @@ module PrettyPrinting = struct
                   else
                     [(int 0)]
                 in
-                List.rev (build arity)
+                List.rev (build (arity - 1))
               in
               let args = Jlist.concat (fun x y -> x ^^ comma ^^ space ^^ y) onetwothree in
               let args = if arity > 1 then lparen ^^ args ^^ rparen else args in

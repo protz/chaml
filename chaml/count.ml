@@ -153,17 +153,21 @@ let count_core_nodes e =
     | `Coerce (p, c) ->
         1 + count_pat p + count_coerc c
 
+  and count_types ts =
+    List.fold_left (fun acc t -> acc + count_type t) 0 ts
+
   and count_type = function
     | `Var _ ->
         1
     | `Cons (_, ts) ->
-        1 + (List.fold_left (fun acc t -> acc + count_type t) 0 ts)
+        1 + count_types ts
     | `Forall t ->
         1 + count_type t
-    | `Named (_, ts)
+    | `Named (_, ts) ->
+        1 + count_types ts
     | `Sum ts
     | `Prod ts ->
-        1 + (List.fold_left (fun acc t -> acc + count_type t) 0 ts)
+        1 + (List.fold_left (fun acc (_, ts) -> acc + count_types ts) 0 ts)
 
   and count_coerc = function
     | `Id | `ForallIntro | `DistribTuple ->

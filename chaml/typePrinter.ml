@@ -25,8 +25,8 @@ type 'var inspected_var = [
   | `Cons of head_symbol * 'var inspected_var list
   | `Alias of 'var inspected_var * 'var type_var
   | `Forall of 'var inspected_var
-  | `Prod of 'var inspected_var list
-  | `Sum of 'var inspected_var list
+  | `Prod of (string * 'var inspected_var list) list
+  | `Sum of (string * 'var inspected_var list) list
   | `Named of string * 'var inspected_var list
 ]
 
@@ -141,19 +141,31 @@ let string_of_types
             else
               Printf.sprintf "%s" head_symbol.cons_name
 
-      | `Sum ts ->
-          let fake_cons = {
-            cons_name = "∑";
-            cons_arity = List.length ts
-          } in
-          print_type paren (`Cons (fake_cons, ts))
+      | `Sum items ->
+          let items = List.map (fun (l, ts) ->
+            if List.length ts > 0 then
+              let ts = List.map (print_type paren) ts in
+              let ts = String.concat " * " ts in
+              Printf.sprintf "%s of %s" l ts
+            else
+              l
+            ) items
+          in
+          let items = String.concat " + " items in
+          Printf.sprintf "∑ %s" items
 
-      | `Prod ts ->
-          let fake_cons = {
-            cons_name = "∏";
-            cons_arity = List.length ts
-          } in
-          print_type paren (`Cons (fake_cons, ts))
+      | `Prod items ->
+          let items = List.map (fun (l, ts) ->
+            if List.length ts > 0 then
+              let ts = List.map (print_type paren) ts in
+              let ts = String.concat " * " ts in
+              Printf.sprintf "%s of %s" l ts
+            else
+              l
+            ) items
+          in
+          let items = String.concat " × " items in
+          Printf.sprintf "∏ %s" items
 
       | `Named (t, args) ->
           let args = List.map (print_type paren) args in
