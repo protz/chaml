@@ -118,7 +118,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
             let new_pat =
               let var = (var :> pattern) in
               let (forall, type_term) = strip_forall typ in
-              generate_coerc new_env { pattern = var; forall; type_term }
+              add_coercions_to_pattern new_env { pattern = var; forall; type_term }
             in
             match new_pat with
             | `Coerce _ ->
@@ -144,7 +144,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
           let new_pat =
             (* XXX FIXME why new_env here? *)
             let type_term = ftt_dtt type_term in
-            generate_coerc new_env { pattern = pat; forall = young_vars; type_term }
+            add_coercions_to_pattern new_env { pattern = pat; forall = young_vars; type_term }
           in
           (* The pattern has already been translated in a first pass. Now check if
            * it's just an identifier (we can use a regular let-binding) or a
@@ -234,7 +234,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
         let sub_env = introduce atoms env in
         let pat =
           let type_term = ftt_dtt type_term in
-          generate_coerc sub_env { pattern = pat; forall = young_vars; type_term }
+          add_coercions_to_pattern sub_env { pattern = pat; forall = young_vars; type_term }
         in
         let expr = 
           desugar_expr sub_env expr
@@ -264,8 +264,8 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
   | `IfThenElse (_if_expr, _then_expr, _else_expr) ->
       assert false
 
-  | `AssertFalse ->
-      assert false
+  | `AssertFalse t ->
+      `Magic (ftt_dtt t)
 
   | `Magic t ->
       `Magic (ftt_dtt t)
@@ -298,6 +298,10 @@ and desugar_letrec:
     in
     var_type_exprs
 
+(* This function only translates stupidly a f_pattern into a Core.pattern. If we
+ * are in a location that requires that we generate a coercion, then
+ * add_coercions_to_pattern will be called. It will enrich the translated
+ * pattern with the required coercions to "make everything work". *)
 and desugar_pat env ?rebind pat =
   match pat with
   | `Var ident ->
@@ -325,8 +329,9 @@ and desugar_pat env ?rebind pat =
       Error.debug "[DOr] Orpat out\n";
       `Or (p1, p2), a1
 
-  | `Construct _ ->
-      failwith "TODO: desugar construct patterns"
+  | `Construct (cons, args) ->
+      let args, introduced_atoms = List.split (List.map (desugar_pat env) args) in
+      `Construct (cons, args), List.flatten introduced_atoms
 
   | `Alias _ ->
       failwith "TODO: desugar alias patterns"
@@ -343,13 +348,25 @@ and desugar_pat env ?rebind pat =
  * only leading \foralls, not deep \foralls. So when calling this function, you
  * usually have at hand the number of generalized variables and the
  * corresponding type scheme. This is what you provide to the function. *)
-and generate_coerc env cenv =
+and add_coercions_to_pattern env cenv =
   let compose c1 c2 =
     match c1, c2 with
     | `Id, c1 -> c1
     | c2, `Id -> c2
     | _ -> `Compose (c1, c2)
   in 
+  let push_n_foralls_inside n what =
+    let rec fold n =
+      if n = 0 then
+          `Id
+      else
+        let c = fold (n - 1) in
+        let c1 = if c = `Id then `Id else `ForallCovar c in
+        compose c1 what
+    in
+    fold n
+  in
+
   (* Instead of returning a pattern every time and possibly using
    *  `Coerce (`Coerce ( ... ) ... )
    * we choose to accumulate coercions and compose the pattern with the coercion
@@ -370,15 +387,8 @@ and generate_coerc env cenv =
         let patterns, coercions = List.split (Jlist.map2i gen patterns cons_args) in
         let c = Jlist.concat compose coercions in
         (* Explain that we inject all the variables inside the branches *)
-        let rec fold forall =
-          if forall = 0 then
-              `Id
-          else
-            let c = fold (forall - 1) in
-            let c1 = if c = `Id then `Id else `ForallCovar c in
-            compose c1 `DistribTuple
-        in
-        `Tuple patterns, `Compose (fold forall, c)
+        let c0 = push_n_foralls_inside forall `DistribTuple in
+        `Tuple patterns, `Compose (c0, c)
 
     | `Var _, _ ->
         (* Are we still under \Lambdas? If not, then we've got a proper
@@ -479,7 +489,7 @@ and desugar_struct
                 (Atom.string_of_atom a)
                 (DeBruijn.string_of_type_term typ);
               let (forall, type_term) = strip_forall typ in
-              generate_coerc new_env { pattern = var; forall; type_term }
+              add_coercions_to_pattern new_env { pattern = var; forall; type_term }
             in
             match new_pat with
             | `Coerce _ ->
@@ -509,7 +519,7 @@ and desugar_struct
             (* Generate the coercion *)
             let new_pat =
               let type_term = ftt_dtt type_term in
-              generate_coerc new_env { pattern = pat; forall = young_vars; type_term }
+              add_coercions_to_pattern new_env { pattern = pat; forall = young_vars; type_term }
             in
             `Let (new_pat, e1)
           in
@@ -730,8 +740,14 @@ module PrettyPrinting = struct
       | `Var atom ->
           string (Atom.string_of_atom atom)
 
-      (* | `Construct _ ->
-          failwith "TODO: pretty-print" *)
+      | `Construct (label, args) ->
+          let l = List.length args in
+          if l > 1 then
+            (string label) ^^ space ^^ (doc_of_pat (`Tuple args))
+          else if l = 1 then
+            (string label) ^^ space ^^ (doc_of_pat (List.hd args))
+          else
+            (string label)
 
       | `Const c ->
           doc_of_const c

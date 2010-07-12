@@ -59,7 +59,7 @@ module Make (S: Algebra.SOLVER): sig
     | `Const of const
     | `Sequence of expression * expression
     | `IfThenElse of expression * expression * expression option
-    | `AssertFalse
+    | `AssertFalse of S.var
     | `Magic (** For builtins, gets a special treatment later on *)
   ]
   and pattern = [
@@ -123,7 +123,7 @@ type f_expression = [
   | `Construct of string * f_type_term list * f_user_label * f_expression list
   | `Sequence of f_expression * f_expression
   | `IfThenElse of f_expression * f_expression * f_expression option
-  | `AssertFalse
+  | `AssertFalse of f_type_term
   | `Const of f_const
   | `Magic of f_type_term
       (** For builtins, gets a special treatment later on *)

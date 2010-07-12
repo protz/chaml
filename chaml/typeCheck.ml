@@ -38,6 +38,27 @@ let add atom typ env =
 let fail msg =
   failwith msg
 
+let assert_types_equal t1 t2 =
+  if t1 <> t2 then begin
+    let t1 = DeBruijn.string_of_type_term t1 in
+    let t2 = DeBruijn.string_of_type_term t2 in
+    Error.debug "[TypeChecking#Fail] %s <> %s\n" t1 t2;
+    failwith "Unrecoverable error, dying.\n"
+  end
+
+let assert_type_lists_equal l1 l2 =
+  if l1 <> l2 then begin
+    let t1 = String.concat "; "
+      (List.map DeBruijn.string_of_type_term l1)
+    in
+    let t2 = String.concat "; "
+      (List.map DeBruijn.string_of_type_term l2)
+    in
+    Error.debug "[TypeChecking#Fail] [%s] <> [%s]\n" t1 t2;
+    failwith "Unrecoverable error, dying.\n"
+  end
+
+
 let rec infer_expr: env -> Core.expression -> DeBruijn.type_term =
   fun env expr ->
     match expr with
@@ -95,7 +116,7 @@ let rec infer_expr: env -> Core.expression -> DeBruijn.type_term =
         infer_letrec
           env
           pat_type_exprs
-            (fun env -> infer_expr env e2)
+          (fun env -> infer_expr env e2)
 
     | `App (expr, exprs) ->
         let t0 = infer_expr env expr in
@@ -107,8 +128,7 @@ let rec infer_expr: env -> Core.expression -> DeBruijn.type_term =
           match t0 with
           | `Cons (head_symbol, [t1; t2])
           when head_symbol = Algebra.TypeCons.head_symbol_arrow ->
-              if t <> t1 then
-                fail "App(1)";
+              assert_types_equal t t1;
               t2
           | _ ->
               fail "App(2)"
@@ -153,17 +173,14 @@ and infer_letrec: 'a. env -> _ -> (env -> 'a) -> 'a =
         add a t acc)
       env pat_type_exprs
     in
-    (* What this function does is: go through all Λ and ▸ to find the
-     * expression beneath, type-checks it, and returns the inferred type
-     * with the Λ and ▸ taken into account (that's for e2), and the type
-     * without them taken into account, that's for checking against the
-     * annotated type in the AST. That way, we erase all previous type
-     * definitions and we possibly apply coercions on-the-fly yeah. *)
+    (* This type-checking is very simple because desugar did quite a lot of work
+     * by finding all identifiers that were defined in the recursive let-rec,
+     * and instanciated them with the same variables (there's no reinstanciation
+     * in standard ML let-rec). *)
     let env = List.fold_left
       (fun env_acc (`Var a, announced_type, e) ->
         let inferred_type = infer_expr env e in
-        if inferred_type <> announced_type then
-          fail "Letrec";
+        assert_types_equal inferred_type announced_type;
         add a inferred_type env_acc)
       env
       pat_type_exprs
@@ -183,8 +200,7 @@ and infer_pat: env -> Core.pattern -> DeBruijn.type_term -> (Atom.t * DeBruijn.t
 
       | `Const c ->
           let t' = infer_const c in
-          if t <> t' then
-            fail "Const";
+          assert_types_equal t t';
           []
 
       | `Var atom ->
@@ -200,7 +216,7 @@ and infer_pat: env -> Core.pattern -> DeBruijn.type_term -> (Atom.t * DeBruijn.t
           bound1
 
       | `Tuple patterns ->
-          match t with
+          begin match t with
           | `Cons (head_symbol, typs)
           when head_symbol = Algebra.TypeCons.head_symbol_tuple (List.length typs) ->
               let bound = List.map2 infer_pat patterns typs in
@@ -210,6 +226,10 @@ and infer_pat: env -> Core.pattern -> DeBruijn.type_term -> (Atom.t * DeBruijn.t
               bound
           | _ ->
               fail "Tuple"
+          end
+
+      | `Construct (_label, _args) ->
+          failwith "TODO: infer_pat `Construct"
     in
     infer_pat pat t
 
@@ -277,40 +297,47 @@ and apply_coerc: env -> DeBruijn.type_term -> Core.coercion -> DeBruijn.type_ter
           | _ ->
               fail "Bad coercion"
           end
+
       | `Fold (t, args) ->
-          (* We must:
-               - fetch the definition of t from the environment
-               - replace all parameters of t with their corresponding args
-               (they're in order, at least I hope)
-               - merge typ = t1 + t2 + ... (we'll deal with product types later)
-               with the instanciated definition of t, assuming t1 + t2 + ... is a
-               subset of the definition of t
-          *)
+          (* We fetch the definition of type t from the environment *)
           let def_arity, def = AtomMap.find t env.unfold_type in
           if def_arity <> List.length args then
             fail "Fold coercion (0)";
-          let full_type = Jlist.fold_lefti
-            (fun i acc arg ->
-              DeBruijn.subst arg (DeBruijn.of_int i) acc)
-            def
-            args
+          (* Fortunately, we have the invariant that args is in order *)
+          let mapping = Array.of_list args in
+          (* We compute what this type looks like when instanciated with args *)
+          let full_type =
+            let rec map = function
+              | `Var v ->
+                  mapping.(DeBruijn.index v)
+              | `Forall t ->
+                  `Forall (map t)
+              | `Cons (head_symbol, cons_args) ->
+                  `Cons (head_symbol, List.map map cons_args)
+              | `Prod ts ->
+                  `Prod (List.map (fun (l, ts) -> (l, List.map map ts)) ts)
+              | `Sum ts ->
+                  `Sum (List.map (fun (l, ts) -> (l, List.map map ts)) ts)
+              | `Named (t, ts) ->
+                  `Named (t, List.map map ts)
+            in
+            map def
           in
+          Error.debug "%s Type is now %s\n"
+            (Bash.color 203 "[TCApplyCoerc]")
+            (DeBruijn.string_of_type_term full_type);
+          (* We check that we can inject the anonymous sum/product into the
+           * isorecursive type by checking that the labels match and that the
+           * arguments match as well *)
           match full_type, typ with
           | `Sum label_args_list, `Sum [i_label, i_args] ->
               let def_label, def_args =
                 List.find (fun (l, _) -> l = i_label) label_args_list
               in
               assert (def_label = i_label);
-              if def_args <> i_args then begin
-                let t1 = String.concat " * "
-                  (List.map DeBruijn.string_of_type_term def_args)
-                in
-                let t2 = String.concat " * "
-                  (List.map DeBruijn.string_of_type_term i_args)
-                in
-                Error.debug "[TC] %s <> %s\n" t1 t2;
-                fail "Fold coercion (1)";
-              end;
+              assert_type_lists_equal def_args i_args;
+              (* We're good, the coercion was right, we can fold this into type
+               * "t" with args "args". *)
               `Named (t, args)
           | _ ->
               fail "Fold coercion (2)"

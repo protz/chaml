@@ -22,6 +22,10 @@
 
 open DeBruijn
 
+(** A named constructor. Can be Nil, or Cons, or maybe later a full path with a
+    module. *)
+type label = string
+
 type var = [
   | `Var of Atom.t
 ]
@@ -60,6 +64,7 @@ type pattern = [
   | `Any
   | `Const of const
   | `Coerce of pattern * coercion
+  | `Construct of label * pattern list
 ]
 
 module AtomMap: module type of Jmap.Make(Atom)
@@ -80,7 +85,7 @@ type expression = [
   | `Const of const
 
   | `Sequence of expression * expression
-  | `Construct of string * expression list
+  | `Construct of label * expression list
 
   | `Magic of type_term
 ]

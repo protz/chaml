@@ -860,9 +860,10 @@ module Make(S: Algebra.SOLVER) = struct
           }
 
       | Pexp_assertfalse ->
+          let `Var t = t in
           {
             e_constraint = `True;
-            expr = `AssertFalse
+            expr = `AssertFalse t
           }
 
       | _ ->

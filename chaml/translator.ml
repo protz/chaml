@@ -142,8 +142,8 @@ let translate =
           `IfThenElse (translate_expr env i, translate_expr env t,
             Option.map (translate_expr env) e)
 
-      | `AssertFalse ->
-          `AssertFalse
+      | `AssertFalse t ->
+          `AssertFalse (type_term_of_uvar env t)
 
       | `Magic ->
           raise Magic
@@ -401,7 +401,7 @@ module PrettyPrinting = struct
           in
           (string c) ^^ doc ^^ colon ^^ space ^^ args ^^ (string t)
 
-      | `AssertFalse ->
+      | `AssertFalse _ ->
           string "assert false"
 
       | `Sequence (e1, e2) ->
