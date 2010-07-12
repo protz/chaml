@@ -53,8 +53,9 @@ module Make (S: Algebra.SOLVER): sig
           * polymorphic. As we're taking an instance, we need this to be able to
           * rebuild the F-term properly. *)
     | `Tuple of expression list
-    | `Construct of string * user_label * expression list
-        (** The first string is the type's name. *)
+    | `Construct of string * S.var list * user_label * expression list
+        (** The string is the type's name.
+            The S.var list are the type variables for this data type. *)
     | `Const of const
     | `Sequence of expression * expression
     | `IfThenElse of expression * expression * expression option
@@ -119,7 +120,7 @@ type f_expression = [
       (** The f_clblock is necessary to properly generate the various coercions
          needed for each branch of the generalizing match. **)
   | `Tuple of f_expression list
-  | `Construct of string * f_user_label * f_expression list
+  | `Construct of string * f_type_term list * f_user_label * f_expression list
   | `Sequence of f_expression * f_expression
   | `IfThenElse of f_expression * f_expression * f_expression option
   | `AssertFalse

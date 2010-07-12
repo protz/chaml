@@ -127,8 +127,10 @@ let translate =
       | `Tuple (exprs) ->
           `Tuple (List.map (translate_expr env) exprs)
 
-      | `Construct (t, c, exprs) ->
-          `Construct (t, c, List.map (translate_expr env) exprs)
+      | `Construct (t, ts, c, exprs) ->
+          let ts = List.map (type_term_of_uvar env) ts in
+          let exprs = List.map (translate_expr env) exprs in
+          `Construct (t, ts, c, exprs)
 
       | `Const _ as x ->
           x
@@ -375,7 +377,18 @@ module PrettyPrinting = struct
       | `Const c ->
           doc_of_const c
 
-      | `Construct (t, c, exprs) ->
+      | `Construct (t, ts, c, exprs) ->
+          let args =
+            let arity = List.length ts in
+            let args = List.map string_of_type_term ts in
+            if arity > 1 then
+              lparen ^^ (Jlist.concat (fun x y -> x ^^ comma ^^ space ^^ y) args)
+              ^^ rparen ^^ space
+            else if arity = 1 then
+              List.hd args ^^ space
+            else
+              empty
+          in
           let doc =
             match exprs with
             | [] ->
@@ -386,7 +399,7 @@ module PrettyPrinting = struct
                 space ^^ lparen ^^ (Jlist.concat (fun x y -> x ^^ comma ^^ space ^^
                 y) (List.map doc_of_expr xs)) ^^ rparen
           in
-          (string c) ^^ doc ^^ colon ^^ (string t)
+          (string c) ^^ doc ^^ colon ^^ space ^^ args ^^ (string t)
 
       | `AssertFalse ->
           string "assert false"

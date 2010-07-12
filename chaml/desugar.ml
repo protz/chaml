@@ -248,10 +248,10 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
       let exprs = List.map (desugar_expr env) exprs in
       `Tuple exprs
 
-  | `Construct (t, cons, args) ->
+  | `Construct (t, ts, cons, args) ->
       let e = `Construct (cons, List.map (desugar_expr env) args) in
       let t = StringMap.find t env.atom_of_type in
-      let c = `Fold t in
+      let c = `Fold (t, (ts: f_type_term list :> DeBruijn.type_term list)) in
       `Coerce (e, c)
 
   | `Const c ->
@@ -522,9 +522,14 @@ and desugar_struct
       let fields = user_type # fields in
       let atom = Atom.fresh (ident name Location.none) in
       let env = register_user_type env name atom in
-      (* XXX todo faire un desugar_type ici et remplacer les type_cons par des `Named *)
       let fields = List.map
-        (fun (l, ts) -> (l, List.map (desugar_type env) ts)) fields in
+        (fun (l, ts) -> (l, List.map (desugar_type env) ts)) fields
+      in
+      (* We enforce the invariant that this list is sorted *)
+      let fields = List.sort
+        (fun (x, _) (y, _) -> compare x y)
+        fields
+      in
       match user_type # kind with
       | `Variant ->
           let t =
@@ -779,9 +784,20 @@ module PrettyPrinting = struct
       | `DistribTuple ->
           fancystring "∀×" 2
 
-      | `Fold t ->
+      | `Fold (t, ts) ->
+          let args =
+            let arity = List.length ts in
+            let args = List.map string_of_type_term ts in
+            if arity > 1 then
+              lparen ^^ (Jlist.concat (fun x y -> x ^^ comma ^^ space ^^ y) args)
+              ^^ rparen ^^ space
+            else if arity = 1 then
+              List.hd args ^^ space
+            else
+              empty
+          in
           let t = Atom.string_of_atom t in
-          (string "fold") ^^ lbracket ^^ (string t) ^^ rbracket
+          (string "fold") ^^ lbracket ^^ args ^^ (string t) ^^ rbracket
 
   and doc_of_struct: structure -> Pprint.document =
     let open Pprint in
@@ -834,7 +850,7 @@ module PrettyPrinting = struct
           let typedoc = pcolor colors.yellow "type" in
           let tdoc = string_of_type_term t in
           typedoc ^^ space ^^ args ^^ (string (Atom.string_of_atom name))
-          ^^ space ^^ equals ^^ space ^^ tdoc ^^ break1
+          ^^ space ^^ equals ^^ space ^^ tdoc
     in
     fun str ->
       let l = List.map doc_of_str str in

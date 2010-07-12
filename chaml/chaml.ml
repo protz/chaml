@@ -203,7 +203,7 @@ let _ =
     TypeCheck.check core_ast;
     Error.debug "[Driver] Done.\n";
     (* Statistics *)
-    if !arg_print_useless then begin
+    (* if !arg_print_useless then begin
       Printf.printf "[Driver] %d nodes in the OCaml ast\n"
         (Count.count_ocaml_nodes ast);
       Printf.printf "[Driver] %d nodes in the constraint\n"
@@ -212,6 +212,6 @@ let _ =
         (Count.count_camlx_nodes camlx_ast);
       Printf.printf "[Driver] %d nodes in the Core AST\n"
         (Count.count_core_nodes core_ast);
-    end;
+    end; *)
     flush stdout; flush stderr;
   end

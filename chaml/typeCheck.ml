@@ -21,13 +21,19 @@ module AtomMap = Jmap.Make(Atom)
 
 type env = {
   type_of_atom: DeBruijn.type_term AtomMap.t;
+    (** This is where we remember the type of the atoms we've seen so far. *)
+  unfold_type: (int * DeBruijn.type_term) AtomMap.t;
+    (** This is used to expand the definition of named types (type t = ...).
+        The integer represents the arity of the type
+        The type is the definition. *)
 }
 
-let find atom { type_of_atom } =
+let find atom { type_of_atom; _ } =
   AtomMap.find atom type_of_atom
 
-let add atom typ { type_of_atom } =
-  { type_of_atom = AtomMap.add atom typ type_of_atom }
+let add atom typ env =
+  let type_of_atom = AtomMap.add atom typ env.type_of_atom in
+  { env with type_of_atom }
 
 let fail msg =
   failwith msg
@@ -37,7 +43,8 @@ let rec infer_expr: env -> Core.expression -> DeBruijn.type_term =
     match expr with
     | `TyAbs expr ->
         let new_env =
-          { type_of_atom = AtomMap.map DeBruijn.lift env.type_of_atom }
+          let type_of_atom = AtomMap.map DeBruijn.lift env.type_of_atom in
+          { env with type_of_atom }
         in
         let typ = infer_expr new_env expr in
         `Forall typ
@@ -63,7 +70,7 @@ let rec infer_expr: env -> Core.expression -> DeBruijn.type_term =
     | `Match (e1, pat_exprs) ->
         let t1 = infer_expr env e1 in
         let infer_branch (pat, expr) =
-          let bound_identifiers = infer_pat pat t1 in
+          let bound_identifiers = infer_pat env pat t1 in
           let env =
             List.fold_left (fun env (atom, t) -> add atom t env) env bound_identifiers
           in
@@ -134,7 +141,7 @@ let rec infer_expr: env -> Core.expression -> DeBruijn.type_term =
         `Sum [label, ts]
 
     | `Coerce (e, c) ->
-        apply_coerc (infer_expr env e) c
+        apply_coerc env (infer_expr env e) c
 
 and infer_letrec: 'a. env -> _ -> (env -> 'a) -> 'a =
   fun env pat_type_exprs k ->
@@ -163,45 +170,48 @@ and infer_letrec: 'a. env -> _ -> (env -> 'a) -> 'a =
     in
     k env
 
-and infer_pat: Core.pattern -> DeBruijn.type_term -> (Atom.t * DeBruijn.type_term) list =
-  fun pat t ->
-    match pat with
-    | `Coerce (pat, coerc) ->
-        let t' = apply_coerc t coerc in
-        infer_pat pat t'
+and infer_pat: env -> Core.pattern -> DeBruijn.type_term -> (Atom.t * DeBruijn.type_term) list =
+  fun env pat t ->
+    let rec infer_pat pat t =
+      match pat with
+      | `Coerce (pat, coerc) ->
+          let t' = apply_coerc env t coerc in
+          infer_pat pat t'
 
-    | `Any ->
-        []
+      | `Any ->
+          []
 
-    | `Const c ->
-        let t' = infer_const c in
-        if t <> t' then
-          fail "Const";
-        []
+      | `Const c ->
+          let t' = infer_const c in
+          if t <> t' then
+            fail "Const";
+          []
 
-    | `Var atom ->
-        [atom, t]
+      | `Var atom ->
+          [atom, t]
 
-    | `Or (p1, p2) ->
-        let bound1 = infer_pat p1 t in
-        let bound2 = infer_pat p2 t in
-        assert (List.length bound1 = List.length bound2);
-        let tbl = Hashtbl.create 2 in
-        List.iter (fun (atom, typ) -> Hashtbl.add tbl atom typ) bound1;
-        List.iter (fun (atom, typ) -> assert (Hashtbl.find tbl atom = typ)) bound2;
-        bound1
+      | `Or (p1, p2) ->
+          let bound1 = infer_pat p1 t in
+          let bound2 = infer_pat p2 t in
+          assert (List.length bound1 = List.length bound2);
+          let tbl = Hashtbl.create 2 in
+          List.iter (fun (atom, typ) -> Hashtbl.add tbl atom typ) bound1;
+          List.iter (fun (atom, typ) -> assert (Hashtbl.find tbl atom = typ)) bound2;
+          bound1
 
-    | `Tuple patterns ->
-        match t with
-        | `Cons (head_symbol, typs)
-        when head_symbol = Algebra.TypeCons.head_symbol_tuple (List.length typs) ->
-            let bound = List.map2 infer_pat patterns typs in
-            (* TODO: assert that identifiers are all distinct (enforced in
-               oCamlConstraintGenerator). *)
-            let bound = List.flatten bound in
-            bound
-        | _ ->
-            fail "Tuple"
+      | `Tuple patterns ->
+          match t with
+          | `Cons (head_symbol, typs)
+          when head_symbol = Algebra.TypeCons.head_symbol_tuple (List.length typs) ->
+              let bound = List.map2 infer_pat patterns typs in
+              (* TODO: assert that identifiers are all distinct (enforced in
+                 oCamlConstraintGenerator). *)
+              let bound = List.flatten bound in
+              bound
+          | _ ->
+              fail "Tuple"
+    in
+    infer_pat pat t
 
 and infer_const: Core.const -> DeBruijn.type_term =
   let open Algebra.TypeCons in
@@ -215,60 +225,100 @@ and infer_const: Core.const -> DeBruijn.type_term =
   | `String _ ->
       type_cons_string
 
-and apply_coerc: DeBruijn.type_term -> Core.coercion -> DeBruijn.type_term =
-  fun typ coerc ->
-    match coerc with
-    | `Id ->
-        typ
-    
-    | `Compose (c1, c2) ->
-        let typ = apply_coerc typ c1 in
-        apply_coerc typ c2
+and apply_coerc: env -> DeBruijn.type_term -> Core.coercion -> DeBruijn.type_term =
+  fun env typ coerc ->
+    let rec apply_coerc typ =
+      function
+      | `Id ->
+          typ
+      
+      | `Compose (c1, c2) ->
+          let typ = apply_coerc typ c1 in
+          apply_coerc typ c2
 
-    | `ForallIntro ->
-        fail "Unused"
+      | `ForallIntro ->
+          fail "Unused"
 
-    | `ForallCovar c ->
-        begin match typ with
-        | `Forall t ->
-            `Forall (apply_coerc t c)
-        | _ ->
-            fail "Bad coercion"
-        end
+      | `ForallCovar c ->
+          begin match typ with
+          | `Forall t ->
+              `Forall (apply_coerc t c)
+          | _ ->
+              fail "Bad coercion"
+          end
 
-    | `ForallElim t2 ->
-        begin match typ with
-        | `Forall t1 ->
-            DeBruijn.subst t2 DeBruijn.zero t1
-        | _ ->
-            fail "Bad coercion"
-        end
+      | `ForallElim t2 ->
+          begin match typ with
+          | `Forall t1 ->
+              DeBruijn.subst t2 DeBruijn.zero t1
+          | _ ->
+              fail "Bad coercion"
+          end
 
-    | `CovarTuple (i, coerc) ->
-        begin match typ with
-        | `Cons (head_symbol, types)
-        when head_symbol = Algebra.TypeCons.head_symbol_tuple (List.length types) ->
-            let types =
-              Jlist.mapi
-                (fun i' t -> if i = i' then apply_coerc t coerc else t)
-                types
-            in
-            Algebra.TypeCons.type_cons_tuple types
-        | _ ->
-            fail "Bad coercion"
-        end
+      | `CovarTuple (i, coerc) ->
+          begin match typ with
+          | `Cons (head_symbol, types)
+          when head_symbol = Algebra.TypeCons.head_symbol_tuple (List.length types) ->
+              let types =
+                Jlist.mapi
+                  (fun i' t -> if i = i' then apply_coerc t coerc else t)
+                  types
+              in
+              Algebra.TypeCons.type_cons_tuple types
+          | _ ->
+              fail "Bad coercion"
+          end
 
-    | `DistribTuple ->
-        begin match typ with
-        | `Forall (`Cons (head_symbol, types))
-        when head_symbol = Algebra.TypeCons.head_symbol_tuple (List.length types) ->
-            Algebra.TypeCons.type_cons_tuple (List.map (fun t -> `Forall t) types)
-        | _ ->
-            fail "Bad coercion"
-        end
+      | `DistribTuple ->
+          begin match typ with
+          | `Forall (`Cons (head_symbol, types))
+          when head_symbol = Algebra.TypeCons.head_symbol_tuple (List.length types) ->
+              Algebra.TypeCons.type_cons_tuple (List.map (fun t -> `Forall t) types)
+          | _ ->
+              fail "Bad coercion"
+          end
+      | `Fold (t, args) ->
+          (* We must:
+               - fetch the definition of t from the environment
+               - replace all parameters of t with their corresponding args
+               (they're in order, at least I hope)
+               - merge typ = t1 + t2 + ... (we'll deal with product types later)
+               with the instanciated definition of t, assuming t1 + t2 + ... is a
+               subset of the definition of t
+          *)
+          let def_arity, def = AtomMap.find t env.unfold_type in
+          if def_arity <> List.length args then
+            fail "Fold coercion (0)";
+          let full_type = Jlist.fold_lefti
+            (fun i acc arg ->
+              DeBruijn.subst arg (DeBruijn.of_int i) acc)
+            def
+            args
+          in
+          match full_type, typ with
+          | `Sum label_args_list, `Sum [i_label, i_args] ->
+              let def_label, def_args =
+                List.find (fun (l, _) -> l = i_label) label_args_list
+              in
+              assert (def_label = i_label);
+              if def_args <> i_args then begin
+                let t1 = String.concat " * "
+                  (List.map DeBruijn.string_of_type_term def_args)
+                in
+                let t2 = String.concat " * "
+                  (List.map DeBruijn.string_of_type_term i_args)
+                in
+                Error.debug "[TC] %s <> %s\n" t1 t2;
+                fail "Fold coercion (1)";
+              end;
+              `Named (t, args)
+          | _ ->
+              fail "Fold coercion (2)"
+    in
+    apply_coerc typ coerc
 
-    | `Fold _ ->
-        failwith "TODO: type-check fold coercions"
+
+
 
 and infer_structure: env -> Core.structure -> env =
   let rec infer_str: env -> _ -> env =
@@ -281,20 +331,21 @@ and infer_structure: env -> Core.structure -> env =
 
     | `Let (pat, expr) ->
         let t = infer_expr env expr in
-        let bound_identifiers = infer_pat pat t in
+        let bound_identifiers = infer_pat env pat t in
         let env =
           List.fold_left (fun env (atom, t) -> add atom t env) env bound_identifiers
         in
         env
 
-    | `Type _ ->
-        failwith "TODO: implement type decls type-checking"
+    | `Type (arity, atom, t) ->
+        let unfold_type = AtomMap.add atom (arity, t) env.unfold_type in
+        { env with unfold_type }
   in
   fun env structure ->
     List.fold_left infer_str env structure
 
 
 let check str =
-  let env = { type_of_atom = AtomMap.empty } in
+  let env = { type_of_atom = AtomMap.empty; unfold_type = AtomMap.empty } in
   let env = infer_structure env str in
   ignore env

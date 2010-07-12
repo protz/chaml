@@ -41,9 +41,9 @@ type coercion = [
       (** If τ1 is a subtype of τ2, then ... * τ1 * ... is a subtype of ... * τ2 * ... *)
   | `DistribTuple
       (** Distribute ∀ under, say, τ1 * τ2 *)
-  | `Fold of Atom.t
+  | `Fold of Atom.t * type_term list
       (** Turn an anonymous sum (say, A + B) into the corresponding named
-          isorecursive type, say t = A + B *)
+          isorecursive type, say int t = A + B *)
 ]
 
 type const = [
