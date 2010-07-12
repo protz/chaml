@@ -248,8 +248,11 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
       let exprs = List.map (desugar_expr env) exprs in
       `Tuple exprs
 
-  | `Construct _ ->
-      failwith "TODO: implement construct in desugar"
+  | `Construct (t, cons, args) ->
+      let e = `Construct (cons, List.map (desugar_expr env) args) in
+      let t = StringMap.find t env.atom_of_type in
+      let c = `Fold t in
+      `Coerce (e, c)
 
   | `Const c ->
       let c = desugar_const c in
@@ -336,7 +339,10 @@ and desugar_pat env ?rebind pat =
 
 (* [generate_coerc] walks down the pattern scheme and the pattern in
  * parallel, and returns a list of coercions needed to properly type this
- * pattern *)
+ * pattern. Since we're working on f_type_terms to generate coercions, there are
+ * only leading \foralls, not deep \foralls. So when calling this function, you
+ * usually have at hand the number of generalized variables and the
+ * corresponding type scheme. This is what you provide to the function. *)
 and generate_coerc env cenv =
   let compose c1 c2 =
     match c1, c2 with
@@ -684,11 +690,20 @@ module PrettyPrinting = struct
       | `Magic t ->
           (string "%magic: ") ^^ (string (DeBruijn.string_of_type_term t))
 
-      (* | `Coerce (expr, coerc) ->
+      | `Coerce (expr, coerc) ->
           let edoc = doc_of_expr expr in
           let cdoc = doc_of_coerc coerc in
           let triangle = pcolor colors.green ~l:1 "▸" in
-          edoc ^^ space ^^ triangle ^^ space ^^ cdoc *)
+          edoc ^^ space ^^ triangle ^^ space ^^ cdoc
+
+      | `Construct (label, args) ->
+          let l = List.length args in
+          if l > 1 then
+            (string label) ^^ space ^^ (doc_of_expr (`Tuple args))
+          else if l = 1 then
+            (string label) ^^ space ^^ (doc_of_expr (List.hd args))
+          else
+            (string label)
 
   and doc_of_pat: pattern -> Pprint.document =
     let open Pprint in
@@ -763,6 +778,10 @@ module PrettyPrinting = struct
 
       | `DistribTuple ->
           fancystring "∀×" 2
+
+      | `Fold t ->
+          let t = Atom.string_of_atom t in
+          (string "fold") ^^ lbracket ^^ (string t) ^^ rbracket
 
   and doc_of_struct: structure -> Pprint.document =
     let open Pprint in

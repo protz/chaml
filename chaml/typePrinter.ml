@@ -168,10 +168,16 @@ let string_of_types
           Printf.sprintf "∏ %s" items
 
       | `Named (t, args) ->
+          let l = List.length args in
           let t = Atom.string_of_atom t in
           let args = List.map (print_type paren) args in
           let args = String.concat ", " args in
-          Printf.sprintf "(%s) %s" args t
+          if l > 1 then
+            Printf.sprintf "((%s) %s)" args t
+          else if l = 1 then
+            Printf.sprintf "(%s %s)" args t
+          else
+            Printf.sprintf "%s" t
   in
   let print_with_scheme uvar =
     let typ = print_type false uvar in

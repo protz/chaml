@@ -54,7 +54,7 @@ let count_camlx_nodes e =
         + count_expr e) 0 pe) + count_type f_type_term
     | `Tuple es ->
         1 + (List.fold_left (fun acc e -> acc + count_expr e) 0 es)
-    | `Construct (_, e) ->
+    | `Construct (_, _, e) ->
         1 + List.fold_left (fun acc e -> acc + count_expr e) 0 e
     | `IfThenElse (i, t, e) ->
         1 + count_expr i + count_expr t + (match e with
@@ -127,6 +127,7 @@ let count_core_nodes e =
     | `App (e, es) ->
         1 + count_expr e + (List.fold_left (fun acc e -> acc + count_expr e) 0 es)
 
+    | `Construct (_, es)
     | `Tuple es ->
         1 + (List.fold_left (fun acc e -> acc + count_expr e) 0 es)
     | `Instance _
@@ -180,6 +181,8 @@ let count_core_nodes e =
         1 + count_type t
     | `CovarTuple (_, c) ->
         1 + count_coerc c
+    | `Fold _ ->
+        1
 
   and count_struct = function
     | `Let (pat, expr) ->

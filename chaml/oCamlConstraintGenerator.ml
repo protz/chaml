@@ -805,7 +805,7 @@ module Make(S: Algebra.SOLVER) = struct
             type_terms)
           in
           let konstraint = `Exists (xis @ type_vars, constr_conj (c0 :: constraints)) in
-          let expr = `Construct (c, exprs) in
+          let expr = `Construct (head_symbol.cons_name, c, exprs) in
           {
             e_constraint = konstraint;
             expr;

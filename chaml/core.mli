@@ -41,6 +41,9 @@ type coercion = [
       (** If τ1 is a subtype of τ2, then ... * τ1 * ... is a subtype of ... * τ2 * ... *)
   | `DistribTuple
       (** Distribute ∀ under, say, τ1 * τ2 *)
+  | `Fold of Atom.t
+      (** Turn an anonymous sum (say, A + B) into the corresponding named
+          isorecursive type, say t = A + B *)
 ]
 
 type const = [
@@ -64,7 +67,7 @@ module AtomMap: module type of Jmap.Make(Atom)
 type expression = [
   | `TyAbs of expression
   | `TyApp of expression * type_term
-  (* | `Coerce of expression * coercion *)
+  | `Coerce of expression * coercion
 
   | `Fun of var * type_term * expression
   | `Match of expression * (pattern * expression) list
@@ -77,6 +80,7 @@ type expression = [
   | `Const of const
 
   | `Sequence of expression * expression
+  | `Construct of string * expression list
 
   | `Magic of type_term
 ]

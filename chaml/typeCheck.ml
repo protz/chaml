@@ -129,8 +129,12 @@ let rec infer_expr: env -> Core.expression -> DeBruijn.type_term =
     | `Sequence _ ->
         failwith "TODO type-check sequence"
 
-    (* | `Coerce (e, c) ->
-        apply_coerc (infer_expr env e) c *)
+    | `Construct (label, args) ->
+        let ts = List.map (infer_expr env) args in
+        `Sum [label, ts]
+
+    | `Coerce (e, c) ->
+        apply_coerc (infer_expr env e) c
 
 and infer_letrec: 'a. env -> _ -> (env -> 'a) -> 'a =
   fun env pat_type_exprs k ->
@@ -262,6 +266,9 @@ and apply_coerc: DeBruijn.type_term -> Core.coercion -> DeBruijn.type_term =
         | _ ->
             fail "Bad coercion"
         end
+
+    | `Fold _ ->
+        failwith "TODO: type-check fold coercions"
 
 and infer_structure: env -> Core.structure -> env =
   let rec infer_str: env -> _ -> env =
