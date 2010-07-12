@@ -38,9 +38,6 @@ type cenv = {
   pattern: pattern;
 }
 
-(* Subtyping *)
-let ftt_dtt type_term = (type_term: f_type_term :> DeBruijn.type_term)
-
 (* Introduce new identifiers in scope, possibly overriding previously defined
  * ones. *)
 let introduce: Atom.t list -> env -> env =
@@ -143,7 +140,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
           (* Generate the coercion *)
           let new_pat =
             (* XXX FIXME why new_env here? *)
-            let type_term = ftt_dtt type_term in
+            let type_term = desugar_type env type_term in
             add_coercions_to_pattern new_env { pattern = pat; forall = young_vars; type_term }
           in
           (* The pattern has already been translated in a first pass. Now check if
@@ -167,7 +164,7 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
       (* Remember, we have the invariant that the instance variables are in the
        * global order, and so are the scheme variables (fingers crossed)! *)
       let app expr type_term =
-        let type_term = ftt_dtt type_term in
+        let type_term = desugar_type env type_term in
         `TyApp (expr, type_term)
       in
       let atom = find ident env in
@@ -188,42 +185,58 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
       `App (List.hd exprs, List.tl exprs)
 
   | `Function (arg_type, pat_exprs) ->
+      let desugar_function () =
+        (* First create a fake ident. We don't care about unique names anymore,
+         * because atoms have a uniquely generated identifier. *)
+        let atom = Atom.fresh (ident "__internal" Location.none) in
+        (* Now function is forbidden, only fun x -> with x being a single
+         * var. This is where the type of the whole argument turns out to be
+         * useful, and this is why we've been forwarding it through the many
+         * passes since the beginning. *)
+        let var = `Var atom in
+        (* Take an instance of the introduced variable. Because we're in ML,
+         * there's no universal quantification on the type of x so there's no type
+         * variables to instanciate, so no `TyApp. *)
+        let instance = `Instance var in
+        let arg_type = desugar_type env arg_type in
+        (* Translate the expressions and the patterns *)
+        let gen (pat, expr) =
+          let pat, atoms = desugar_pat env pat in
+          let pat =
+            add_coercions_to_pattern
+              env
+              { forall = 0; type_term = arg_type; pattern = pat }
+          in
+          let new_env = introduce atoms env in
+          let expr = desugar_expr new_env expr in
+          (pat, expr)
+        in
+        (* Finally return fun x -> match x with [...] *)
+        let mmatch = `Match (instance, (List.map gen pat_exprs)) in
+        `Fun (var, arg_type, mmatch)
+      in
       begin match pat_exprs with
           (* We deal with the trivial case fun x -> where x is already an identifier *)
           | [(`Var _ as v, expr)] ->
-              begin match desugar_pat env v with
+              let arg_type = desugar_type env arg_type in
+              let pat, atoms = desugar_pat env v in
+              let pat =
+                add_coercions_to_pattern
+                  env
+                  { forall = 0; type_term = arg_type; pattern = pat }
+              in
+              begin match pat, atoms with
               | (`Var _ as v), ([_] as atoms) ->
                   let new_env = introduce atoms env in
-                  `Fun (v, ftt_dtt arg_type, desugar_expr new_env expr)
+                  `Fun (v, arg_type, desugar_expr new_env expr)
               | _ ->
-                  assert false
+                  desugar_function ()
               end
 
           (* This is the general case. We either have many branches, or a
            * pattern instead of a single var. *)
           | _ ->
-            (* First create a fake ident. We don't care about unique names anymore,
-             * because atoms have a uniquely generated identifier. *)
-            let atom = Atom.fresh (ident "__internal" Location.none) in
-            (* Now function is forbidden, only fun x -> with x being a single
-             * var. This is where the type of the whole argument turns out to be
-             * useful, and this is why we've been forwarding it through the many
-             * passes since the beginning. *)
-            let var = `Var atom in
-            (* Take an instance of the introduced variable. Because we're in ML,
-             * there's no universal quantification on the type of x so there's no type
-             * variables to instanciate, so no `TyApp. *)
-            let instance = `Instance var in
-            (* Translate the expressions and the patterns *)
-            let gen (pat, expr) =
-              let pat, atoms = desugar_pat env pat in
-              let new_env = introduce atoms env in
-              let expr = desugar_expr new_env expr in
-              (pat, expr)
-            in
-            (* Finally return fun x -> match x with [...] *)
-            let mmatch = `Match (instance, (List.map gen pat_exprs)) in
-            `Fun (var, ftt_dtt arg_type, mmatch)
+              desugar_function ()
       end
 
   | `Match (expr, { young_vars; f_type_term = type_term }, pat_exprs) ->
@@ -233,7 +246,9 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
         let pat, atoms = desugar_pat env pat in
         let sub_env = introduce atoms env in
         let pat =
-          let type_term = ftt_dtt type_term in
+          let type_term = desugar_type env type_term in
+          Error.debug "[DesugarMatch] Adding coercions to match %s\n"
+            (DeBruijn.string_of_type_term type_term);
           add_coercions_to_pattern sub_env { pattern = pat; forall = young_vars; type_term }
         in
         let expr = 
@@ -262,13 +277,13 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
       `Sequence (desugar_expr env e1, desugar_expr env e2)
 
   | `IfThenElse (_if_expr, _then_expr, _else_expr) ->
-      assert false
+      failwith "TODO: desugar if-then-else"
 
   | `AssertFalse t ->
-      `Magic (ftt_dtt t)
+      `Magic (desugar_type env t)
 
   | `Magic t ->
-      `Magic (ftt_dtt t)
+      `Magic (desugar_type env t)
 
 and desugar_letrec:
       env ->
@@ -284,7 +299,7 @@ and desugar_letrec:
     let new_env = enter_letrec new_env rec_atoms young_vars in
     let var_type_exprs = List.map
       (fun (pat, { young_vars; f_type_term }, expr) ->
-        let f_type_term = ftt_dtt f_type_term in
+        let f_type_term = desugar_type new_env f_type_term in
         match pat with
         | `Var ident ->
             let a = find ident new_env in
@@ -518,7 +533,7 @@ and desugar_struct
             let e1 = wrap_lambda young_vars e1 in
             (* Generate the coercion *)
             let new_pat =
-              let type_term = ftt_dtt type_term in
+              let type_term = desugar_type env type_term in
               add_coercions_to_pattern new_env { pattern = pat; forall = young_vars; type_term }
             in
             `Let (new_pat, e1)
