@@ -231,8 +231,16 @@ and infer_pat: env -> Core.pattern -> DeBruijn.type_term -> (Atom.t * DeBruijn.t
               fail "Tuple"
           end
 
-      | `Construct (_label, _args) ->
-          failwith "TODO: infer_pat `Construct"
+      | `Construct (label, patterns) ->
+          begin match t with
+          | `Sum label_types_list ->
+              let types = List.assoc label label_types_list in
+              let patterns = List.map fst patterns in
+              let bound = List.map2 infer_pat patterns types in
+              List.flatten bound
+          | _ ->
+              fail "infer_pat construct"
+          end
     in
     infer_pat pat t
 
@@ -327,11 +335,24 @@ and apply_coerc: env -> DeBruijn.type_term -> Core.coercion -> DeBruijn.type_ter
               fail "Fold coercion (2)"
           end
 
-      | `Unfold _ ->
-          failwith "TODO: unfold typecheck"
+      | `Unfold (t, args) ->
+          let def_arity, def = AtomMap.find t env.unfold_type in
+          if def_arity <> List.length args then
+            fail "Fold coercion (0)";
+          let full_type = DeBruijn.instanciate_data_constructor def args in
+          (full_type: DeBruijn.type_data_type :> DeBruijn.type_term)
 
       | `DistribVariant ->
-          failwith "TODO: distribvariant typecheck"
+          begin match typ with
+          | `Forall (`Sum label_args_list) ->
+              `Sum (List.map
+                (fun (l, args) -> (l, List.map (fun t -> `Forall t) args))
+                label_args_list)
+          | _ ->
+              Error.debug "Don't know how to distribvariant %s\n"
+                (DeBruijn.string_of_type_term typ);
+              fail "Bad coercion distribvariant"
+          end
 
       | `CovarVariant _ ->
           failwith "TODO: covarvariant typecheck"
