@@ -89,20 +89,28 @@ let strip_forall =
   in
   strip 0
 
-let rec desugar_expr: env -> CamlX.f_expression -> expression =
-  fun env expr ->
+let rec desugar_expr
+        (env: env)
+        (expr: CamlX.f_expression)
+        : expression =
   match expr with
   | `Let (rec_flag, pat_coerc_exprs, e2) ->
       if rec_flag then
         let new_env, var_type_exprs = desugar_letrec env pat_coerc_exprs in
         let e2 = desugar_expr new_env e2 in
+        (* We explicitely forbid anything but identifiers in the LHS of a
+         * let-rec. This is enforced in the constraint generator, so we're
+         * confident we have either a variable or a coerced variable in this
+         * pattern *)
         let e2, var_type_exprs = List.fold_left
           (fun (acc, var_type_exprs) (pat, typ, expr) ->
             match pat with
             | `Coerce (`Var _ as var, _) ->
-                (`Match (`Instance var, [pat, acc]), (var, typ, expr) :: var_type_exprs)
+                `Match (`Instance var, [pat, acc]),
+                (var, typ, expr) :: var_type_exprs
             | `Var _ as var ->
-                (acc, (var, typ, expr) :: var_type_exprs)
+                acc,
+                (var, typ, expr) :: var_type_exprs
             | _ ->
                 assert false
           )
@@ -118,15 +126,10 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
           List.split
             (List.map (fun (pat, _, _) -> desugar_pat env pat) pat_coerc_exprs)
         in
-        (* We generate e2 with all identifiers in scope *)
-        let new_env = introduce (List.flatten new_atoms) env in
-        let e2 = desugar_expr new_env e2 in
-        (* And then we desugar all of the initial branches in the same previous
-         * scope *)
+        (* We desugar all branches in the initial scope *)
         let gen_branch e2 (_, { young_vars; f_type_term = type_term }, e1) pat =
           let e1 = desugar_expr env e1 in
-          (* Beware, now we must generate proper F terms *)
-          (* So we generate proper Lambdas *)
+          (* Beware, now we must generate proper F terms. Don't forget to add Lambdas. *)
           let e1 = wrap_lambda young_vars e1 in
           (* Generate the coercion *)
           let type_term = desugar_type env type_term in
@@ -145,6 +148,9 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
           | _ ->
               `Match (e1, [pat, e2])
         in
+        (* We generate e2 with all identifiers in scope *)
+        let new_env = introduce (List.flatten new_atoms) env in
+        let e2 = desugar_expr new_env e2 in
         (* Wrap everyone around e2 *)
         let expr = List.fold_left2 gen_branch e2 pat_coerc_exprs new_patterns in
         expr
@@ -157,6 +163,10 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
         `TyApp (expr, type_term)
       in
       let atom = find ident env in
+      (* This is a trick that allows us to transform ML-style recursion (no
+       * re-instanciation) into regular F-style recursion (identifiers are
+       * given a polymorphic type and are reinstanciated in the recursive
+       * definitions. *)
       let type_terms =
         match AtomMap.find_opt atom env.rec_atoms with
         | None ->
@@ -174,6 +184,8 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
       `App (List.hd exprs, List.tl exprs)
 
   | `Function (arg_type, pat_exprs) ->
+      (* This is the regular desugaring function. We try a few tricks before
+       * resorting to it in order to simplify the AST we generate. *)
       let desugar_function () =
         (* First create a fake ident. We don't care about unique names anymore,
          * because atoms have a uniquely generated identifier. *)
@@ -202,23 +214,23 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
         `Fun (var, arg_type, mmatch)
       in
       begin match pat_exprs with
-          (* We deal with the trivial case fun x -> where x is already an identifier *)
-          | [(`Var _ as v, expr)] ->
-              let arg_type = desugar_type env arg_type in
-              let pat, atoms = desugar_pat env v in
-              let pat = add_coercions_to_pattern env pat arg_type in
-              begin match pat, atoms with
-              | (`Var _ as v), ([_] as atoms) ->
-                  let new_env = introduce atoms env in
-                  `Fun (v, arg_type, desugar_expr new_env expr)
-              | _ ->
-                  desugar_function ()
-              end
+        (* We deal with the trivial case fun x -> where x is already an identifier *)
+        | [(`Var _ as v, expr)] ->
+            let arg_type = desugar_type env arg_type in
+            let pat, atoms = desugar_pat env v in
+            let pat = add_coercions_to_pattern env pat arg_type in
+            begin match pat, atoms with
+            | (`Var _ as v), ([_] as atoms) ->
+                let new_env = introduce atoms env in
+                `Fun (v, arg_type, desugar_expr new_env expr)
+            | _ ->
+                desugar_function ()
+            end
 
-          (* This is the general case. We either have many branches, or a
-           * pattern instead of a single var. *)
-          | _ ->
-              desugar_function ()
+        (* This is the general case. We either have many branches, or a
+         * pattern instead of a single var. *)
+        | _ ->
+            desugar_function ()
       end
 
   | `Match (expr, { young_vars; f_type_term = type_term }, pat_exprs) ->
@@ -249,7 +261,8 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
   | `Construct (t, ts, cons, args) ->
       let e = `Construct (cons, List.map (desugar_expr env) args) in
       let t = StringMap.find t env.atom_of_type in
-      let c = `Fold (t, (ts: f_type_term list :> DeBruijn.type_term list)) in
+      let ts = List.map (desugar_type env) ts in
+      let c = `Fold (t, ts) in
       `Coerce (e, c)
 
   | `Const c ->
@@ -268,44 +281,48 @@ let rec desugar_expr: env -> CamlX.f_expression -> expression =
   | `Magic t ->
       `Magic (desugar_type env t)
 
-and desugar_letrec:
-      env ->
-      (f_pattern * f_clblock * f_expression) list ->
-      env * (pattern * type_term * expression) list
-    =
-  fun env pat_coerc_exprs ->
-    let new_patterns, new_atoms =
-      List.split
-        (List.map (fun (pat, _, _) -> desugar_pat env pat) pat_coerc_exprs)
-    in
-    assert (List.length new_atoms = List.length (List.flatten new_atoms));
-    let new_atoms = List.flatten new_atoms in
-    (* We generate e2 with all identifiers in scope *)
-    let env = introduce new_atoms env in
-    (* The convention is: the information is in the first clblock *)
-    let _, { young_vars; _ }, _ = List.hd pat_coerc_exprs in
-    (* Assume we know all the atoms *)
-    let rec_env = enter_letrec env new_atoms young_vars in
-    let var_type_exprs = List.map2
-      (fun pat (_, { young_vars; f_type_term }, expr) ->
-        (* Desugar the type *)
-        let f_type_term = desugar_type rec_env f_type_term in
-        let type_term = wrap_forall young_vars f_type_term in
-        (* The pattern was already generated in a first pass. We must do it
-         * once, otherwise we regenerate fresh atoms for identifiers *)
-        let pat = add_coercions_to_pattern rec_env pat type_term in
-        (* And now the expression *)
-        let e = desugar_expr rec_env expr in
-        let e = wrap_lambda young_vars e in
-        (pat, type_term, e)
-      )
-      new_patterns
-      pat_coerc_exprs
-    in
-    env, var_type_exprs
+and desugar_letrec
+    (env: env)
+    (pat_coerc_exprs: (f_pattern * f_clblock * f_expression) list)
+    : env * (pattern * type_term * expression) list =
+
+  (* We first make a big pass to generate all the patterns, which in turn
+   * generates all the atoms we need. *)
+  let new_patterns, new_atoms =
+    List.split
+      (List.map (fun (pat, _, _) -> desugar_pat env pat) pat_coerc_exprs)
+  in
+  (* Each pattern is actually a variable. We introduce all these in the
+   * environment *)
+  List.iter (fun l -> assert (List.length l = 1)) new_atoms;
+  let new_atoms = List.flatten new_atoms in
+  let env = introduce new_atoms env in
+  (* The convention is: the information is in the first clblock *)
+  let _, { young_vars; _ }, _ = List.hd pat_coerc_exprs in
+  (* Assume we know all the atoms *)
+  let rec_env = enter_letrec env new_atoms young_vars in
+  (* To type the branches *)
+  let var_type_exprs = List.map2
+    (fun pat (_, { young_vars; f_type_term }, expr) ->
+      (* Desugar the type *)
+      let f_type_term = desugar_type rec_env f_type_term in
+      let type_term = wrap_forall young_vars f_type_term in
+      (* The pattern was already generated in a first pass. So we use the one
+       * that was generated before, and we enrich it with coercions now we know
+       * its type. *)
+      let pat = add_coercions_to_pattern rec_env pat type_term in
+      (* And now the expression *)
+      let e = desugar_expr rec_env expr in
+      let e = wrap_lambda young_vars e in
+      (pat, type_term, e)
+    )
+    new_patterns
+    pat_coerc_exprs
+  in
+  env, var_type_exprs
 
 (* This function only translates stupidly a f_pattern into a Core.pattern. If we
- * are in a location that requires that we generate a coercion, then
+ * are in a situation that requires that we generate a coercion, then
  * add_coercions_to_pattern will be called. It will enrich the translated
  * pattern with the required coercions to "make everything work". *)
 and desugar_pat
@@ -352,21 +369,39 @@ and desugar_pat
   | `Any ->
       `Any, []
 
-(* [generate_coerc] walks down the pattern and the pattern type in parallel, and
- * returns a list of coercions needed to properly type this pattern. The
- * expected workflow is:
- *  - obtain a f_type_term (possibly with the number of generalized variables)
+(* [add_coercions_to_pattern] walks down the pattern and the pattern type in
+ * parallel, and returns a list of coercions needed to properly
+ * type this pattern. The expected workflow is:
+ *  - obtain a f_type_term (possibly with the number of generalized variables from a clblock)
  *  - call desugar_type
  *  - call wrap_forall if needed
- *  - return add_coercions_to_pattern
+ *  - call add_coercions_to_pattern
  * *)
-and add_coercions_to_pattern env pat typ =
+and add_coercions_to_pattern
+    (env: env)
+    (pat: pattern)
+    (typ: type_term)
+    : pattern =
+
   let compose c1 c2 =
     match c1, c2 with
     | `Id, c1 -> c1
     | c2, `Id -> c2
     | _ -> `Compose (c1, c2)
   in 
+
+  let forall_covar c =
+     if c = `Id then `Id else `ForallCovar c
+  in
+
+  let covar_tuple i c =
+    if c = `Id then `Id else `CovarTuple (i, c)
+  in
+
+  let coerce p1 c1 =
+    if c1 = `Id then p1 else `Coerce (p1, c1)
+  in
+
   let push_n_foralls_inside n what =
     let rec fold n =
       if n = 0 then
@@ -401,7 +436,7 @@ and add_coercions_to_pattern env pat typ =
               let pattern, c =
                 generate_coerc env pattern (wrap_forall forall type_term)
               in
-              pattern, if c = `Id then `Id else `CovarTuple (i, c)
+              pattern, covar_tuple i c
             in
             (* We have the first coercion *)
             let patterns, coercions = List.split (Jlist.map2i gen patterns cons_args) in
@@ -445,15 +480,15 @@ and add_coercions_to_pattern env pat typ =
                let celim = `ForallElim Algebra.TypeCons.type_cons_bottom in
                compose celim c
              else
-               if c = `Id then `Id else `ForallCovar c
+               forall_covar c
         in
         pat, fold forall
 
     | `Or (p1, p2) ->
         let p1, c1 = generate_coerc env p1 typ in
         let p2, c2 = generate_coerc env p2 typ in
-        let p1 = if c1 = `Id then p1 else `Coerce (p1, c1) in
-        let p2 = if c2 = `Id then p2 else `Coerce (p2, c2) in
+        let p1 = coerce p1 c1 in
+        let p2 = coerce p2 c2 in
         `Or (p1, p2), `Id
 
     | `Const x ->
@@ -811,20 +846,27 @@ module PrettyPrinting = struct
       | `DistribTuple ->
           fancystring "∀×" 2
 
+      | `Unfold (t, ts) ->
+          let args = doc_of_args ts in
+          let t = Atom.string_of_atom t in
+          (string "unfold") ^^ lbracket ^^ args ^^ (string t) ^^ rbracket
+
       | `Fold (t, ts) ->
-          let args =
-            let arity = List.length ts in
-            let args = List.map string_of_type_term ts in
-            if arity > 1 then
-              lparen ^^ (Jlist.concat (fun x y -> x ^^ comma ^^ space ^^ y) args)
-              ^^ rparen ^^ space
-            else if arity = 1 then
-              List.hd args ^^ space
-            else
-              empty
-          in
+          let args = doc_of_args ts in
           let t = Atom.string_of_atom t in
           (string "fold") ^^ lbracket ^^ args ^^ (string t) ^^ rbracket
+
+  and doc_of_args ts =
+    let open Pprint in
+    let arity = List.length ts in
+    let args = List.map string_of_type_term ts in
+    if arity > 1 then
+      lparen ^^ (Jlist.concat (fun x y -> x ^^ comma ^^ space ^^ y) args)
+      ^^ rparen ^^ space
+    else if arity = 1 then
+      List.hd args ^^ space
+    else
+      empty
 
   and doc_of_struct: structure -> Pprint.document =
     let open Pprint in

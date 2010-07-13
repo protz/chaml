@@ -332,7 +332,7 @@ and apply_coerc: env -> DeBruijn.type_term -> Core.coercion -> DeBruijn.type_ter
           (* We check that we can inject the anonymous sum/product into the
            * isorecursive type by checking that the labels match and that the
            * arguments match as well *)
-          match full_type, typ with
+          begin match full_type, typ with
           | `Sum label_args_list, `Sum [i_label, i_args] ->
               let def_label, def_args =
                 List.find (fun (l, _) -> l = i_label) label_args_list
@@ -344,6 +344,11 @@ and apply_coerc: env -> DeBruijn.type_term -> Core.coercion -> DeBruijn.type_ter
               `Named (t, args)
           | _ ->
               fail "Fold coercion (2)"
+          end
+
+      | `Unfold _ ->
+          failwith "TODO: unfold typecheck"
+
     in
     apply_coerc typ coerc
 

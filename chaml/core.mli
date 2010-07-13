@@ -48,6 +48,8 @@ type coercion = [
   | `Fold of Atom.t * type_term list
       (** Turn an anonymous sum (say, A + B) into the corresponding named
           isorecursive type, say int t = A + B *)
+  | `Unfold of Atom.t * type_term list
+      (** The opposite of the coercion above *)
 ]
 
 type const = [

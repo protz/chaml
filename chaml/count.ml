@@ -183,8 +183,9 @@ let count_core_nodes e =
         1 + count_type t
     | `CovarTuple (_, c) ->
         1 + count_coerc c
-    | `Fold _ ->
-        1
+    | `Unfold (_, ts)
+    | `Fold (_, ts) ->
+        1 + count_types ts
 
   and count_struct = function
     | `Let (pat, expr) ->

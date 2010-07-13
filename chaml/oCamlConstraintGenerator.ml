@@ -32,6 +32,7 @@ type error =
   | AlgebraError of Algebra.Core.error
   | OnlyIdentInLetRec of Location.t
   | TypeConstructorArguments of string * int * int * Location.t
+  | UnboundDataConstructor of string
 
 exception Error of error
 let raise_error e = raise (Error e)
@@ -65,6 +66,8 @@ let string_of_error =
       Printf.sprintf
         "%a: type constructor %s expects %d arguments, but you provided %d\n"
         print_loc loc s n1 n2
+  | UnboundDataConstructor c ->
+      Printf.sprintf "Unbound data constructor %s\n" c
   | AlgebraError e ->
       Algebra.Core.string_of_error e
 
@@ -195,7 +198,10 @@ module Make(S: Algebra.SOLVER) = struct
     StringMap.find data_type head_symbol_of_type
 
   let data_type_of_constructor { data_type_of_constructor; _ } data_constructor =
-    StringMap.find data_constructor data_type_of_constructor
+    try
+      StringMap.find data_constructor data_type_of_constructor
+    with Not_found ->
+      raise_error (UnboundDataConstructor data_constructor)
 
   let tuple_or_not loc cons_name l1 args =
     let l2 = List.length args in
