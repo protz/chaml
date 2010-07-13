@@ -32,6 +32,9 @@ let find atom { type_of_atom; _ } =
   AtomMap.find atom type_of_atom
 
 let add atom typ env =
+  Error.debug "[TC] Adding %s: %s into env\n"
+    (Atom.string_of_atom atom)
+    (DeBruijn.string_of_type_term typ);
   let type_of_atom = AtomMap.add atom typ env.type_of_atom in
   { env with type_of_atom }
 
