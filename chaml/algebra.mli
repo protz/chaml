@@ -103,6 +103,11 @@ module TypeCons: sig
   (** And for n-ary tuples *)
   val head_symbol_tuple: int -> head_symbol
 
+  val head_symbol_int: head_symbol
+  val head_symbol_char: head_symbol
+  val head_symbol_string: head_symbol
+  val head_symbol_float: head_symbol
+
 end
 
 (** Once again, putting this in a separate module is not necessary strictly

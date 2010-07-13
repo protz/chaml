@@ -1,13 +1,5 @@
-let rec f (x, y) =
-  g x
-and g x =
-  (x, x)
+type 'a t = A of (int * ('a -> 'a))
 
-let g = g
-
-let rec f' (x, y) =
-  g' x
-and g' x =
-  x
-
-let v = g' 1 + 2
+let g =
+  let A (_, f) = (fun x -> x) (A (1, fun x -> x)) in
+  f

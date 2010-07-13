@@ -111,7 +111,7 @@ let translate =
           let fexpr = translate_expr new_env expr in
           (* Generate patterns and expressions properly *)
           let gen (pat, pscheme, expr) =
-            let fpat = translate_pat env pat in
+            let fpat = translate_pat new_env pat in
             let fexpr = translate_expr env expr in
             begin match pscheme with
               | Some pscheme ->
@@ -165,17 +165,19 @@ let translate =
     let pat_expr_list =
       List.map
         (fun (upat, pscheme, uexpr) ->
-          (* The patterns are translated in the current environment *)
-          let fpat = translate_pat env upat in
-          (* Then we move to the rigt of let p1 = e1, this is where we
-           * introduce the new type variables *)
+          (* Remember, env is just a mapping from uvars to f_type_terms, so it's
+           * fine to create it now. *)
           let young_vars =
             if rec_flag then
               rec_scheme_vars
             else
               pscheme.p_young_vars
           in
+          (* Since we now potentially have S.vars in patterns (for
+           * constructs)... *)
           let new_env = List.fold_left lift_add env young_vars in
+          (* The patterns are translated in the current environment *)
+          let fpat = translate_pat new_env upat in
           let f_type_term = type_term_of_uvar new_env pscheme.p_uvar in
           let young_vars = List.length young_vars in
           Error.debug "[TScheme] %d variables in this pattern\n" young_vars;
@@ -195,10 +197,38 @@ let translate =
     in
     k pat_expr_list
 
-  (* [translate_pat] just generates patterns as needed. It doesn't try to
-   * assign schemes to variables if those are on the left-hand side of a pattern. *)
+  (* [translate_pat] just generates patterns as needed. *)
   and translate_pat: env -> pattern -> f_pattern =
-    fun _env upat -> upat
+    fun env upat ->
+      match upat with
+      | `Any as r ->
+          r
+
+      | `Alias (pat, ident) ->
+          `Alias (translate_pat env pat, ident)
+
+      | `Const c ->
+          `Const c
+
+      | `Tuple patterns ->
+          `Tuple (List.map (translate_pat env) patterns)
+
+      | `Or (p1, p2) ->
+          `Or (translate_pat env p1, translate_pat env p2)
+
+      | `Var ident ->
+          `Var ident
+
+      | `Construct (l, pat_types) ->
+          `Construct (
+            l,
+            List.map
+              (fun (pat, { scheme_var = typ }) ->
+                Error.debug "[TConstructPattern] Uvar is %a\n" uvar_name typ;
+                (translate_pat env pat, type_term_of_uvar env typ))
+              pat_types
+          )
+
 
   (* The thing is here, we're only renaming types, and types of top-level
    * bindings are closed, so there's nothing to forward across structure items.
@@ -426,6 +456,9 @@ module PrettyPrinting = struct
 
   and doc_of_pat: f_pattern -> Pprint.document =
     let open Pprint in
+    let doc_of_pat_typ (pat, typ) =
+      (doc_of_pat pat) ^^ colon ^^ space ^^ (string_of_type_term typ)
+    in
     function
       | `Any ->
           underscore
@@ -440,16 +473,16 @@ module PrettyPrinting = struct
           let pdoc2 = doc_of_pat p2 in
           pdoc1 ^^ space ^^ bar ^^ space ^^ pdoc2
 
-      | `Construct (c, pats) ->
+      | `Construct (c, pat_typ_list) ->
           let doc =
-            match pats with
+            match pat_typ_list with
             | [] ->
                 empty
             | [x] ->
-                space ^^ (doc_of_pat x)
+                space ^^ (doc_of_pat_typ x)
             | xs ->
                 space ^^ lparen ^^ (Jlist.concat (fun x y -> x ^^ comma ^^ space ^^
-                y) (List.map doc_of_pat xs)) ^^ rparen
+                y) (List.map doc_of_pat_typ xs)) ^^ rparen
           in
           (string c) ^^ doc
 

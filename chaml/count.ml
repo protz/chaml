@@ -76,7 +76,7 @@ let count_camlx_nodes e =
     | `Or (p1, p2) ->
         1 + count_pat p1 + count_pat p2
     | `Construct (_, p) ->
-        1 + List.fold_left (fun acc p -> acc + count_pat p) 0 p
+        1 + List.fold_left (fun acc (p, t) -> acc + count_pat p + count_type t) 0 p
     | `Const _
     | `Any ->
         1
@@ -106,8 +106,8 @@ open Parsetree
 
 module AtomMap = Jmap.Make(Atom)
 
-let count_core_nodes e =
-  let rec count_expr = function
+let count_core_nodes (e: Core.structure) =
+  let rec count_expr: Core.expression -> int = function
     | `TyAbs e ->
         count_expr e + 1
     | `TyApp (e, t) ->
@@ -142,10 +142,11 @@ let count_core_nodes e =
     | `Coerce (e, c) ->
         1 + count_expr e + count_coerc c
 
-  and count_pat = function
+  and count_pat: Core.pattern -> int = function
     | `Var _ ->
         1
-    | `Construct (_, p)
+    | `Construct (_, p) ->
+        1 + List.fold_left (fun acc (p, t) -> acc + count_pat p + count_type t) 0 p
     | `Tuple p ->
         1 + List.fold_left (fun acc p -> acc + count_pat p) 0 p
     | `Or (p1, p2) ->
@@ -156,10 +157,10 @@ let count_core_nodes e =
     | `Coerce (p, c) ->
         1 + count_pat p + count_coerc c
 
-  and count_types ts =
+  and count_types: DeBruijn.type_term list -> int = fun ts ->
     List.fold_left (fun acc t -> acc + count_type t) 0 ts
 
-  and count_type = function
+  and count_type: DeBruijn.type_term -> int = function
     | `Var _ ->
         1
     | `Cons (_, ts) ->
@@ -172,8 +173,8 @@ let count_core_nodes e =
     | `Prod ts ->
         1 + (List.fold_left (fun acc (_, ts) -> acc + count_types ts) 0 ts)
 
-  and count_coerc = function
-    | `Id | `ForallIntro | `DistribTuple ->
+  and count_coerc: Core.coercion -> int = function
+    | `Id | `ForallIntro | `DistribTuple | `DistribVariant ->
         1
     | `Compose (c1, c2) ->
         1 + count_coerc c1 + count_coerc c2
@@ -181,6 +182,7 @@ let count_core_nodes e =
         1 + count_coerc c
     | `ForallElim t ->
         1 + count_type t
+    | `CovarVariant (_, c)
     | `CovarTuple (_, c) ->
         1 + count_coerc c
     | `Unfold (_, ts)

@@ -195,7 +195,17 @@ module Make(S: Algebra.SOLVER) = struct
       env
 
   let head_symbol_of_type { head_symbol_of_type; _ } data_type =
-    StringMap.find data_type head_symbol_of_type
+    match data_type with
+    | "int" ->
+        head_symbol_int
+    | "string" ->
+        head_symbol_string
+    | "char" ->
+        head_symbol_char
+    | "float" ->
+        head_symbol_float
+    | _ ->
+        StringMap.find data_type head_symbol_of_type
 
   let data_type_of_constructor { data_type_of_constructor; _ } data_constructor =
     try
@@ -213,9 +223,9 @@ module Make(S: Algebra.SOLVER) = struct
       raise_error (TypeConstructorArguments (cons_name, l1, l2, loc))
 
   let copy_data_constructor env k =
-    (* XXX bad complexity, maybe change the abstractions? *)
     Error.debug "[CG] Copying data constructor %s\n" k;
     let head_symbol, data_constructors = data_type_of_constructor env k in
+    (* List.find XXX bad complexity, maybe change the abstractions? *)
     let cons_name, type_terms =
       List.find (fun (k', _) -> k = k') data_constructors
     in
@@ -487,7 +497,7 @@ module Make(S: Algebra.SOLVER) = struct
                 in
                 let konstraint = `Equals (xi, type_term) in
                 let konstraint = `Conj (konstraint, p_constraint) in
-                konstraint, var_map, xi :: introduced_vars, pat)
+                konstraint, var_map, xi :: introduced_vars, (pat, new_scheme xi))
               pats
               type_terms
             in

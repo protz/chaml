@@ -50,6 +50,11 @@ type coercion = [
           isorecursive type, say int t = A + B *)
   | `Unfold of Atom.t * type_term list
       (** The opposite of the coercion above *)
+  | `DistribVariant
+      (** Distribute ∀ under a data constructor *)
+  | `CovarVariant of int * coercion
+      (** If τ1 is a subtype of τ2, then K (... * τ1 * ...)
+          is a subtype of K (... * τ2 * ...) *)
 ]
 
 type const = [
@@ -66,7 +71,7 @@ type pattern = [
   | `Any
   | `Const of const
   | `Coerce of pattern * coercion
-  | `Construct of label * pattern list
+  | `Construct of label * (pattern * type_term) list
 ]
 
 module AtomMap: module type of Jmap.Make(Atom)
@@ -95,6 +100,6 @@ type expression = [
 type structure = [
   | `Let of pattern * expression
   | `LetRec of (var * type_term * expression) list
-  | `Type of int * Atom.t * type_term
+  | `Type of int * Atom.t * type_data_type
       (* (type arity, type name, anonymous sum or product) *)
 ] list

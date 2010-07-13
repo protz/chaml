@@ -22,7 +22,7 @@ module AtomMap = Jmap.Make(Atom)
 type env = {
   type_of_atom: DeBruijn.type_term AtomMap.t;
     (** This is where we remember the type of the atoms we've seen so far. *)
-  unfold_type: (int * DeBruijn.type_term) AtomMap.t;
+  unfold_type: (int * DeBruijn.type_data_type) AtomMap.t;
     (** This is used to expand the definition of named types (type t = ...).
         The integer represents the arity of the type
         The type is the definition. *)
@@ -306,29 +306,10 @@ and apply_coerc: env -> DeBruijn.type_term -> Core.coercion -> DeBruijn.type_ter
           let def_arity, def = AtomMap.find t env.unfold_type in
           if def_arity <> List.length args then
             fail "Fold coercion (0)";
-          (* Fortunately, we have the invariant that args is in order *)
-          let mapping = Array.of_list args in
-          (* We compute what this type looks like when instanciated with args *)
-          let full_type =
-            let rec map = function
-              | `Var v ->
-                  mapping.(DeBruijn.index v)
-              | `Forall t ->
-                  `Forall (map t)
-              | `Cons (head_symbol, cons_args) ->
-                  `Cons (head_symbol, List.map map cons_args)
-              | `Prod ts ->
-                  `Prod (List.map (fun (l, ts) -> (l, List.map map ts)) ts)
-              | `Sum ts ->
-                  `Sum (List.map (fun (l, ts) -> (l, List.map map ts)) ts)
-              | `Named (t, ts) ->
-                  `Named (t, List.map map ts)
-            in
-            map def
-          in
+          let full_type = DeBruijn.instanciate_data_constructor def args in
           Error.debug "%s Type is now %s\n"
             (Bash.color 203 "[TCApplyCoerc]")
-            (DeBruijn.string_of_type_term full_type);
+            (DeBruijn.string_of_type_term (full_type: DeBruijn.type_data_type :> DeBruijn.type_term));
           (* We check that we can inject the anonymous sum/product into the
            * isorecursive type by checking that the labels match and that the
            * arguments match as well *)
@@ -349,10 +330,14 @@ and apply_coerc: env -> DeBruijn.type_term -> Core.coercion -> DeBruijn.type_ter
       | `Unfold _ ->
           failwith "TODO: unfold typecheck"
 
+      | `DistribVariant ->
+          failwith "TODO: distribvariant typecheck"
+
+      | `CovarVariant _ ->
+          failwith "TODO: covarvariant typecheck"
+
     in
     apply_coerc typ coerc
-
-
 
 
 and infer_structure: env -> Core.structure -> env =

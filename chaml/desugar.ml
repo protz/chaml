@@ -356,8 +356,14 @@ and desugar_pat
       Error.debug "[DOr] Orpat out\n";
       `Or (p1, p2), a1
 
-  | `Construct (cons, args) ->
-      let args, introduced_atoms = List.split (List.map (desugar_pat env) args) in
+  | `Construct (cons, pat_typ_list) ->
+      let args, introduced_atoms = List.split
+        (List.map
+          (fun (pat, typ) ->
+            let pat, atoms = desugar_pat env pat in
+            (pat, desugar_type env typ), atoms)
+        pat_typ_list)
+      in
       `Construct (cons, args), List.flatten introduced_atoms
 
   | `Alias _ ->
@@ -378,7 +384,7 @@ and desugar_pat
  *  - call add_coercions_to_pattern
  * *)
 and add_coercions_to_pattern
-    (env: env)
+    (_env: env)
     (pat: pattern)
     (typ: type_term)
     : pattern =
@@ -402,10 +408,14 @@ and add_coercions_to_pattern
     if c1 = `Id then p1 else `Coerce (p1, c1)
   in
 
-  let push_n_foralls_inside n what =
+  let unfold t args =
+    `Unfold (t, args)
+  in
+
+  let push_n_foralls_inside n ?(final=`Id) what =
     let rec fold n =
       if n = 0 then
-          `Id
+          final
       else
         let c = fold (n - 1) in
         let c1 = if c = `Id then `Id else `ForallCovar c in
@@ -419,7 +429,6 @@ and add_coercions_to_pattern
    * we batch coercions as much as we can by returning a pattern + a coercion
    * instead of just a pattern with coercions inside. *)
   let rec generate_coerc
-          (env: env)
           (pat: pattern)
           (typ: DeBruijn.type_term)
           : pattern * coercion =
@@ -434,7 +443,7 @@ and add_coercions_to_pattern
             (* Recursively generate the coercions for each of the branches *)
             let gen i pattern type_term =
               let pattern, c =
-                generate_coerc env pattern (wrap_forall forall type_term)
+                generate_coerc pattern (wrap_forall forall type_term)
               in
               pattern, covar_tuple i c
             in
@@ -443,7 +452,7 @@ and add_coercions_to_pattern
             let c = Jlist.concat compose coercions in
             (* Explain that we inject all the variables inside the branches *)
             let c0 = push_n_foralls_inside forall `DistribTuple in
-            `Tuple patterns, `Compose (c0, c)
+            `Tuple patterns, compose c0 c
         | _ ->
             assert false
         end
@@ -485,8 +494,8 @@ and add_coercions_to_pattern
         pat, fold forall
 
     | `Or (p1, p2) ->
-        let p1, c1 = generate_coerc env p1 typ in
-        let p2, c2 = generate_coerc env p2 typ in
+        let p1, c1 = generate_coerc p1 typ in
+        let p2, c2 = generate_coerc p2 typ in
         let p1 = coerce p1 c1 in
         let p2 = coerce p2 c2 in
         `Or (p1, p2), `Id
@@ -497,17 +506,32 @@ and add_coercions_to_pattern
     | `Any ->
         `Any, `Id
 
+    | `Construct (label, pat_type_list) ->
+        let forall, bare_term = strip_forall typ in
+        begin match bare_term with
+        | `Named (t, args) ->
+            let c0 = unfold t args in
+            let c = push_n_foralls_inside forall ~final:c0 `DistribVariant in
+            let patterns = List.map
+              (fun (pat, typ) ->
+                (* This is the type that *will* be assigned to arg *)
+                let typ = wrap_forall forall typ in
+                let pat, coerc = generate_coerc pat typ in
+                (coerce pat coerc, typ))
+              pat_type_list
+            in
+            `Construct (label, patterns), c
+        | _ ->
+            assert false
+        end
+
     | `Coerce _ ->
         Error.debug "This pattern already has coercions! You probably called \
           add_coercions_to_pattern twice. Please check your code.\n";
         failwith "Fatal."
                   
-    | _ ->
-        Error.debug "Trying to generate a coercion for type %s\n"
-          (DeBruijn.string_of_type_term typ);
-        failwith "Only supporting coercions for tuples at the moment\n"
   in
-  let pat, coerc = generate_coerc env pat typ in
+  let pat, coerc = generate_coerc pat typ in
   if coerc = `Id then pat else `Coerce (pat, coerc)
 
 and desugar_const const =
@@ -786,14 +810,21 @@ module PrettyPrinting = struct
       | `Var atom ->
           string (Atom.string_of_atom atom)
 
-      | `Construct (label, args) ->
-          let l = List.length args in
-          if l > 1 then
-            (string label) ^^ space ^^ (doc_of_pat (`Tuple args))
-          else if l = 1 then
-            (string label) ^^ space ^^ (doc_of_pat (List.hd args))
-          else
-            (string label)
+      | `Construct (c, pat_typ_list) ->
+          let doc_of_pat_typ (pat, typ) =
+            (doc_of_pat pat) ^^ colon ^^ space ^^ (string_of_type_term typ)
+          in
+          let doc =
+            match pat_typ_list with
+            | [] ->
+                empty
+            | [x] ->
+                space ^^ (doc_of_pat_typ x)
+            | xs ->
+                space ^^ lparen ^^ (Jlist.concat (fun x y -> x ^^ comma ^^ space ^^
+                y) (List.map doc_of_pat_typ xs)) ^^ rparen
+          in
+          (string c) ^^ doc
 
       | `Const c ->
           doc_of_const c
@@ -843,6 +874,9 @@ module PrettyPrinting = struct
           let i = string (string_of_int i) in
           (string "×") ^^ i ^^ lbracket ^^ coercion ^^ rbracket
 
+      | `DistribVariant ->
+          fancystring "∀+" 2
+
       | `DistribTuple ->
           fancystring "∀×" 2
 
@@ -855,6 +889,11 @@ module PrettyPrinting = struct
           let args = doc_of_args ts in
           let t = Atom.string_of_atom t in
           (string "fold") ^^ lbracket ^^ args ^^ (string t) ^^ rbracket
+      
+      | `CovarVariant (i, coercion) ->
+          let coercion = doc_of_coerc coercion in
+          let i = string (string_of_int i) in
+          (string "+") ^^ i ^^ lbracket ^^ coercion ^^ rbracket
 
   and doc_of_args ts =
     let open Pprint in
@@ -898,6 +937,7 @@ module PrettyPrinting = struct
           in
           letdoc ^^ space ^^ branches
       | `Type (arity, name, t) ->
+          let t = (t: DeBruijn.type_data_type :> DeBruijn.type_term) in
           let args =
             if arity > 0 then
               let int i = string (string_of_int i) in

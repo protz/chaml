@@ -156,6 +156,11 @@ module TypeCons = struct
   let type_cons_bottom = type_cons "_bottom" []
   
   let head_symbol_arrow = Hashtbl.find global_constructor_table "->"
+  let head_symbol_int = Hashtbl.find global_constructor_table "int"
+  let head_symbol_char = Hashtbl.find global_constructor_table "char"
+  let head_symbol_float = Hashtbl.find global_constructor_table "float"
+  let head_symbol_string = Hashtbl.find global_constructor_table "string"
+
   let head_symbol_tuple cons_arity =
     let _ = type_cons_tuple (Jlist.make cons_arity (fun _ -> ())) in
     Hashtbl.find global_constructor_table (Printf.sprintf "*%d" cons_arity)

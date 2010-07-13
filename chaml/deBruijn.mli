@@ -29,12 +29,18 @@ type type_var = t Algebra.Core.type_var
     not in {!Desugar}. *)
 type type_term = [
     type_var
-  | `Cons of Algebra.TypeCons.head_symbol * type_term list
-  | `Forall of type_term
   | `Sum of (string * type_term list) list
   | `Prod of (string * type_term list) list
+  | `Cons of Algebra.TypeCons.head_symbol * type_term list
+  | `Forall of type_term
   | `Named of Atom.t * type_term list
 ]
+(** These are the so-called data types *)
+type type_data_type = [
+  | `Sum of (string * type_term list) list
+  | `Prod of (string * type_term list) list
+]
+
 
 (** Lift a single variable *)
 val lift_t: t -> t
@@ -59,3 +65,6 @@ val string_of_t: t -> string
 
 (** This one prints nested $\forall$s *)
 val string_of_type_term: type_term -> string
+
+(** Instanciate a data constructor with the given parameters *)
+val instanciate_data_constructor: type_data_type -> type_term list -> type_data_type

@@ -68,7 +68,10 @@ module Make (S: Algebra.SOLVER): sig
     | `Or of pattern * pattern
     | `Const of const
     | `Any
-    | `Construct of user_label * pattern list
+    | `Construct of user_label * (pattern * S.scheme) list
+        (** Because the outer pscheme will contain only the named type, we need
+            to attach more information here so that we can go deeper generate our
+            coercions later on. *)
     | `Alias of pattern * ident
   ]
   and const = [
@@ -133,7 +136,7 @@ and f_pattern = [
   | `Tuple of f_pattern list
   | `Or of f_pattern * f_pattern
   | `Const of f_const
-  | `Construct of f_user_label * f_pattern list
+  | `Construct of f_user_label * (f_pattern * f_type_term) list
   | `Alias of f_pattern * ident
   | `Any
 ]

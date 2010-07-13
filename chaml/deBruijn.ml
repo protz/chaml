@@ -22,11 +22,15 @@ type t = { index: int; }
 type type_var = t Algebra.Core.type_var
 type type_term = [
     type_var
-  | `Cons of Algebra.TypeCons.head_symbol * type_term list
-  | `Forall of type_term
   | `Sum of (string * type_term list) list
   | `Prod of (string * type_term list) list
+  | `Cons of Algebra.TypeCons.head_symbol * type_term list
+  | `Forall of type_term
   | `Named of Atom.t * type_term list
+]
+type type_data_type = [
+  | `Sum of (string * type_term list) list
+  | `Prod of (string * type_term list) list
 ]
 
 let index { index } = index
@@ -88,3 +92,30 @@ let string_of_type_term scheme =
   in
   scheme
 
+let instanciate_data_constructor
+    (t: type_data_type)
+    (args: type_term list) =
+
+  (* Fortunately, we have the invariant that args is in order *)
+  let mapping = Array.of_list args in
+  (* We compute what this type looks like when instanciated with args *)
+  let rec fuck_there_are_no_gadts = function
+    | `Prod ts ->
+        `Prod (List.map (fun (l, ts) -> (l, List.map map ts)) ts)
+    | `Sum ts ->
+        `Sum (List.map (fun (l, ts) -> (l, List.map map ts)) ts)
+  and map = function
+    | `Var { index } ->
+        mapping.(index)
+    | `Forall t ->
+        `Forall (map t)
+    | `Cons (head_symbol, cons_args) ->
+        `Cons (head_symbol, List.map map cons_args)
+    | `Prod ts ->
+        `Prod (List.map (fun (l, ts) -> (l, List.map map ts)) ts)
+    | `Sum ts ->
+        `Sum (List.map (fun (l, ts) -> (l, List.map map ts)) ts)
+    | `Named (t, ts) ->
+        `Named (t, List.map map ts)
+  in
+  fuck_there_are_no_gadts t
