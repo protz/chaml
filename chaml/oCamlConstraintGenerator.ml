@@ -1038,6 +1038,7 @@ module Make(S: Algebra.SOLVER) = struct
           let head_symbol_unit = { cons_arity = 0; cons_name = "unit" } in
           let head_symbol_bool = { cons_arity = 0; cons_name = "bool" } in
           let head_symbol_list = { cons_arity = 1; cons_name = "list" } in
+          let head_symbol_option = { cons_arity = 1; cons_name = "option" } in
           let type_cons_bool = `Cons (head_symbol_bool, []) in
           let default_bindings, default_let_bindings =
             let arithmetic_operator_scheme op =
@@ -1142,6 +1143,13 @@ module Make(S: Algebra.SOLVER) = struct
           let env =
             register_data_constructors env head_symbol_bool ["true", []; "false", []]
           in
+          let env = register_data_type env head_symbol_option in
+          let env =
+            register_data_constructors
+              env
+              head_symbol_option
+              ["None", []; "Some", [`Var 0]]
+          in
           let env = register_data_type env head_symbol_list in
           let env =
             register_data_constructors
@@ -1170,6 +1178,13 @@ module Make(S: Algebra.SOLVER) = struct
               method kind = `Variant;
               method fields =
                 ["[]", []; "::", [`Var 0; `Cons (head_symbol_list, [`Var 0])]];
+              method internal = true
+            end;
+            object
+              method name = "option";
+              method arity = 1;
+              method kind = `Variant;
+              method fields = ["None", []; "Some", [`Var 0]];
               method internal = true
             end
           ] in
