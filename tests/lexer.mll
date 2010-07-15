@@ -28,6 +28,11 @@
         [
           "val", VAL;
           "as", AS;
+          "type", TYPE;
+          "and", AND;
+          "private", PRIVATE;
+          "of", OF;
+          "mutable", MUTABLE;
         ];
       t
 
@@ -36,13 +41,17 @@
     match Jhashtbl.find_opt keywords ident with
     | Some kw -> kw
     | None ->
-        IDENT (ident)
+        LIDENT (ident)
 
 }
 
 let lowercase = [ 'a'-'z' ]
+let uppercase = [ 'A'-'Z' ]
 let whitespace = [ ' ' '\t' ]
 let number = [ '0'-'9' ]
+
+let identchar =
+  ['A'-'Z' 'a'-'z' '_' '\192'-'\214' '\216'-'\246' '\248'-'\255' '\'' '0'-'9']
 
 rule token = parse
 | '\n'
@@ -53,6 +62,12 @@ rule token = parse
 
 | '*'
   { STAR }
+
+| '-'
+  { MINUS }
+
+| '='
+  { EQUAL }
 
 | '('
   { LPAREN }
@@ -66,14 +81,32 @@ rule token = parse
 | ':'
   { COLON }
 
+| ':' ':'
+  { COLONCOLON }
+
+| ';'
+  { SEMI }
+
 | ','
   { COMMA }
+
+| '{'
+  { LBRACE }
+
+| '}'
+  { RBRACE }
+
+| '|'
+  { BAR }
 
 | '.'
   { DOT }
 
-| lowercase (lowercase|number|'\''|'_')*
+| lowercase identchar*
   { filter lexbuf }
+
+| uppercase identchar*
+  { UIDENT (Lexing.lexeme lexbuf) }
 
 | '@'
   { OPERATOR ("@") }
