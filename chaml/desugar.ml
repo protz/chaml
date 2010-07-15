@@ -89,6 +89,23 @@ let strip_forall =
   in
   strip 0
 
+(* Ok, we have one intermediate representation:
+  * desugar_pattern: f_pattern -> i_pattern ("i" as in "intermediate")
+  * add_coercions_to_pattern: i_pattern -> pattern
+  *
+  * As a bonus, this enforces the fact that we run all patterns through
+  * add_coercions_to_pattern
+  * *)
+type i_pattern = [
+    var
+  | `Tuple of i_pattern list
+  | `Or of i_pattern * i_pattern
+  | `Any
+  | `Const of const
+  | `Coerce of i_pattern * coercion
+  | `Construct of label * (i_pattern * type_term) list
+]
+
 let rec desugar_expr
         (env: env)
         (expr: CamlX.f_expression)
@@ -272,8 +289,17 @@ let rec desugar_expr
   | `Sequence (e1, e2) ->
       `Sequence (desugar_expr env e1, desugar_expr env e2)
 
-  | `IfThenElse (_if_expr, _then_expr, _else_expr) ->
-      failwith "TODO: desugar if-then-else"
+  | `IfThenElse (if_expr, then_expr, else_expr) ->
+      begin match else_expr with
+      | Some else_expr ->
+          `IfThenElse (desugar_expr env if_expr,
+                       desugar_expr env then_expr,
+                       desugar_expr env else_expr)
+      | None ->
+          `IfThenElse (desugar_expr env if_expr,
+                       desugar_expr env then_expr,
+                       `Construct ("()", []))
+      end
 
   | `AssertFalse t ->
       `Magic (desugar_type env t)
@@ -329,7 +355,7 @@ and desugar_pat
     (env: env)
     ?(rebind: unit option)
     (pat: f_pattern)
-    : pattern * Atom.t list =
+    : i_pattern * Atom.t list =
   match pat with
   | `Var ident ->
       if Option.unit_bool rebind then
@@ -385,7 +411,7 @@ and desugar_pat
  * *)
 and add_coercions_to_pattern
     (_env: env)
-    (pat: pattern)
+    (pat: i_pattern)
     (typ: type_term)
     : pattern =
 
@@ -429,7 +455,7 @@ and add_coercions_to_pattern
    * we batch coercions as much as we can by returning a pattern + a coercion
    * instead of just a pattern with coercions inside. *)
   let rec generate_coerc
-          (pat: pattern)
+          (pat: i_pattern)
           (typ: DeBruijn.type_term)
           : pattern * coercion =
     match pat with
@@ -457,7 +483,7 @@ and add_coercions_to_pattern
             assert false
         end
 
-    | `Var _ ->
+    | `Var _ as pat ->
         let forall, bare_term = strip_forall typ in
         (* Mark all the variables quantified in this scheme
            XXX this probably has a bad complexity *)
@@ -517,7 +543,8 @@ and add_coercions_to_pattern
                 (* This is the type that *will* be assigned to arg *)
                 let typ = wrap_forall forall typ in
                 let pat, coerc = generate_coerc pat typ in
-                (coerce pat coerc, typ))
+                coerce pat coerc
+              )
               pat_type_list
             in
             `Construct (label, patterns), c
@@ -755,6 +782,13 @@ module PrettyPrinting = struct
       | `Sequence (e1, e2) ->
           (doc_of_expr e1) ^^ semi ^^ break1 ^^ (doc_of_expr e2)
 
+      | `IfThenElse (e1, e2, e3) ->
+          (keyword "if ") ^^ (doc_of_expr e1) ^^ (keyword " then begin") ^^
+            (nest 2 (break1 ^^ (doc_of_expr e2))) ^^ break1 ^^
+          (keyword "end else begin") ^^
+            (nest 2 (break1 ^^ (doc_of_expr e3))) ^^ break1 ^^
+          (keyword "end")
+
       | `Tuple (exprs) ->
           (* XXX compute operator priorities cleanly here *)
           let has_fun = List.exists (function `Fun _ -> true | _ -> false) exprs in
@@ -810,19 +844,16 @@ module PrettyPrinting = struct
       | `Var atom ->
           string (Atom.string_of_atom atom)
 
-      | `Construct (c, pat_typ_list) ->
-          let doc_of_pat_typ (pat, typ) =
-            (doc_of_pat pat) ^^ colon ^^ space ^^ (string_of_type_term typ)
-          in
+      | `Construct (c, pat_list) ->
           let doc =
-            match pat_typ_list with
+            match pat_list with
             | [] ->
                 empty
             | [x] ->
-                space ^^ (doc_of_pat_typ x)
+                space ^^ (doc_of_pat x)
             | xs ->
                 space ^^ lparen ^^ (Jlist.concat (fun x y -> x ^^ comma ^^ space ^^
-                y) (List.map doc_of_pat_typ xs)) ^^ rparen
+                y) (List.map doc_of_pat xs)) ^^ rparen
           in
           (string c) ^^ doc
 

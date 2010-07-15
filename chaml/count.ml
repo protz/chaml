@@ -139,6 +139,9 @@ let count_core_nodes (e: Core.structure) =
     | `Sequence (e1, e2) ->
         1 + count_expr e1 + count_expr e2
 
+    | `IfThenElse (e1, e2, e3) ->
+        1 + count_expr e1 + count_expr e2 + count_expr e3
+
     | `Coerce (e, c) ->
         1 + count_expr e + count_coerc c
 
@@ -146,7 +149,7 @@ let count_core_nodes (e: Core.structure) =
     | `Var _ ->
         1
     | `Construct (_, p) ->
-        1 + List.fold_left (fun acc (p, t) -> acc + count_pat p + count_type t) 0 p
+        1 + List.fold_left (fun acc p -> acc + count_pat p) 0 p
     | `Tuple p ->
         1 + List.fold_left (fun acc p -> acc + count_pat p) 0 p
     | `Or (p1, p2) ->

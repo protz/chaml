@@ -32,3 +32,7 @@ let unit_bool = function
 let extract = function
   | Some v -> v
   | None -> assert false
+
+let iter = fun f -> function
+  | Some i -> f i
+  | None -> ()

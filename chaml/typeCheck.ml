@@ -159,6 +159,13 @@ let rec infer_expr: env -> Core.expression -> DeBruijn.type_term =
     | `Sequence _ ->
         failwith "TODO type-check sequence"
 
+    | `IfThenElse (if_expr, then_expr, else_expr) ->
+        (* let if_type = infer_expr env if_expr in
+        assert_types_equal
+        let then_type = infer_expr env then_expr in
+        let else_type = infer_expr env else_expr in *)
+        assert false
+
     | `Construct (label, args) ->
         let ts = List.map (infer_expr env) args in
         `Sum [label, ts]
@@ -235,7 +242,6 @@ and infer_pat: env -> Core.pattern -> DeBruijn.type_term -> (Atom.t * DeBruijn.t
           begin match t with
           | `Sum label_types_list ->
               let types = List.assoc label label_types_list in
-              let patterns = List.map fst patterns in
               let bound = List.map2 infer_pat patterns types in
               List.flatten bound
           | _ ->

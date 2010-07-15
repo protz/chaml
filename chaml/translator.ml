@@ -52,6 +52,7 @@ let type_term_of_uvar env uvar =
     let repr = find uvar in
     match repr.term with
     | None ->
+        Error.debug "[TTTofUvar] Finding %a\n" uvar_name uvar;
         let fvar = IntMap.find repr.id env.fvar_of_uvar in
         `Var fvar
     | Some (`Cons (head_symbol, cons_args)) ->
@@ -111,8 +112,17 @@ let translate =
           let fexpr = translate_expr new_env expr in
           (* Generate patterns and expressions properly *)
           let gen (pat, pscheme, expr) =
+            (* We must not forget any uvar's! In this case, this pscheme
+             * contains the inner variables that describe the components of data
+             * constructors, while the outer pscheme does not contain them. *)
+            let new_env = match pscheme with
+              | Some pscheme ->
+                  List.fold_left lift_add new_env pscheme.p_young_vars
+              | None ->
+                  new_env
+            in
             let fpat = translate_pat new_env pat in
-            let fexpr = translate_expr env expr in
+            let fexpr = translate_expr new_env expr in
             begin match pscheme with
               | Some pscheme ->
                   assert (List.length pscheme.p_young_vars = young_vars);

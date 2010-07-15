@@ -71,7 +71,7 @@ type pattern = [
   | `Any
   | `Const of const
   | `Coerce of pattern * coercion
-  | `Construct of label * (pattern * type_term) list
+  | `Construct of label * pattern list
 ]
 
 module AtomMap: module type of Jmap.Make(Atom)
@@ -92,6 +92,7 @@ type expression = [
   | `Const of const
 
   | `Sequence of expression * expression
+  | `IfThenElse of expression * expression * expression
   | `Construct of label * expression list
 
   | `Magic of type_term

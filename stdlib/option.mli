@@ -33,3 +33,6 @@ val unit_bool : unit option -> bool
 
 (** When you're sure you have [Some] *)
 val extract: 'a option -> 'a
+
+(** The name speaks for itself *)
+val iter: ('a -> unit) -> 'a option -> unit
