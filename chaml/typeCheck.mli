@@ -21,4 +21,4 @@
     {!Core} expression. *)
 
 (* val check: Core.signature -> Core.structure -> unit *)
-val check: Core.structure -> unit
+val check: < predef_types: Atom.t Jmap.Make(String).t > -> Core.structure -> unit

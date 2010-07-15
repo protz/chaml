@@ -194,13 +194,13 @@ let _ =
     end;
     Error.debug "\n[Driver] Translation done, now desugaring...\n";
     (* Translate to the core language *)
-    let core_ast = Desugar.desugar camlx_ast in
+    let minimal_env, core_ast = Desugar.desugar camlx_ast in
     if !arg_print_core_ast then begin
       flush stdout; flush stderr;
       print_string (Desugar.string_of_struct core_ast);
     end;
     (* The final type-checking part *)
-    TypeCheck.check core_ast;
+    TypeCheck.check minimal_env core_ast;
     Error.debug "[Driver] Done.\n";
     (* Statistics *)
     if !arg_print_useless then begin

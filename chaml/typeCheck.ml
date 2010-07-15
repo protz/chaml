@@ -18,6 +18,9 @@
 (*****************************************************************************)
 
 module AtomMap = Jmap.Make(Atom)
+module StringMap = Jmap.Make(String)
+
+(* As usual, the environment carries a lot of information. *)
 
 type env = {
   type_of_atom: DeBruijn.type_term AtomMap.t;
@@ -26,6 +29,7 @@ type env = {
     (** This is used to expand the definition of named types (type t = ...).
         The integer represents the arity of the type
         The type is the definition. *)
+  internal_types: Atom.t StringMap.t;
 }
 
 let find atom { type_of_atom; _ } =
@@ -37,6 +41,13 @@ let add atom typ env =
     (DeBruijn.string_of_type_term typ);
   let type_of_atom = AtomMap.add atom typ env.type_of_atom in
   { env with type_of_atom }
+
+let internal { internal_types; _ } k =
+  let name = StringMap.find k internal_types in
+  `Named (name, [])
+  
+(* These are the very basic error-handling and checking functions we use here.
+ * Could probably be improved a lot. *)
 
 let fail msg =
   failwith msg
@@ -156,15 +167,18 @@ let rec infer_expr: env -> Core.expression -> DeBruijn.type_term =
     | `Magic t ->
         t
 
-    | `Sequence _ ->
-        failwith "TODO type-check sequence"
+    | `Sequence (e1, e2) ->
+        let t = infer_expr env e1 in
+        assert_types_equal t (internal env "unit");
+        infer_expr env e2
 
     | `IfThenElse (if_expr, then_expr, else_expr) ->
-        (* let if_type = infer_expr env if_expr in
-        assert_types_equal
+        let if_type = infer_expr env if_expr in
+        assert_types_equal if_type (internal env "bool");
         let then_type = infer_expr env then_expr in
-        let else_type = infer_expr env else_expr in *)
-        failwith "TODO: if-then-else typeCheck"
+        let else_type = infer_expr env else_expr in
+        assert_types_equal then_type else_type;
+        then_type
 
     | `Construct (label, args) ->
         let ts = List.map (infer_expr env) args in
@@ -397,8 +411,11 @@ and infer_structure: env -> Core.structure -> env =
   fun env structure ->
     List.fold_left infer_str env structure
 
-
-let check str =
-  let env = { type_of_atom = AtomMap.empty; unfold_type = AtomMap.empty } in
+let check minimal_env str =
+  let env = {
+    type_of_atom = AtomMap.empty;
+    unfold_type = AtomMap.empty;
+    internal_types = minimal_env # predef_types
+  } in
   let env = infer_structure env str in
   ignore env

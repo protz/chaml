@@ -273,6 +273,7 @@ let translate =
               List.map
                 (fun (l, ts) -> (l, List.map debruijnize ts))
                 (t # fields)
+            method internal = t # internal
           end)
 
   in

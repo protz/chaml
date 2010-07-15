@@ -307,6 +307,7 @@ module Make(S: Algebra.SOLVER) = struct
                 method arity = arity
                 method kind  = `Variant
                 method fields = constructors
+                method internal = false
               end
 
           | _ ->
@@ -1154,12 +1155,14 @@ module Make(S: Algebra.SOLVER) = struct
               method arity = 0;
               method kind = `Variant;
               method fields = ["()", []];
+              method internal = true
             end;
             object
               method name = "bool";
               method arity = 0;
               method kind = `Variant;
               method fields = ["false", []; "true", []];
+              method internal = true
             end;
             object
               method name = "list";
@@ -1167,6 +1170,7 @@ module Make(S: Algebra.SOLVER) = struct
               method kind = `Variant;
               method fields =
                 ["[]", []; "::", [`Var 0; `Cons (head_symbol_list, [`Var 0])]];
+              method internal = true
             end
           ] in
           let type_decls: camlx_structure = List.map (fun x -> `Type x) type_decls in

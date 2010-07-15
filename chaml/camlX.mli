@@ -37,6 +37,7 @@ module Make (S: Algebra.SOLVER): sig
     arity: int;
     kind: user_type_kind;
     fields: (user_label * user_type_term list) list;
+    internal: bool
   >
 
   type expression = [
@@ -106,6 +107,7 @@ type f_user_type = <
   arity: int;
   kind: f_user_type_kind;
   fields: (f_user_label * f_user_type_term list) list;
+  internal: bool
 >
 
 type f_instance = f_type_term list

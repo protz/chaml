@@ -31,6 +31,7 @@ type env = {
   atom_of_ident: Atom.t IdentMap.t;
   atom_of_type: Atom.t StringMap.t;
   rec_atoms: int AtomMap.t;
+  internal_types: Atom.t StringMap.t;
 }
 
 let introduce: Atom.t list -> env -> env =
@@ -647,6 +648,12 @@ and desugar_struct
         (fun (x, _) (y, _) -> compare x y)
         fields
       in
+      let env =
+        if user_type # internal then
+          { env with internal_types = StringMap.add name atom env.internal_types }
+        else
+          env
+      in
       match user_type # kind with
       | `Variant ->
           let t =
@@ -676,10 +683,18 @@ and desugar_type
 
 
 let desugar structure =
-  let env = { atom_of_ident = IdentMap.empty; rec_atoms = AtomMap.empty; atom_of_type = StringMap.empty } in
-  let _toplevel_env, structure =
+  let env = {
+    atom_of_ident = IdentMap.empty;
+    rec_atoms = AtomMap.empty;
+    atom_of_type = StringMap.empty;
+    internal_types = StringMap.empty
+  } in
+  let toplevel_env, structure =
     List.fold_left desugar_struct (env, []) structure
   in
+  object
+    method predef_types = toplevel_env.internal_types
+  end,
   List.rev structure
 
 
