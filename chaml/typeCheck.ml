@@ -164,7 +164,7 @@ let rec infer_expr: env -> Core.expression -> DeBruijn.type_term =
         assert_types_equal
         let then_type = infer_expr env then_expr in
         let else_type = infer_expr env else_expr in *)
-        assert false
+        failwith "TODO: if-then-else typeCheck"
 
     | `Construct (label, args) ->
         let ts = List.map (infer_expr env) args in
@@ -247,6 +247,12 @@ and infer_pat: env -> Core.pattern -> DeBruijn.type_term -> (Atom.t * DeBruijn.t
           | _ ->
               fail "infer_pat construct"
           end
+
+      | `Alias (p1, p2) ->
+          let bound1 = infer_pat p1 t in
+          let bound2 = infer_pat (p2: Core.coerced_var :> Core.pattern) t in
+          bound1 @ bound2
+
     in
     infer_pat pat t
 

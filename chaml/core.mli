@@ -26,10 +26,6 @@ open DeBruijn
     module. *)
 type label = string
 
-type var = [
-  | `Var of Atom.t
-]
-
 type coercion = [
   | `Id
       (** The identity *)
@@ -64,6 +60,19 @@ type const = [
   | `String of string
 ]
 
+type var = [
+  | `Var of Atom.t
+]
+
+(* ...is a subtype of *)
+
+type coerced_var = [
+    var
+  | `Coerce of var * coercion
+]
+
+(* ...is a subtype of *)
+
 type pattern = [
     var
   | `Tuple of pattern list
@@ -72,6 +81,7 @@ type pattern = [
   | `Const of const
   | `Coerce of pattern * coercion
   | `Construct of label * pattern list
+  | `Alias of pattern * coerced_var
 ]
 
 module AtomMap: module type of Jmap.Make(Atom)

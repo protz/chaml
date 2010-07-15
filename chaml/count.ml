@@ -152,6 +152,9 @@ let count_core_nodes (e: Core.structure) =
         1 + List.fold_left (fun acc p -> acc + count_pat p) 0 p
     | `Tuple p ->
         1 + List.fold_left (fun acc p -> acc + count_pat p) 0 p
+    | `Alias (p1, p2) ->
+        let p2 = (p2 :> Core.pattern) in
+        1 + count_pat p1 + count_pat p2
     | `Or (p1, p2) ->
         1 + count_pat p1 + count_pat p2
     | `Const _

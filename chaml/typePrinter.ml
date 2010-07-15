@@ -170,6 +170,7 @@ let string_of_types
       | `Named (t, args) ->
           let l = List.length args in
           let t = Atom.string_of_atom t in
+          let t = Bash.underline "%s" t in
           let args = List.map (print_type paren) args in
           let args = String.concat ", " args in
           if l > 1 then

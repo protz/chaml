@@ -26,7 +26,8 @@
 
   (* Remove this as soon as we have a representation for type decls.
    * Warning: we do not parse type decls, we just ignore them, but the right
-   * rules have been copied from the OCaml parser. *)
+   * rules have been copied from the OCaml parser. We don't print them either in
+   * ChaML anyway.*)
   open Location
   open Parsetree
   open Asttypes

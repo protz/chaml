@@ -102,8 +102,8 @@ type i_pattern = [
   | `Or of i_pattern * i_pattern
   | `Any
   | `Const of const
-  | `Coerce of i_pattern * coercion
   | `Construct of label * (i_pattern * type_term) list
+  | `Alias of i_pattern * var
 ]
 
 let rec desugar_expr
@@ -123,13 +123,11 @@ let rec desugar_expr
           (fun (acc, var_type_exprs) (pat, typ, expr) ->
             match pat with
             | `Coerce (`Var _ as var, _) ->
-                `Match (`Instance var, [pat, acc]),
+                `Match (`Instance var, [(pat: coerced_var :> pattern), acc]),
                 (var, typ, expr) :: var_type_exprs
             | `Var _ as var ->
                 acc,
                 (var, typ, expr) :: var_type_exprs
-            | _ ->
-                assert false
           )
           (e2, [])
           var_type_exprs
@@ -310,7 +308,7 @@ let rec desugar_expr
 and desugar_letrec
     (env: env)
     (pat_coerc_exprs: (f_pattern * f_clblock * f_expression) list)
-    : env * (pattern * type_term * expression) list =
+    : env * (coerced_var * type_term * expression) list =
 
   (* We first make a big pass to generate all the patterns, which in turn
    * generates all the atoms we need. *)
@@ -337,6 +335,13 @@ and desugar_letrec
        * that was generated before, and we enrich it with coercions now we know
        * its type. *)
       let pat = add_coercions_to_pattern rec_env pat type_term in
+      let pat = match pat with
+        | `Coerce (`Var _, _)
+        | `Var _ as pat ->
+            pat
+        | _ ->
+            assert false
+      in
       (* And now the expression *)
       let e = desugar_expr rec_env expr in
       let e = wrap_lambda young_vars e in
@@ -386,20 +391,23 @@ and desugar_pat
       let args, introduced_atoms = List.split
         (List.map
           (fun (pat, typ) ->
-            let pat, atoms = desugar_pat env pat in
+            let pat, atoms = desugar_pat ?rebind env pat in
             (pat, desugar_type env typ), atoms)
         pat_typ_list)
       in
       `Construct (cons, args), List.flatten introduced_atoms
-
-  | `Alias _ ->
-      failwith "TODO: desugar alias patterns"
 
   | `Const c ->
       `Const (desugar_const c), []
 
   | `Any ->
       `Any, []
+
+  | `Alias (pat, ident) ->
+      let pat1, atoms1 = desugar_pat ?rebind env pat in
+      let pat2, atoms2 = desugar_pat ?rebind env (`Var ident) in
+      let pat2 = match pat2 with `Var _ as pat2 -> pat2 | _ -> assert false in
+      `Alias (pat1, pat2), atoms1 @ atoms2
 
 (* [add_coercions_to_pattern] walks down the pattern and the pattern type in
  * parallel, and returns a list of coercions needed to properly
@@ -549,13 +557,17 @@ and add_coercions_to_pattern
             in
             `Construct (label, patterns), c
         | _ ->
+            Error.debug "Weird. %s (full) / %s (stripped)\n"
+              (DeBruijn.string_of_type_term typ)
+              (DeBruijn.string_of_type_term bare_term);
             assert false
         end
 
-    | `Coerce _ ->
-        Error.debug "This pattern already has coercions! You probably called \
-          add_coercions_to_pattern twice. Please check your code.\n";
-        failwith "Fatal."
+    | `Alias (p1, p2) ->
+        let p1, c1 = generate_coerc p1 typ in
+        let p2, c2 = generate_coerc (p2: var :> i_pattern) typ in
+        let p2: var = match p2 with `Var _ as p2 -> p2 | _ -> assert false in
+        `Alias (coerce p1 c1, `Coerce (p2, c2)), `Id
                   
   in
   let pat, coerc = generate_coerc pat typ in
@@ -589,8 +601,6 @@ and desugar_struct
                 Some (`Let (pat, `Instance var)), (var, typ, expr)
             | `Var _ as var ->
                 None, (var, typ, expr)
-            | _ ->
-                assert false
           )
           var_type_exprs)
         in
@@ -653,13 +663,13 @@ and desugar_type
     : DeBruijn.type_term =
   (match t with
   | `Var _ as v ->
-      (v: f_type_term :> DeBruijn.type_term)
-  | `Cons ( { cons_name; _ }, cons_args ) as c ->
+      v
+  | `Cons ( { cons_name; _ } as head_symbol, cons_args ) ->
       begin match StringMap.find_opt cons_name env.atom_of_type with
       | Some atom ->
-          `Named (atom, (cons_args: f_type_term list :> DeBruijn.type_term list))
+          `Named (atom, List.map (desugar_type env) cons_args)
       | None ->
-          (c: f_type_term :> DeBruijn.type_term)
+          `Cons (head_symbol, List.map (desugar_type env) cons_args)
       end
   | `Forall t ->
       `Forall (desugar_type env t))
@@ -865,6 +875,12 @@ module PrettyPrinting = struct
           let cdoc = doc_of_coerc coerc in
           let triangle = pcolor colors.green ~l:1 "◂" in
           cdoc ^^ space ^^ triangle ^^ space ^^ pdoc
+
+      | `Alias (pat1, pat2) ->
+          let pdoc1 = doc_of_pat pat1 in
+          let pat2 = (pat2: coerced_var :> pattern) in
+          let pdoc2 = doc_of_pat pat2 in
+          pdoc1 ^^ (keyword " as ") ^^ pdoc2
 
   and doc_of_const: const -> Pprint.document =
     let open Pprint in
