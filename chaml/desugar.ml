@@ -778,8 +778,8 @@ module PrettyPrinting = struct
       | `Coerce (expr, coerc) ->
           let edoc = doc_of_expr expr in
           let cdoc = doc_of_coerc coerc in
-          let triangle = pcolor colors.green ~l:1 "▸" in
-          edoc ^^ space ^^ triangle ^^ space ^^ cdoc
+          let triangle = pcolor colors.green ~l:1 "◂" in
+          cdoc ^^ space ^^ triangle ^^ space ^^ edoc
 
       | `Construct (label, args) ->
           let l = List.length args in
@@ -832,8 +832,8 @@ module PrettyPrinting = struct
       | `Coerce (pat, coerc) ->
           let pdoc = doc_of_pat pat in
           let cdoc = doc_of_coerc coerc in
-          let triangle = pcolor colors.green ~l:1 "▸" in
-          pdoc ^^ space ^^ triangle ^^ space ^^ cdoc
+          let triangle = pcolor colors.green ~l:1 "◂" in
+          cdoc ^^ space ^^ triangle ^^ space ^^ pdoc
 
   and doc_of_const: const -> Pprint.document =
     let open Pprint in
