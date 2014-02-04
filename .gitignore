@@ -1,0 +1,14 @@
+Makefile.local
+Makefile.config
+_build
+chaml
+test
+testsuite
+*.native
+*.byte
+bisect*.out
+coverage*.out
+configure.ml
+callgrind.out.*
+tmp/*
+myocamlbuild.ml
